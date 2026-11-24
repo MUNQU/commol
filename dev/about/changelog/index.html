@@ -5717,6 +5717,13 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>ParameterSample::distinct</code>, <code>Distribution::log_variance</code>,
   <code>Distribution::smoothed_at_bound</code> and <code>Stream::SampleDirections</code> are
   new. See <a href="../../guide/uncertainty/identifiability/#a-sample">A sample</a>.</li>
+<li><strong>Breaking:</strong> <code>SampleSection.correlation</code>, and its key in
+  <code>SampleSectionData</code>, hold <code>None</code> with a parameter whose weighted variance
+  is 0: one constant in every draw, or any of a sample of one distinct draw.
+  Before, they held <code>NaN</code> or rounding noise. Check an entry for <code>None</code> before
+  you compute with it. In Rust, <code>SampleIdentifiability::correlation</code> is
+  <code>Vec&lt;Vec&lt;Option&lt;f64&gt;&gt;&gt;</code>. See
+  <a href="../../guide/uncertainty/identifiability/#a-sample">A sample</a>.</li>
 <li><strong>Breaking:</strong> a build logs one <code>INFO</code> record, with the number of bins,
   parameters, transitions and outputs; the records of each bin,
   accumulator, stratification, matrix, parameter and transition of a
@@ -6257,6 +6264,16 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   warnings name the effective size, since the count of hidden ridges
   over-counts there. In Rust, <code>SampleIdentifiability::size</code>,
   <code>identifiability::SampleSize</code> and <code>FEW_DRAWS_PER_PARAMETER</code> are new. See
+  <a href="../../guide/uncertainty/identifiability/#limits-of-a-sample">Limits of a sample</a>.</p>
+</li>
+<li>
+<p><code>SampleIdentifiability</code> calls no parameter <code>determined</code> that is constant in
+  every draw of a sample of more than one distinct draw: its verdict is
+  <code>poorly_determined</code> with the reason "Sample: constant in every draw.", and
+  the warnings of the section name it. Before, its contraction of 1 read
+  <code>determined</code>, and its correlations were <code>NaN</code>, or <code>±1</code> between two constants
+  under weights whose mean rounds; they are now <code>None</code>. In Rust,
+  <code>SampleVerdict::constant</code> is new. See
   <a href="../../guide/uncertainty/identifiability/#limits-of-a-sample">Limits of a sample</a>.</p>
 </li>
 <li>

@@ -4737,7 +4737,7 @@ distinct draws (<code>effective_size</code>).</p>
 </tr>
 <tr>
 <td><code>correlation</code>, <code>correlated_pairs</code></td>
-<td>The weighted correlations, and the pairs above <code>correlation_threshold</code></td>
+<td>The weighted correlations, <code>None</code> with a parameter whose weighted variance is 0 (constant in every draw, or a sample of one distinct draw), and the pairs above <code>correlation_threshold</code></td>
 <td>A pair that moves together is fitted only together</td>
 </tr>
 <tr>
@@ -4768,13 +4768,14 @@ distinct draws (<code>effective_size</code>).</p>
 <tr>
 <td><code>hidden_ridges</code>, <code>draws_per_parameter</code>, <code>warnings</code></td>
 <td>How many directions among the <code>determined</code> parameters contract less than <code>contraction_threshold</code>, <code>n_eff / p</code>, and what the section warns of</td>
-<td>A ridge that no pair shows; an effective size below <code>p + 1</code> or <code>30·p</code></td>
+<td>A ridge that no pair shows; an effective size below <code>p + 1</code> or <code>30·p</code>; a parameter constant in every draw</td>
 </tr>
 </tbody>
 </table>
 <p>A parameter is <code>poorly_determined</code> when the effective size is below <code>p + 1</code>
-for <code>p</code> parameters, its contraction is below <code>contraction_threshold</code>, it is
-in a correlated pair, or its marginal has two or more modes. The count of
+for <code>p</code> parameters, it is constant in every draw of a sample of more than one
+distinct draw, its contraction is below <code>contraction_threshold</code>, it is in a
+correlated pair, or its marginal has two or more modes. The count of
 hidden ridges corrects the contraction of each direction by a Bayesian
 bootstrap whose weights are drawn from the seed of the calibrator
 (<code>Calibrator.seed</code>), so <code>problem.seed</code> repeats it.
@@ -4882,6 +4883,21 @@ reference, which no scale changes.</p>
   weights are worth. No setting moves it: below <code>p + 1</code> no covariance
   estimate exists to judge. Between <code>p + 1</code> and <code>30·p</code>, <code>warnings</code> names
   the effective size.</li>
+<li><strong>A parameter constant in every draw.</strong> A sampler that never moved a
+  parameter, a value fixed by hand or a column copied from a point estimate
+  has a weighted variance of 0 and a contraction of 1: the sample did not
+  explore it, so it cannot say that the data fix it. Its verdict is
+  <code>poorly_determined</code>, with the reason "Sample: constant in every draw.",
+  <code>warnings</code> names it, and its correlations are <code>None</code>. A draw of weight 0
+  does not count. The criterion is a variance of 0 on the scale of the
+  parameter, with no tolerance: on the natural scale, one draw that differs
+  in the last digit leaves a contraction near 1, which does not make the
+  parameter poorly determined. Values that the arithmetic does not tell apart
+  are constant: neighbouring numbers with one <code>ln</code>, for <code>log_parameters</code>, or
+  values with a weighted squared deviation of 0, which is a deviation below
+  about <code>1e-161</code>, or a draw of negligible weight (in 50 draws, 0.1 against
+  0.25 in one draw of log weight −738 reads constant). When the sample holds
+  one distinct draw, the effective size is the reason.</li>
 <li><strong>Hidden ridges.</strong> Below <code>n_eff ≈ 30·p</code> the count of hidden ridges
   over-counts: the eigenvalues of a sample covariance spread with the
   dimension, and the bootstrap correction does not remove all of it.</li>

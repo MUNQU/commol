@@ -5202,7 +5202,9 @@ it is a modelling judgment.</p>
 
         <p>Practical identifiability from any parameter sample: what it learned
 about each parameter against its reference (the bounds or the priors).</p>
-<p>A parameter is <code>poorly_determined</code> when its contraction is below
+<p>A parameter is <code>poorly_determined</code> when the effective size of the
+sample is below <code>p + 1</code> for <code>p</code> parameters, it is constant in every
+draw of a sample of more than one distinct draw, its contraction is below
 <code>contraction_threshold</code>, its correlation with another is above
 <code>correlation_threshold</code>, or its marginal has several modes. The section
 also gives the mass of each parameter in the outer <code>bound_share</code> of its
@@ -5425,81 +5427,85 @@ draw at 0.</p>
 <span class="normal"><a href="#__codelineno-0-196">196</a></span>
 <span class="normal"><a href="#__codelineno-0-197">197</a></span>
 <span class="normal"><a href="#__codelineno-0-198">198</a></span>
-<span class="normal"><a href="#__codelineno-0-199">199</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-125"><a id="__codelineno-0-125" name="__codelineno-0-125"></a><span class="k">class</span><span class="w"> </span><span class="nc">SampleIdentifiability</span><span class="p">(</span>
+<span class="normal"><a href="#__codelineno-0-199">199</a></span>
+<span class="normal"><a href="#__codelineno-0-200">200</a></span>
+<span class="normal"><a href="#__codelineno-0-201">201</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-125"><a id="__codelineno-0-125" name="__codelineno-0-125"></a><span class="k">class</span><span class="w"> </span><span class="nc">SampleIdentifiability</span><span class="p">(</span>
 </span><span id="__span-0-126"><a id="__codelineno-0-126" name="__codelineno-0-126"></a>    <span class="n">IdentifiabilityMethod</span><span class="p">[</span><span class="n">IdentifiabilityReport</span><span class="p">],</span> <span class="n">EngineChecked</span><span class="p">,</span> <span class="n">RangeChecked</span>
 </span><span id="__span-0-127"><a id="__codelineno-0-127" name="__codelineno-0-127"></a><span class="p">):</span>
 </span><span id="__span-0-128"><a id="__codelineno-0-128" name="__codelineno-0-128"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="__span-0-129"><a id="__codelineno-0-129" name="__codelineno-0-129"></a><span class="sd">    Practical identifiability from any parameter sample: what it learned</span>
 </span><span id="__span-0-130"><a id="__codelineno-0-130" name="__codelineno-0-130"></a><span class="sd">    about each parameter against its reference (the bounds or the priors).</span>
 </span><span id="__span-0-131"><a id="__codelineno-0-131" name="__codelineno-0-131"></a>
-</span><span id="__span-0-132"><a id="__codelineno-0-132" name="__codelineno-0-132"></a><span class="sd">    A parameter is ``poorly_determined`` when its contraction is below</span>
-</span><span id="__span-0-133"><a id="__codelineno-0-133" name="__codelineno-0-133"></a><span class="sd">    `contraction_threshold`, its correlation with another is above</span>
-</span><span id="__span-0-134"><a id="__codelineno-0-134" name="__codelineno-0-134"></a><span class="sd">    `correlation_threshold`, or its marginal has several modes. The section</span>
-</span><span id="__span-0-135"><a id="__codelineno-0-135" name="__codelineno-0-135"></a><span class="sd">    also gives the mass of each parameter in the outer `bound_share` of its</span>
-</span><span id="__span-0-136"><a id="__codelineno-0-136" name="__codelineno-0-136"></a><span class="sd">    reference at each side, the bounds that set a side of a marginal</span>
-</span><span id="__span-0-137"><a id="__codelineno-0-137" name="__codelineno-0-137"></a><span class="sd">    (``at_bound``, which does not set the verdict), the overlap of each</span>
-</span><span id="__span-0-138"><a id="__codelineno-0-138" name="__codelineno-0-138"></a><span class="sd">    marginal with its reference and the directions of the parameters, with</span>
-</span><span id="__span-0-139"><a id="__codelineno-0-139" name="__codelineno-0-139"></a><span class="sd">    the count of directions among the ``determined`` parameters that</span>
-</span><span id="__span-0-140"><a id="__codelineno-0-140" name="__codelineno-0-140"></a><span class="sd">    contract less than `contraction_threshold`. Equal draws are merged, each</span>
-</span><span id="__span-0-141"><a id="__codelineno-0-141" name="__codelineno-0-141"></a><span class="sd">    with the summed weight of its copies. The bootstrap of that count draws</span>
-</span><span id="__span-0-142"><a id="__codelineno-0-142" name="__codelineno-0-142"></a><span class="sd">    from the seed of the calibrator, ``Calibrator.seed``.</span>
-</span><span id="__span-0-143"><a id="__codelineno-0-143" name="__codelineno-0-143"></a>
-</span><span id="__span-0-144"><a id="__codelineno-0-144" name="__codelineno-0-144"></a><span class="sd">    Attributes</span>
-</span><span id="__span-0-145"><a id="__codelineno-0-145" name="__codelineno-0-145"></a><span class="sd">    ----------</span>
-</span><span id="__span-0-146"><a id="__codelineno-0-146" name="__codelineno-0-146"></a><span class="sd">    sample : ParameterSample</span>
-</span><span id="__span-0-147"><a id="__codelineno-0-147" name="__codelineno-0-147"></a><span class="sd">        The sample, such as the draws of an uncertainty method.</span>
-</span><span id="__span-0-148"><a id="__codelineno-0-148" name="__codelineno-0-148"></a><span class="sd">    reference : {&quot;bounds&quot;, &quot;prior&quot;}</span>
-</span><span id="__span-0-149"><a id="__codelineno-0-149" name="__codelineno-0-149"></a><span class="sd">        The distribution the sample is measured against: ``&quot;bounds&quot;``, the</span>
-</span><span id="__span-0-150"><a id="__codelineno-0-150" name="__codelineno-0-150"></a><span class="sd">        uniform distribution on the bounds, or ``&quot;prior&quot;``, the prior of each</span>
-</span><span id="__span-0-151"><a id="__codelineno-0-151" name="__codelineno-0-151"></a><span class="sd">        parameter in `priors`, such as the priors the sample was drawn with.</span>
-</span><span id="__span-0-152"><a id="__codelineno-0-152" name="__codelineno-0-152"></a><span class="sd">    correlation_threshold : float</span>
-</span><span id="__span-0-153"><a id="__codelineno-0-153" name="__codelineno-0-153"></a><span class="sd">        The absolute correlation above which a pair is listed and its</span>
-</span><span id="__span-0-154"><a id="__codelineno-0-154" name="__codelineno-0-154"></a><span class="sd">        parameters are poorly determined, strictly between 0 and 1. No</span>
-</span><span id="__span-0-155"><a id="__codelineno-0-155" name="__codelineno-0-155"></a><span class="sd">        default: it is a modelling judgment.</span>
-</span><span id="__span-0-156"><a id="__codelineno-0-156" name="__codelineno-0-156"></a><span class="sd">    contraction_threshold : float</span>
-</span><span id="__span-0-157"><a id="__codelineno-0-157" name="__codelineno-0-157"></a><span class="sd">        The contraction ``1 − Var(sample) / Var(reference)`` below which a</span>
-</span><span id="__span-0-158"><a id="__codelineno-0-158" name="__codelineno-0-158"></a><span class="sd">        parameter is poorly determined, strictly between 0 and 1; also the</span>
-</span><span id="__span-0-159"><a id="__codelineno-0-159" name="__codelineno-0-159"></a><span class="sd">        contraction below which a direction counts as a hidden ridge. No</span>
-</span><span id="__span-0-160"><a id="__codelineno-0-160" name="__codelineno-0-160"></a><span class="sd">        default: it is a modelling judgment.</span>
-</span><span id="__span-0-161"><a id="__codelineno-0-161" name="__codelineno-0-161"></a><span class="sd">    bound_share : float</span>
-</span><span id="__span-0-162"><a id="__codelineno-0-162" name="__codelineno-0-162"></a><span class="sd">        The share ``ε`` of the reference at each side, strictly between 0</span>
-</span><span id="__span-0-163"><a id="__codelineno-0-163" name="__codelineno-0-163"></a><span class="sd">        and 0.5: the section gives the mass of the sample where the</span>
-</span><span id="__span-0-164"><a id="__codelineno-0-164" name="__codelineno-0-164"></a><span class="sd">        distribution function of the reference is below ``ε`` and above</span>
-</span><span id="__span-0-165"><a id="__codelineno-0-165" name="__codelineno-0-165"></a><span class="sd">        ``1 − ε``. No default: it is a modelling judgment.</span>
-</span><span id="__span-0-166"><a id="__codelineno-0-166" name="__codelineno-0-166"></a><span class="sd">    log_parameters : list[str]</span>
-</span><span id="__span-0-167"><a id="__codelineno-0-167" name="__codelineno-0-167"></a><span class="sd">        The parameters whose shape measures (contraction, correlation,</span>
-</span><span id="__span-0-168"><a id="__codelineno-0-168" name="__codelineno-0-168"></a><span class="sd">        modes, density at a bound, directions) read ``ln θ``; each has a</span>
-</span><span id="__span-0-169"><a id="__codelineno-0-169" name="__codelineno-0-169"></a><span class="sd">        lower bound of at least 0 and every draw above 0. Default: none.</span>
-</span><span id="__span-0-170"><a id="__codelineno-0-170" name="__codelineno-0-170"></a><span class="sd">    priors : Priors | dict[str, distribution] | None</span>
-</span><span id="__span-0-171"><a id="__codelineno-0-171" name="__codelineno-0-171"></a><span class="sd">        The prior of each parameter, with ``reference=&quot;prior&quot;`` only.</span>
-</span><span id="__span-0-172"><a id="__codelineno-0-172" name="__codelineno-0-172"></a>
-</span><span id="__span-0-173"><a id="__codelineno-0-173" name="__codelineno-0-173"></a><span class="sd">    Raises</span>
-</span><span id="__span-0-174"><a id="__codelineno-0-174" name="__codelineno-0-174"></a><span class="sd">    ------</span>
-</span><span id="__span-0-175"><a id="__codelineno-0-175" name="__codelineno-0-175"></a><span class="sd">    ValueError</span>
-</span><span id="__span-0-176"><a id="__codelineno-0-176" name="__codelineno-0-176"></a><span class="sd">        When the analysis runs, if `log_parameters` names a parameter the</span>
-</span><span id="__span-0-177"><a id="__codelineno-0-177" name="__codelineno-0-177"></a><span class="sd">        sample does not hold, one with a lower bound below 0, or one with a</span>
-</span><span id="__span-0-178"><a id="__codelineno-0-178" name="__codelineno-0-178"></a><span class="sd">        draw at 0.</span>
-</span><span id="__span-0-179"><a id="__codelineno-0-179" name="__codelineno-0-179"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-180"><a id="__codelineno-0-180" name="__codelineno-0-180"></a>
-</span><span id="__span-0-181"><a id="__codelineno-0-181" name="__codelineno-0-181"></a>    <span class="n">_runner</span> <span class="o">=</span> <span class="nb">staticmethod</span><span class="p">(</span><span class="n">run_sample_identifiability</span><span class="p">)</span>
+</span><span id="__span-0-132"><a id="__codelineno-0-132" name="__codelineno-0-132"></a><span class="sd">    A parameter is ``poorly_determined`` when the effective size of the</span>
+</span><span id="__span-0-133"><a id="__codelineno-0-133" name="__codelineno-0-133"></a><span class="sd">    sample is below ``p + 1`` for ``p`` parameters, it is constant in every</span>
+</span><span id="__span-0-134"><a id="__codelineno-0-134" name="__codelineno-0-134"></a><span class="sd">    draw of a sample of more than one distinct draw, its contraction is below</span>
+</span><span id="__span-0-135"><a id="__codelineno-0-135" name="__codelineno-0-135"></a><span class="sd">    `contraction_threshold`, its correlation with another is above</span>
+</span><span id="__span-0-136"><a id="__codelineno-0-136" name="__codelineno-0-136"></a><span class="sd">    `correlation_threshold`, or its marginal has several modes. The section</span>
+</span><span id="__span-0-137"><a id="__codelineno-0-137" name="__codelineno-0-137"></a><span class="sd">    also gives the mass of each parameter in the outer `bound_share` of its</span>
+</span><span id="__span-0-138"><a id="__codelineno-0-138" name="__codelineno-0-138"></a><span class="sd">    reference at each side, the bounds that set a side of a marginal</span>
+</span><span id="__span-0-139"><a id="__codelineno-0-139" name="__codelineno-0-139"></a><span class="sd">    (``at_bound``, which does not set the verdict), the overlap of each</span>
+</span><span id="__span-0-140"><a id="__codelineno-0-140" name="__codelineno-0-140"></a><span class="sd">    marginal with its reference and the directions of the parameters, with</span>
+</span><span id="__span-0-141"><a id="__codelineno-0-141" name="__codelineno-0-141"></a><span class="sd">    the count of directions among the ``determined`` parameters that</span>
+</span><span id="__span-0-142"><a id="__codelineno-0-142" name="__codelineno-0-142"></a><span class="sd">    contract less than `contraction_threshold`. Equal draws are merged, each</span>
+</span><span id="__span-0-143"><a id="__codelineno-0-143" name="__codelineno-0-143"></a><span class="sd">    with the summed weight of its copies. The bootstrap of that count draws</span>
+</span><span id="__span-0-144"><a id="__codelineno-0-144" name="__codelineno-0-144"></a><span class="sd">    from the seed of the calibrator, ``Calibrator.seed``.</span>
+</span><span id="__span-0-145"><a id="__codelineno-0-145" name="__codelineno-0-145"></a>
+</span><span id="__span-0-146"><a id="__codelineno-0-146" name="__codelineno-0-146"></a><span class="sd">    Attributes</span>
+</span><span id="__span-0-147"><a id="__codelineno-0-147" name="__codelineno-0-147"></a><span class="sd">    ----------</span>
+</span><span id="__span-0-148"><a id="__codelineno-0-148" name="__codelineno-0-148"></a><span class="sd">    sample : ParameterSample</span>
+</span><span id="__span-0-149"><a id="__codelineno-0-149" name="__codelineno-0-149"></a><span class="sd">        The sample, such as the draws of an uncertainty method.</span>
+</span><span id="__span-0-150"><a id="__codelineno-0-150" name="__codelineno-0-150"></a><span class="sd">    reference : {&quot;bounds&quot;, &quot;prior&quot;}</span>
+</span><span id="__span-0-151"><a id="__codelineno-0-151" name="__codelineno-0-151"></a><span class="sd">        The distribution the sample is measured against: ``&quot;bounds&quot;``, the</span>
+</span><span id="__span-0-152"><a id="__codelineno-0-152" name="__codelineno-0-152"></a><span class="sd">        uniform distribution on the bounds, or ``&quot;prior&quot;``, the prior of each</span>
+</span><span id="__span-0-153"><a id="__codelineno-0-153" name="__codelineno-0-153"></a><span class="sd">        parameter in `priors`, such as the priors the sample was drawn with.</span>
+</span><span id="__span-0-154"><a id="__codelineno-0-154" name="__codelineno-0-154"></a><span class="sd">    correlation_threshold : float</span>
+</span><span id="__span-0-155"><a id="__codelineno-0-155" name="__codelineno-0-155"></a><span class="sd">        The absolute correlation above which a pair is listed and its</span>
+</span><span id="__span-0-156"><a id="__codelineno-0-156" name="__codelineno-0-156"></a><span class="sd">        parameters are poorly determined, strictly between 0 and 1. No</span>
+</span><span id="__span-0-157"><a id="__codelineno-0-157" name="__codelineno-0-157"></a><span class="sd">        default: it is a modelling judgment.</span>
+</span><span id="__span-0-158"><a id="__codelineno-0-158" name="__codelineno-0-158"></a><span class="sd">    contraction_threshold : float</span>
+</span><span id="__span-0-159"><a id="__codelineno-0-159" name="__codelineno-0-159"></a><span class="sd">        The contraction ``1 − Var(sample) / Var(reference)`` below which a</span>
+</span><span id="__span-0-160"><a id="__codelineno-0-160" name="__codelineno-0-160"></a><span class="sd">        parameter is poorly determined, strictly between 0 and 1; also the</span>
+</span><span id="__span-0-161"><a id="__codelineno-0-161" name="__codelineno-0-161"></a><span class="sd">        contraction below which a direction counts as a hidden ridge. No</span>
+</span><span id="__span-0-162"><a id="__codelineno-0-162" name="__codelineno-0-162"></a><span class="sd">        default: it is a modelling judgment.</span>
+</span><span id="__span-0-163"><a id="__codelineno-0-163" name="__codelineno-0-163"></a><span class="sd">    bound_share : float</span>
+</span><span id="__span-0-164"><a id="__codelineno-0-164" name="__codelineno-0-164"></a><span class="sd">        The share ``ε`` of the reference at each side, strictly between 0</span>
+</span><span id="__span-0-165"><a id="__codelineno-0-165" name="__codelineno-0-165"></a><span class="sd">        and 0.5: the section gives the mass of the sample where the</span>
+</span><span id="__span-0-166"><a id="__codelineno-0-166" name="__codelineno-0-166"></a><span class="sd">        distribution function of the reference is below ``ε`` and above</span>
+</span><span id="__span-0-167"><a id="__codelineno-0-167" name="__codelineno-0-167"></a><span class="sd">        ``1 − ε``. No default: it is a modelling judgment.</span>
+</span><span id="__span-0-168"><a id="__codelineno-0-168" name="__codelineno-0-168"></a><span class="sd">    log_parameters : list[str]</span>
+</span><span id="__span-0-169"><a id="__codelineno-0-169" name="__codelineno-0-169"></a><span class="sd">        The parameters whose shape measures (contraction, correlation,</span>
+</span><span id="__span-0-170"><a id="__codelineno-0-170" name="__codelineno-0-170"></a><span class="sd">        modes, density at a bound, directions) read ``ln θ``; each has a</span>
+</span><span id="__span-0-171"><a id="__codelineno-0-171" name="__codelineno-0-171"></a><span class="sd">        lower bound of at least 0 and every draw above 0. Default: none.</span>
+</span><span id="__span-0-172"><a id="__codelineno-0-172" name="__codelineno-0-172"></a><span class="sd">    priors : Priors | dict[str, distribution] | None</span>
+</span><span id="__span-0-173"><a id="__codelineno-0-173" name="__codelineno-0-173"></a><span class="sd">        The prior of each parameter, with ``reference=&quot;prior&quot;`` only.</span>
+</span><span id="__span-0-174"><a id="__codelineno-0-174" name="__codelineno-0-174"></a>
+</span><span id="__span-0-175"><a id="__codelineno-0-175" name="__codelineno-0-175"></a><span class="sd">    Raises</span>
+</span><span id="__span-0-176"><a id="__codelineno-0-176" name="__codelineno-0-176"></a><span class="sd">    ------</span>
+</span><span id="__span-0-177"><a id="__codelineno-0-177" name="__codelineno-0-177"></a><span class="sd">    ValueError</span>
+</span><span id="__span-0-178"><a id="__codelineno-0-178" name="__codelineno-0-178"></a><span class="sd">        When the analysis runs, if `log_parameters` names a parameter the</span>
+</span><span id="__span-0-179"><a id="__codelineno-0-179" name="__codelineno-0-179"></a><span class="sd">        sample does not hold, one with a lower bound below 0, or one with a</span>
+</span><span id="__span-0-180"><a id="__codelineno-0-180" name="__codelineno-0-180"></a><span class="sd">        draw at 0.</span>
+</span><span id="__span-0-181"><a id="__codelineno-0-181" name="__codelineno-0-181"></a><span class="sd">    &quot;&quot;&quot;</span>
 </span><span id="__span-0-182"><a id="__codelineno-0-182" name="__codelineno-0-182"></a>
-</span><span id="__span-0-183"><a id="__codelineno-0-183" name="__codelineno-0-183"></a>    <span class="n">_engine_handles</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;sample&quot;</span><span class="p">,)</span>
+</span><span id="__span-0-183"><a id="__codelineno-0-183" name="__codelineno-0-183"></a>    <span class="n">_runner</span> <span class="o">=</span> <span class="nb">staticmethod</span><span class="p">(</span><span class="n">run_sample_identifiability</span><span class="p">)</span>
 </span><span id="__span-0-184"><a id="__codelineno-0-184" name="__codelineno-0-184"></a>
-</span><span id="__span-0-185"><a id="__codelineno-0-185" name="__codelineno-0-185"></a>    <span class="n">sample</span><span class="p">:</span> <span class="n">ParameterSample</span>
-</span><span id="__span-0-186"><a id="__codelineno-0-186" name="__codelineno-0-186"></a>    <span class="n">reference</span><span class="p">:</span> <span class="n">SampleReference</span>
-</span><span id="__span-0-187"><a id="__codelineno-0-187" name="__codelineno-0-187"></a>    <span class="n">correlation_threshold</span><span class="p">:</span> <span class="nb">float</span>
-</span><span id="__span-0-188"><a id="__codelineno-0-188" name="__codelineno-0-188"></a>    <span class="n">contraction_threshold</span><span class="p">:</span> <span class="nb">float</span>
-</span><span id="__span-0-189"><a id="__codelineno-0-189" name="__codelineno-0-189"></a>    <span class="n">bound_share</span><span class="p">:</span> <span class="nb">float</span>
-</span><span id="__span-0-190"><a id="__codelineno-0-190" name="__codelineno-0-190"></a>    <span class="n">log_parameters</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
-</span><span id="__span-0-191"><a id="__codelineno-0-191" name="__codelineno-0-191"></a>    <span class="n">priors</span><span class="p">:</span> <span class="n">Priors</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-0-192"><a id="__codelineno-0-192" name="__codelineno-0-192"></a>
-</span><span id="__span-0-193"><a id="__codelineno-0-193" name="__codelineno-0-193"></a>    <span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;before&quot;</span><span class="p">)</span>
-</span><span id="__span-0-194"><a id="__codelineno-0-194" name="__codelineno-0-194"></a>    <span class="nd">@classmethod</span>
-</span><span id="__span-0-195"><a id="__codelineno-0-195" name="__codelineno-0-195"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_read_priors</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">JsonValue</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">JsonValue</span><span class="p">:</span>
-</span><span id="__span-0-196"><a id="__codelineno-0-196" name="__codelineno-0-196"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Read a mapping of parameter to distribution as `Priors`.&quot;&quot;&quot;</span>
-</span><span id="__span-0-197"><a id="__codelineno-0-197" name="__codelineno-0-197"></a>        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">)</span> <span class="ow">and</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;priors&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-198"><a id="__codelineno-0-198" name="__codelineno-0-198"></a>            <span class="k">return</span> <span class="p">{</span><span class="o">**</span><span class="n">data</span><span class="p">,</span> <span class="s2">&quot;priors&quot;</span><span class="p">:</span> <span class="n">coerce_priors</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;priors&quot;</span><span class="p">])}</span>
-</span><span id="__span-0-199"><a id="__codelineno-0-199" name="__codelineno-0-199"></a>        <span class="k">return</span> <span class="n">data</span>
+</span><span id="__span-0-185"><a id="__codelineno-0-185" name="__codelineno-0-185"></a>    <span class="n">_engine_handles</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;sample&quot;</span><span class="p">,)</span>
+</span><span id="__span-0-186"><a id="__codelineno-0-186" name="__codelineno-0-186"></a>
+</span><span id="__span-0-187"><a id="__codelineno-0-187" name="__codelineno-0-187"></a>    <span class="n">sample</span><span class="p">:</span> <span class="n">ParameterSample</span>
+</span><span id="__span-0-188"><a id="__codelineno-0-188" name="__codelineno-0-188"></a>    <span class="n">reference</span><span class="p">:</span> <span class="n">SampleReference</span>
+</span><span id="__span-0-189"><a id="__codelineno-0-189" name="__codelineno-0-189"></a>    <span class="n">correlation_threshold</span><span class="p">:</span> <span class="nb">float</span>
+</span><span id="__span-0-190"><a id="__codelineno-0-190" name="__codelineno-0-190"></a>    <span class="n">contraction_threshold</span><span class="p">:</span> <span class="nb">float</span>
+</span><span id="__span-0-191"><a id="__codelineno-0-191" name="__codelineno-0-191"></a>    <span class="n">bound_share</span><span class="p">:</span> <span class="nb">float</span>
+</span><span id="__span-0-192"><a id="__codelineno-0-192" name="__codelineno-0-192"></a>    <span class="n">log_parameters</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+</span><span id="__span-0-193"><a id="__codelineno-0-193" name="__codelineno-0-193"></a>    <span class="n">priors</span><span class="p">:</span> <span class="n">Priors</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="__span-0-194"><a id="__codelineno-0-194" name="__codelineno-0-194"></a>
+</span><span id="__span-0-195"><a id="__codelineno-0-195" name="__codelineno-0-195"></a>    <span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;before&quot;</span><span class="p">)</span>
+</span><span id="__span-0-196"><a id="__codelineno-0-196" name="__codelineno-0-196"></a>    <span class="nd">@classmethod</span>
+</span><span id="__span-0-197"><a id="__codelineno-0-197" name="__codelineno-0-197"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_read_priors</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">JsonValue</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">JsonValue</span><span class="p">:</span>
+</span><span id="__span-0-198"><a id="__codelineno-0-198" name="__codelineno-0-198"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Read a mapping of parameter to distribution as `Priors`.&quot;&quot;&quot;</span>
+</span><span id="__span-0-199"><a id="__codelineno-0-199" name="__codelineno-0-199"></a>        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">)</span> <span class="ow">and</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;priors&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-200"><a id="__codelineno-0-200" name="__codelineno-0-200"></a>            <span class="k">return</span> <span class="p">{</span><span class="o">**</span><span class="n">data</span><span class="p">,</span> <span class="s2">&quot;priors&quot;</span><span class="p">:</span> <span class="n">coerce_priors</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;priors&quot;</span><span class="p">])}</span>
+</span><span id="__span-0-201"><a id="__codelineno-0-201" name="__codelineno-0-201"></a>        <span class="k">return</span> <span class="n">data</span>
 </span></code></pre></div></td></tr></table></div>
               </details>
 
@@ -5601,9 +5607,7 @@ apart flag the parameters that differ.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>commol/identifiability/methods.py</code></summary>
-                <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-202">202</a></span>
-<span class="normal"><a href="#__codelineno-0-203">203</a></span>
-<span class="normal"><a href="#__codelineno-0-204">204</a></span>
+                <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-204">204</a></span>
 <span class="normal"><a href="#__codelineno-0-205">205</a></span>
 <span class="normal"><a href="#__codelineno-0-206">206</a></span>
 <span class="normal"><a href="#__codelineno-0-207">207</a></span>
@@ -5623,29 +5627,31 @@ apart flag the parameters that differ.</p>
 <span class="normal"><a href="#__codelineno-0-221">221</a></span>
 <span class="normal"><a href="#__codelineno-0-222">222</a></span>
 <span class="normal"><a href="#__codelineno-0-223">223</a></span>
-<span class="normal"><a href="#__codelineno-0-224">224</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-202"><a id="__codelineno-0-202" name="__codelineno-0-202"></a><span class="k">class</span><span class="w"> </span><span class="nc">StartsIdentifiability</span><span class="p">(</span><span class="n">IdentifiabilityMethod</span><span class="p">[</span><span class="n">IdentifiabilityReport</span><span class="p">],</span> <span class="n">RangeChecked</span><span class="p">):</span>
-</span><span id="__span-0-203"><a id="__codelineno-0-203" name="__codelineno-0-203"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="__span-0-204"><a id="__codelineno-0-204" name="__codelineno-0-204"></a><span class="sd">    Practical identifiability from the starts of a calibration</span>
-</span><span id="__span-0-205"><a id="__codelineno-0-205" name="__codelineno-0-205"></a><span class="sd">    (``Calibrator.run(starts=n)``): converged starts of equal loss that end</span>
-</span><span id="__span-0-206"><a id="__codelineno-0-206" name="__codelineno-0-206"></a><span class="sd">    apart flag the parameters that differ.</span>
-</span><span id="__span-0-207"><a id="__codelineno-0-207" name="__codelineno-0-207"></a>
-</span><span id="__span-0-208"><a id="__codelineno-0-208" name="__codelineno-0-208"></a><span class="sd">    Attributes</span>
-</span><span id="__span-0-209"><a id="__codelineno-0-209" name="__codelineno-0-209"></a><span class="sd">    ----------</span>
-</span><span id="__span-0-210"><a id="__codelineno-0-210" name="__codelineno-0-210"></a><span class="sd">    result : CalibrationResult</span>
-</span><span id="__span-0-211"><a id="__codelineno-0-211" name="__codelineno-0-211"></a><span class="sd">        The result, with at least two converged starts.</span>
-</span><span id="__span-0-212"><a id="__codelineno-0-212" name="__codelineno-0-212"></a><span class="sd">    parameter_tolerance : float</span>
-</span><span id="__span-0-213"><a id="__codelineno-0-213" name="__codelineno-0-213"></a><span class="sd">        The share of its bound width above which a parameter differs.</span>
-</span><span id="__span-0-214"><a id="__codelineno-0-214" name="__codelineno-0-214"></a><span class="sd">    loss_tolerance : float</span>
-</span><span id="__span-0-215"><a id="__codelineno-0-215" name="__codelineno-0-215"></a><span class="sd">        The share of the best loss within which two losses are equal.</span>
-</span><span id="__span-0-216"><a id="__codelineno-0-216" name="__codelineno-0-216"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-217"><a id="__codelineno-0-217" name="__codelineno-0-217"></a>
-</span><span id="__span-0-218"><a id="__codelineno-0-218" name="__codelineno-0-218"></a>    <span class="n">_runner</span> <span class="o">=</span> <span class="nb">staticmethod</span><span class="p">(</span><span class="n">run_starts_identifiability</span><span class="p">)</span>
+<span class="normal"><a href="#__codelineno-0-224">224</a></span>
+<span class="normal"><a href="#__codelineno-0-225">225</a></span>
+<span class="normal"><a href="#__codelineno-0-226">226</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-204"><a id="__codelineno-0-204" name="__codelineno-0-204"></a><span class="k">class</span><span class="w"> </span><span class="nc">StartsIdentifiability</span><span class="p">(</span><span class="n">IdentifiabilityMethod</span><span class="p">[</span><span class="n">IdentifiabilityReport</span><span class="p">],</span> <span class="n">RangeChecked</span><span class="p">):</span>
+</span><span id="__span-0-205"><a id="__codelineno-0-205" name="__codelineno-0-205"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="__span-0-206"><a id="__codelineno-0-206" name="__codelineno-0-206"></a><span class="sd">    Practical identifiability from the starts of a calibration</span>
+</span><span id="__span-0-207"><a id="__codelineno-0-207" name="__codelineno-0-207"></a><span class="sd">    (``Calibrator.run(starts=n)``): converged starts of equal loss that end</span>
+</span><span id="__span-0-208"><a id="__codelineno-0-208" name="__codelineno-0-208"></a><span class="sd">    apart flag the parameters that differ.</span>
+</span><span id="__span-0-209"><a id="__codelineno-0-209" name="__codelineno-0-209"></a>
+</span><span id="__span-0-210"><a id="__codelineno-0-210" name="__codelineno-0-210"></a><span class="sd">    Attributes</span>
+</span><span id="__span-0-211"><a id="__codelineno-0-211" name="__codelineno-0-211"></a><span class="sd">    ----------</span>
+</span><span id="__span-0-212"><a id="__codelineno-0-212" name="__codelineno-0-212"></a><span class="sd">    result : CalibrationResult</span>
+</span><span id="__span-0-213"><a id="__codelineno-0-213" name="__codelineno-0-213"></a><span class="sd">        The result, with at least two converged starts.</span>
+</span><span id="__span-0-214"><a id="__codelineno-0-214" name="__codelineno-0-214"></a><span class="sd">    parameter_tolerance : float</span>
+</span><span id="__span-0-215"><a id="__codelineno-0-215" name="__codelineno-0-215"></a><span class="sd">        The share of its bound width above which a parameter differs.</span>
+</span><span id="__span-0-216"><a id="__codelineno-0-216" name="__codelineno-0-216"></a><span class="sd">    loss_tolerance : float</span>
+</span><span id="__span-0-217"><a id="__codelineno-0-217" name="__codelineno-0-217"></a><span class="sd">        The share of the best loss within which two losses are equal.</span>
+</span><span id="__span-0-218"><a id="__codelineno-0-218" name="__codelineno-0-218"></a><span class="sd">    &quot;&quot;&quot;</span>
 </span><span id="__span-0-219"><a id="__codelineno-0-219" name="__codelineno-0-219"></a>
-</span><span id="__span-0-220"><a id="__codelineno-0-220" name="__codelineno-0-220"></a>    <span class="n">_engine_handles</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;result&quot;</span><span class="p">,)</span>
+</span><span id="__span-0-220"><a id="__codelineno-0-220" name="__codelineno-0-220"></a>    <span class="n">_runner</span> <span class="o">=</span> <span class="nb">staticmethod</span><span class="p">(</span><span class="n">run_starts_identifiability</span><span class="p">)</span>
 </span><span id="__span-0-221"><a id="__codelineno-0-221" name="__codelineno-0-221"></a>
-</span><span id="__span-0-222"><a id="__codelineno-0-222" name="__codelineno-0-222"></a>    <span class="n">result</span><span class="p">:</span> <span class="n">CalibrationResult</span>
-</span><span id="__span-0-223"><a id="__codelineno-0-223" name="__codelineno-0-223"></a>    <span class="n">parameter_tolerance</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">Field</span><span class="p">()</span>
-</span><span id="__span-0-224"><a id="__codelineno-0-224" name="__codelineno-0-224"></a>    <span class="n">loss_tolerance</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">Field</span><span class="p">()</span>
+</span><span id="__span-0-222"><a id="__codelineno-0-222" name="__codelineno-0-222"></a>    <span class="n">_engine_handles</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;result&quot;</span><span class="p">,)</span>
+</span><span id="__span-0-223"><a id="__codelineno-0-223" name="__codelineno-0-223"></a>
+</span><span id="__span-0-224"><a id="__codelineno-0-224" name="__codelineno-0-224"></a>    <span class="n">result</span><span class="p">:</span> <span class="n">CalibrationResult</span>
+</span><span id="__span-0-225"><a id="__codelineno-0-225" name="__codelineno-0-225"></a>    <span class="n">parameter_tolerance</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">Field</span><span class="p">()</span>
+</span><span id="__span-0-226"><a id="__codelineno-0-226" name="__codelineno-0-226"></a>    <span class="n">loss_tolerance</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">Field</span><span class="p">()</span>
 </span></code></pre></div></td></tr></table></div>
               </details>
 
@@ -5757,9 +5763,7 @@ parameter.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>commol/identifiability/methods.py</code></summary>
-                <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-227">227</a></span>
-<span class="normal"><a href="#__codelineno-0-228">228</a></span>
-<span class="normal"><a href="#__codelineno-0-229">229</a></span>
+                <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-229">229</a></span>
 <span class="normal"><a href="#__codelineno-0-230">230</a></span>
 <span class="normal"><a href="#__codelineno-0-231">231</a></span>
 <span class="normal"><a href="#__codelineno-0-232">232</a></span>
@@ -5796,46 +5800,48 @@ parameter.</p>
 <span class="normal"><a href="#__codelineno-0-263">263</a></span>
 <span class="normal"><a href="#__codelineno-0-264">264</a></span>
 <span class="normal"><a href="#__codelineno-0-265">265</a></span>
-<span class="normal"><a href="#__codelineno-0-266">266</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-227"><a id="__codelineno-0-227" name="__codelineno-0-227"></a><span class="k">class</span><span class="w"> </span><span class="nc">ProfileIdentifiability</span><span class="p">(</span><span class="n">IdentifiabilityMethod</span><span class="p">[</span><span class="n">IdentifiabilityReport</span><span class="p">]):</span>
-</span><span id="__span-0-228"><a id="__codelineno-0-228" name="__codelineno-0-228"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="__span-0-229"><a id="__codelineno-0-229" name="__codelineno-0-229"></a><span class="sd">    Identifiability from the profiles of a `ProfileLikelihood`: the verdict</span>
-</span><span id="__span-0-230"><a id="__codelineno-0-230" name="__codelineno-0-230"></a><span class="sd">    of the shape of each profile, with a ``profile`` section.</span>
-</span><span id="__span-0-231"><a id="__codelineno-0-231" name="__codelineno-0-231"></a>
-</span><span id="__span-0-232"><a id="__codelineno-0-232" name="__codelineno-0-232"></a><span class="sd">    ``identifiable`` gives the practical verdict ``determined`` and</span>
-</span><span id="__span-0-233"><a id="__codelineno-0-233" name="__codelineno-0-233"></a><span class="sd">    ``practically_non_identifiable`` the practical verdict</span>
-</span><span id="__span-0-234"><a id="__codelineno-0-234" name="__codelineno-0-234"></a><span class="sd">    ``poorly_determined``. ``structurally_non_identifiable`` gives the</span>
-</span><span id="__span-0-235"><a id="__codelineno-0-235" name="__codelineno-0-235"></a><span class="sd">    structural verdict of its `structure`, ``in_combination`` or</span>
-</span><span id="__span-0-236"><a id="__codelineno-0-236" name="__codelineno-0-236"></a><span class="sd">    ``non_identifiable``, with no combination: the reason names the</span>
-</span><span id="__span-0-237"><a id="__codelineno-0-237" name="__codelineno-0-237"></a><span class="sd">    compensating parameters. A flat profile with no structural verdict gives</span>
-</span><span id="__span-0-238"><a id="__codelineno-0-238" name="__codelineno-0-238"></a><span class="sd">    the practical verdict ``poorly_determined``. Every reason says that the</span>
-</span><span id="__span-0-239"><a id="__codelineno-0-239" name="__codelineno-0-239"></a><span class="sd">    verdict holds with the other parameters at their fitted values. A</span>
-</span><span id="__span-0-240"><a id="__codelineno-0-240" name="__codelineno-0-240"></a><span class="sd">    parameter with no profile, or no verdict, gets neither.</span>
-</span><span id="__span-0-241"><a id="__codelineno-0-241" name="__codelineno-0-241"></a>
-</span><span id="__span-0-242"><a id="__codelineno-0-242" name="__codelineno-0-242"></a><span class="sd">    Attributes</span>
-</span><span id="__span-0-243"><a id="__codelineno-0-243" name="__codelineno-0-243"></a><span class="sd">    ----------</span>
-</span><span id="__span-0-244"><a id="__codelineno-0-244" name="__codelineno-0-244"></a><span class="sd">    result : ProfileResult</span>
-</span><span id="__span-0-245"><a id="__codelineno-0-245" name="__codelineno-0-245"></a><span class="sd">        The profiles of the parameters of this calibration problem.</span>
-</span><span id="__span-0-246"><a id="__codelineno-0-246" name="__codelineno-0-246"></a>
-</span><span id="__span-0-247"><a id="__codelineno-0-247" name="__codelineno-0-247"></a><span class="sd">    Raises</span>
-</span><span id="__span-0-248"><a id="__codelineno-0-248" name="__codelineno-0-248"></a><span class="sd">    ------</span>
-</span><span id="__span-0-249"><a id="__codelineno-0-249" name="__codelineno-0-249"></a><span class="sd">    ValueError</span>
-</span><span id="__span-0-250"><a id="__codelineno-0-250" name="__codelineno-0-250"></a><span class="sd">        If the result holds prediction profiles, which have no verdict on a</span>
-</span><span id="__span-0-251"><a id="__codelineno-0-251" name="__codelineno-0-251"></a><span class="sd">        parameter.</span>
-</span><span id="__span-0-252"><a id="__codelineno-0-252" name="__codelineno-0-252"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-253"><a id="__codelineno-0-253" name="__codelineno-0-253"></a>
-</span><span id="__span-0-254"><a id="__codelineno-0-254" name="__codelineno-0-254"></a>    <span class="n">_runner</span> <span class="o">=</span> <span class="nb">staticmethod</span><span class="p">(</span><span class="n">run_profile_identifiability</span><span class="p">)</span>
+<span class="normal"><a href="#__codelineno-0-266">266</a></span>
+<span class="normal"><a href="#__codelineno-0-267">267</a></span>
+<span class="normal"><a href="#__codelineno-0-268">268</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-229"><a id="__codelineno-0-229" name="__codelineno-0-229"></a><span class="k">class</span><span class="w"> </span><span class="nc">ProfileIdentifiability</span><span class="p">(</span><span class="n">IdentifiabilityMethod</span><span class="p">[</span><span class="n">IdentifiabilityReport</span><span class="p">]):</span>
+</span><span id="__span-0-230"><a id="__codelineno-0-230" name="__codelineno-0-230"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="__span-0-231"><a id="__codelineno-0-231" name="__codelineno-0-231"></a><span class="sd">    Identifiability from the profiles of a `ProfileLikelihood`: the verdict</span>
+</span><span id="__span-0-232"><a id="__codelineno-0-232" name="__codelineno-0-232"></a><span class="sd">    of the shape of each profile, with a ``profile`` section.</span>
+</span><span id="__span-0-233"><a id="__codelineno-0-233" name="__codelineno-0-233"></a>
+</span><span id="__span-0-234"><a id="__codelineno-0-234" name="__codelineno-0-234"></a><span class="sd">    ``identifiable`` gives the practical verdict ``determined`` and</span>
+</span><span id="__span-0-235"><a id="__codelineno-0-235" name="__codelineno-0-235"></a><span class="sd">    ``practically_non_identifiable`` the practical verdict</span>
+</span><span id="__span-0-236"><a id="__codelineno-0-236" name="__codelineno-0-236"></a><span class="sd">    ``poorly_determined``. ``structurally_non_identifiable`` gives the</span>
+</span><span id="__span-0-237"><a id="__codelineno-0-237" name="__codelineno-0-237"></a><span class="sd">    structural verdict of its `structure`, ``in_combination`` or</span>
+</span><span id="__span-0-238"><a id="__codelineno-0-238" name="__codelineno-0-238"></a><span class="sd">    ``non_identifiable``, with no combination: the reason names the</span>
+</span><span id="__span-0-239"><a id="__codelineno-0-239" name="__codelineno-0-239"></a><span class="sd">    compensating parameters. A flat profile with no structural verdict gives</span>
+</span><span id="__span-0-240"><a id="__codelineno-0-240" name="__codelineno-0-240"></a><span class="sd">    the practical verdict ``poorly_determined``. Every reason says that the</span>
+</span><span id="__span-0-241"><a id="__codelineno-0-241" name="__codelineno-0-241"></a><span class="sd">    verdict holds with the other parameters at their fitted values. A</span>
+</span><span id="__span-0-242"><a id="__codelineno-0-242" name="__codelineno-0-242"></a><span class="sd">    parameter with no profile, or no verdict, gets neither.</span>
+</span><span id="__span-0-243"><a id="__codelineno-0-243" name="__codelineno-0-243"></a>
+</span><span id="__span-0-244"><a id="__codelineno-0-244" name="__codelineno-0-244"></a><span class="sd">    Attributes</span>
+</span><span id="__span-0-245"><a id="__codelineno-0-245" name="__codelineno-0-245"></a><span class="sd">    ----------</span>
+</span><span id="__span-0-246"><a id="__codelineno-0-246" name="__codelineno-0-246"></a><span class="sd">    result : ProfileResult</span>
+</span><span id="__span-0-247"><a id="__codelineno-0-247" name="__codelineno-0-247"></a><span class="sd">        The profiles of the parameters of this calibration problem.</span>
+</span><span id="__span-0-248"><a id="__codelineno-0-248" name="__codelineno-0-248"></a>
+</span><span id="__span-0-249"><a id="__codelineno-0-249" name="__codelineno-0-249"></a><span class="sd">    Raises</span>
+</span><span id="__span-0-250"><a id="__codelineno-0-250" name="__codelineno-0-250"></a><span class="sd">    ------</span>
+</span><span id="__span-0-251"><a id="__codelineno-0-251" name="__codelineno-0-251"></a><span class="sd">    ValueError</span>
+</span><span id="__span-0-252"><a id="__codelineno-0-252" name="__codelineno-0-252"></a><span class="sd">        If the result holds prediction profiles, which have no verdict on a</span>
+</span><span id="__span-0-253"><a id="__codelineno-0-253" name="__codelineno-0-253"></a><span class="sd">        parameter.</span>
+</span><span id="__span-0-254"><a id="__codelineno-0-254" name="__codelineno-0-254"></a><span class="sd">    &quot;&quot;&quot;</span>
 </span><span id="__span-0-255"><a id="__codelineno-0-255" name="__codelineno-0-255"></a>
-</span><span id="__span-0-256"><a id="__codelineno-0-256" name="__codelineno-0-256"></a>    <span class="n">result</span><span class="p">:</span> <span class="n">ProfileResult</span>
+</span><span id="__span-0-256"><a id="__codelineno-0-256" name="__codelineno-0-256"></a>    <span class="n">_runner</span> <span class="o">=</span> <span class="nb">staticmethod</span><span class="p">(</span><span class="n">run_profile_identifiability</span><span class="p">)</span>
 </span><span id="__span-0-257"><a id="__codelineno-0-257" name="__codelineno-0-257"></a>
-</span><span id="__span-0-258"><a id="__codelineno-0-258" name="__codelineno-0-258"></a>    <span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;after&quot;</span><span class="p">)</span>
-</span><span id="__span-0-259"><a id="__codelineno-0-259" name="__codelineno-0-259"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_parameter_profiles</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
-</span><span id="__span-0-260"><a id="__codelineno-0-260" name="__codelineno-0-260"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">quantity</span> <span class="o">!=</span> <span class="s2">&quot;parameter&quot;</span><span class="p">:</span>
-</span><span id="__span-0-261"><a id="__codelineno-0-261" name="__codelineno-0-261"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-</span><span id="__span-0-262"><a id="__codelineno-0-262" name="__codelineno-0-262"></a>                <span class="s2">&quot;This result holds the profiles of predictions, and predictions &quot;</span>
-</span><span id="__span-0-263"><a id="__codelineno-0-263" name="__codelineno-0-263"></a>                <span class="s2">&quot;have no verdict on a parameter; profile the parameters &quot;</span>
-</span><span id="__span-0-264"><a id="__codelineno-0-264" name="__codelineno-0-264"></a>                <span class="s2">&quot;(ProfileLikelihood) for their identifiability.&quot;</span>
-</span><span id="__span-0-265"><a id="__codelineno-0-265" name="__codelineno-0-265"></a>            <span class="p">)</span>
-</span><span id="__span-0-266"><a id="__codelineno-0-266" name="__codelineno-0-266"></a>        <span class="k">return</span> <span class="bp">self</span>
+</span><span id="__span-0-258"><a id="__codelineno-0-258" name="__codelineno-0-258"></a>    <span class="n">result</span><span class="p">:</span> <span class="n">ProfileResult</span>
+</span><span id="__span-0-259"><a id="__codelineno-0-259" name="__codelineno-0-259"></a>
+</span><span id="__span-0-260"><a id="__codelineno-0-260" name="__codelineno-0-260"></a>    <span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;after&quot;</span><span class="p">)</span>
+</span><span id="__span-0-261"><a id="__codelineno-0-261" name="__codelineno-0-261"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_parameter_profiles</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+</span><span id="__span-0-262"><a id="__codelineno-0-262" name="__codelineno-0-262"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">quantity</span> <span class="o">!=</span> <span class="s2">&quot;parameter&quot;</span><span class="p">:</span>
+</span><span id="__span-0-263"><a id="__codelineno-0-263" name="__codelineno-0-263"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+</span><span id="__span-0-264"><a id="__codelineno-0-264" name="__codelineno-0-264"></a>                <span class="s2">&quot;This result holds the profiles of predictions, and predictions &quot;</span>
+</span><span id="__span-0-265"><a id="__codelineno-0-265" name="__codelineno-0-265"></a>                <span class="s2">&quot;have no verdict on a parameter; profile the parameters &quot;</span>
+</span><span id="__span-0-266"><a id="__codelineno-0-266" name="__codelineno-0-266"></a>                <span class="s2">&quot;(ProfileLikelihood) for their identifiability.&quot;</span>
+</span><span id="__span-0-267"><a id="__codelineno-0-267" name="__codelineno-0-267"></a>            <span class="p">)</span>
+</span><span id="__span-0-268"><a id="__codelineno-0-268" name="__codelineno-0-268"></a>        <span class="k">return</span> <span class="bp">self</span>
 </span></code></pre></div></td></tr></table></div>
               </details>
 
@@ -5941,12 +5947,7 @@ practical verdict comes from <code>Collinearity</code>, <code>SampleIdentifiabil
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>commol/identifiability/results.py</code></summary>
-                <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-540">540</a></span>
-<span class="normal"><a href="#__codelineno-0-541">541</a></span>
-<span class="normal"><a href="#__codelineno-0-542">542</a></span>
-<span class="normal"><a href="#__codelineno-0-543">543</a></span>
-<span class="normal"><a href="#__codelineno-0-544">544</a></span>
-<span class="normal"><a href="#__codelineno-0-545">545</a></span>
+                <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-545">545</a></span>
 <span class="normal"><a href="#__codelineno-0-546">546</a></span>
 <span class="normal"><a href="#__codelineno-0-547">547</a></span>
 <span class="normal"><a href="#__codelineno-0-548">548</a></span>
@@ -6051,117 +6052,122 @@ practical verdict comes from <code>Collinearity</code>, <code>SampleIdentifiabil
 <span class="normal"><a href="#__codelineno-0-647">647</a></span>
 <span class="normal"><a href="#__codelineno-0-648">648</a></span>
 <span class="normal"><a href="#__codelineno-0-649">649</a></span>
-<span class="normal"><a href="#__codelineno-0-650">650</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-540"><a id="__codelineno-0-540" name="__codelineno-0-540"></a><span class="k">class</span><span class="w"> </span><span class="nc">IdentifiabilityReport</span><span class="p">(</span><span class="n">_FrozenResult</span><span class="p">):</span>
-</span><span id="__span-0-541"><a id="__codelineno-0-541" name="__codelineno-0-541"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="__span-0-542"><a id="__codelineno-0-542" name="__codelineno-0-542"></a><span class="sd">    Which parameters the model and the data determine: one structural and one</span>
-</span><span id="__span-0-543"><a id="__codelineno-0-543" name="__codelineno-0-543"></a><span class="sd">    practical verdict per parameter, and the evidence of each method.</span>
-</span><span id="__span-0-544"><a id="__codelineno-0-544" name="__codelineno-0-544"></a>
-</span><span id="__span-0-545"><a id="__codelineno-0-545" name="__codelineno-0-545"></a><span class="sd">    The structural verdict comes from `StructuralRank` on the design of the</span>
-</span><span id="__span-0-546"><a id="__codelineno-0-546" name="__codelineno-0-546"></a><span class="sd">    observations, and from a flat profile; a dense design answers what</span>
-</span><span id="__span-0-547"><a id="__codelineno-0-547" name="__codelineno-0-547"></a><span class="sd">    denser data would determine, so its verdicts stay in its section. The</span>
-</span><span id="__span-0-548"><a id="__codelineno-0-548" name="__codelineno-0-548"></a><span class="sd">    practical verdict comes from `Collinearity`, `SampleIdentifiability`,</span>
-</span><span id="__span-0-549"><a id="__codelineno-0-549" name="__codelineno-0-549"></a><span class="sd">    `StartsIdentifiability` and the other profiles.</span>
-</span><span id="__span-0-550"><a id="__codelineno-0-550" name="__codelineno-0-550"></a>
-</span><span id="__span-0-551"><a id="__codelineno-0-551" name="__codelineno-0-551"></a><span class="sd">    Attributes</span>
-</span><span id="__span-0-552"><a id="__codelineno-0-552" name="__codelineno-0-552"></a><span class="sd">    ----------</span>
-</span><span id="__span-0-553"><a id="__codelineno-0-553" name="__codelineno-0-553"></a><span class="sd">    parameters : list[str]</span>
-</span><span id="__span-0-554"><a id="__codelineno-0-554" name="__codelineno-0-554"></a><span class="sd">        The parameters, in problem order.</span>
-</span><span id="__span-0-555"><a id="__codelineno-0-555" name="__codelineno-0-555"></a><span class="sd">    verdicts : dict[str, ParameterVerdicts]</span>
-</span><span id="__span-0-556"><a id="__codelineno-0-556" name="__codelineno-0-556"></a><span class="sd">        The verdicts of each parameter.</span>
-</span><span id="__span-0-557"><a id="__codelineno-0-557" name="__codelineno-0-557"></a><span class="sd">    structural, collinearity, sample, starts, profile : list</span>
-</span><span id="__span-0-558"><a id="__codelineno-0-558" name="__codelineno-0-558"></a><span class="sd">        The sections of the methods that ran, one per run.</span>
-</span><span id="__span-0-559"><a id="__codelineno-0-559" name="__codelineno-0-559"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-560"><a id="__codelineno-0-560" name="__codelineno-0-560"></a>
-</span><span id="__span-0-561"><a id="__codelineno-0-561" name="__codelineno-0-561"></a>    <span class="n">parameters</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
-</span><span id="__span-0-562"><a id="__codelineno-0-562" name="__codelineno-0-562"></a>    <span class="n">verdicts</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ParameterVerdicts</span><span class="p">]</span>
-</span><span id="__span-0-563"><a id="__codelineno-0-563" name="__codelineno-0-563"></a>    <span class="n">structural</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">StructuralSection</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
-</span><span id="__span-0-564"><a id="__codelineno-0-564" name="__codelineno-0-564"></a>    <span class="n">collinearity</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">CollinearitySection</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
-</span><span id="__span-0-565"><a id="__codelineno-0-565" name="__codelineno-0-565"></a>    <span class="n">sample</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">SampleSection</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
-</span><span id="__span-0-566"><a id="__codelineno-0-566" name="__codelineno-0-566"></a>    <span class="n">starts</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">StartsSection</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
-</span><span id="__span-0-567"><a id="__codelineno-0-567" name="__codelineno-0-567"></a>    <span class="n">profile</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ProfileSection</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
-</span><span id="__span-0-568"><a id="__codelineno-0-568" name="__codelineno-0-568"></a>
-</span><span id="__span-0-569"><a id="__codelineno-0-569" name="__codelineno-0-569"></a>    <span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;after&quot;</span><span class="p">)</span>
-</span><span id="__span-0-570"><a id="__codelineno-0-570" name="__codelineno-0-570"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_check_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
-</span><span id="__span-0-571"><a id="__codelineno-0-571" name="__codelineno-0-571"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Check that the verdicts hold the parameters, in order.&quot;&quot;&quot;</span>
-</span><span id="__span-0-572"><a id="__codelineno-0-572" name="__codelineno-0-572"></a>        <span class="k">if</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">verdicts</span><span class="p">)</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">:</span>
-</span><span id="__span-0-573"><a id="__codelineno-0-573" name="__codelineno-0-573"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-</span><span id="__span-0-574"><a id="__codelineno-0-574" name="__codelineno-0-574"></a>                <span class="sa">f</span><span class="s2">&quot;The verdicts must hold the parameters </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="si">}</span><span class="s2"> in &quot;</span>
-</span><span id="__span-0-575"><a id="__codelineno-0-575" name="__codelineno-0-575"></a>                <span class="sa">f</span><span class="s2">&quot;order, got </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">verdicts</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span>
-</span><span id="__span-0-576"><a id="__codelineno-0-576" name="__codelineno-0-576"></a>            <span class="p">)</span>
-</span><span id="__span-0-577"><a id="__codelineno-0-577" name="__codelineno-0-577"></a>        <span class="k">return</span> <span class="bp">self</span>
-</span><span id="__span-0-578"><a id="__codelineno-0-578" name="__codelineno-0-578"></a>
-</span><span id="__span-0-579"><a id="__codelineno-0-579" name="__codelineno-0-579"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">report</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IdentifiabilityReportData</span><span class="p">:</span>
-</span><span id="__span-0-580"><a id="__codelineno-0-580" name="__codelineno-0-580"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="__span-0-581"><a id="__codelineno-0-581" name="__codelineno-0-581"></a><span class="sd">        Report the identifiability of each parameter as plain data.</span>
-</span><span id="__span-0-582"><a id="__codelineno-0-582" name="__codelineno-0-582"></a>
-</span><span id="__span-0-583"><a id="__codelineno-0-583" name="__codelineno-0-583"></a><span class="sd">        Returns</span>
-</span><span id="__span-0-584"><a id="__codelineno-0-584" name="__codelineno-0-584"></a><span class="sd">        -------</span>
-</span><span id="__span-0-585"><a id="__codelineno-0-585" name="__codelineno-0-585"></a><span class="sd">        IdentifiabilityReportData</span>
-</span><span id="__span-0-586"><a id="__codelineno-0-586" name="__codelineno-0-586"></a><span class="sd">            ``parameters``: each parameter, in problem order, with its</span>
-</span><span id="__span-0-587"><a id="__codelineno-0-587" name="__codelineno-0-587"></a><span class="sd">            structural and practical verdicts; ``sections``: the evidence of</span>
-</span><span id="__span-0-588"><a id="__codelineno-0-588" name="__codelineno-0-588"></a><span class="sd">            each method that ran.</span>
-</span><span id="__span-0-589"><a id="__codelineno-0-589" name="__codelineno-0-589"></a><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="__span-0-590"><a id="__codelineno-0-590" name="__codelineno-0-590"></a>        <span class="k">return</span> <span class="n">identifiability_report</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
-</span><span id="__span-0-591"><a id="__codelineno-0-591" name="__codelineno-0-591"></a>
-</span><span id="__span-0-592"><a id="__codelineno-0-592" name="__codelineno-0-592"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">merge</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">others</span><span class="p">:</span> <span class="s2">&quot;IdentifiabilityReport&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;IdentifiabilityReport&quot;</span><span class="p">:</span>
-</span><span id="__span-0-593"><a id="__codelineno-0-593" name="__codelineno-0-593"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="__span-0-594"><a id="__codelineno-0-594" name="__codelineno-0-594"></a><span class="sd">        Join this report with others of the same parameters.</span>
-</span><span id="__span-0-595"><a id="__codelineno-0-595" name="__codelineno-0-595"></a>
-</span><span id="__span-0-596"><a id="__codelineno-0-596" name="__codelineno-0-596"></a><span class="sd">        The sections are kept side by side. A verdict that the reports agree</span>
-</span><span id="__span-0-597"><a id="__codelineno-0-597" name="__codelineno-0-597"></a><span class="sd">        on stays, with the reasons of each; one they disagree on is</span>
-</span><span id="__span-0-598"><a id="__codelineno-0-598" name="__codelineno-0-598"></a><span class="sd">        ``conflicting``, with every reason. A structural verdict of ``None``</span>
-</span><span id="__span-0-599"><a id="__codelineno-0-599" name="__codelineno-0-599"></a><span class="sd">        adds its reasons and leaves the verdicts of the other reports.</span>
+<span class="normal"><a href="#__codelineno-0-650">650</a></span>
+<span class="normal"><a href="#__codelineno-0-651">651</a></span>
+<span class="normal"><a href="#__codelineno-0-652">652</a></span>
+<span class="normal"><a href="#__codelineno-0-653">653</a></span>
+<span class="normal"><a href="#__codelineno-0-654">654</a></span>
+<span class="normal"><a href="#__codelineno-0-655">655</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-545"><a id="__codelineno-0-545" name="__codelineno-0-545"></a><span class="k">class</span><span class="w"> </span><span class="nc">IdentifiabilityReport</span><span class="p">(</span><span class="n">_FrozenResult</span><span class="p">):</span>
+</span><span id="__span-0-546"><a id="__codelineno-0-546" name="__codelineno-0-546"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="__span-0-547"><a id="__codelineno-0-547" name="__codelineno-0-547"></a><span class="sd">    Which parameters the model and the data determine: one structural and one</span>
+</span><span id="__span-0-548"><a id="__codelineno-0-548" name="__codelineno-0-548"></a><span class="sd">    practical verdict per parameter, and the evidence of each method.</span>
+</span><span id="__span-0-549"><a id="__codelineno-0-549" name="__codelineno-0-549"></a>
+</span><span id="__span-0-550"><a id="__codelineno-0-550" name="__codelineno-0-550"></a><span class="sd">    The structural verdict comes from `StructuralRank` on the design of the</span>
+</span><span id="__span-0-551"><a id="__codelineno-0-551" name="__codelineno-0-551"></a><span class="sd">    observations, and from a flat profile; a dense design answers what</span>
+</span><span id="__span-0-552"><a id="__codelineno-0-552" name="__codelineno-0-552"></a><span class="sd">    denser data would determine, so its verdicts stay in its section. The</span>
+</span><span id="__span-0-553"><a id="__codelineno-0-553" name="__codelineno-0-553"></a><span class="sd">    practical verdict comes from `Collinearity`, `SampleIdentifiability`,</span>
+</span><span id="__span-0-554"><a id="__codelineno-0-554" name="__codelineno-0-554"></a><span class="sd">    `StartsIdentifiability` and the other profiles.</span>
+</span><span id="__span-0-555"><a id="__codelineno-0-555" name="__codelineno-0-555"></a>
+</span><span id="__span-0-556"><a id="__codelineno-0-556" name="__codelineno-0-556"></a><span class="sd">    Attributes</span>
+</span><span id="__span-0-557"><a id="__codelineno-0-557" name="__codelineno-0-557"></a><span class="sd">    ----------</span>
+</span><span id="__span-0-558"><a id="__codelineno-0-558" name="__codelineno-0-558"></a><span class="sd">    parameters : list[str]</span>
+</span><span id="__span-0-559"><a id="__codelineno-0-559" name="__codelineno-0-559"></a><span class="sd">        The parameters, in problem order.</span>
+</span><span id="__span-0-560"><a id="__codelineno-0-560" name="__codelineno-0-560"></a><span class="sd">    verdicts : dict[str, ParameterVerdicts]</span>
+</span><span id="__span-0-561"><a id="__codelineno-0-561" name="__codelineno-0-561"></a><span class="sd">        The verdicts of each parameter.</span>
+</span><span id="__span-0-562"><a id="__codelineno-0-562" name="__codelineno-0-562"></a><span class="sd">    structural, collinearity, sample, starts, profile : list</span>
+</span><span id="__span-0-563"><a id="__codelineno-0-563" name="__codelineno-0-563"></a><span class="sd">        The sections of the methods that ran, one per run.</span>
+</span><span id="__span-0-564"><a id="__codelineno-0-564" name="__codelineno-0-564"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-565"><a id="__codelineno-0-565" name="__codelineno-0-565"></a>
+</span><span id="__span-0-566"><a id="__codelineno-0-566" name="__codelineno-0-566"></a>    <span class="n">parameters</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+</span><span id="__span-0-567"><a id="__codelineno-0-567" name="__codelineno-0-567"></a>    <span class="n">verdicts</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ParameterVerdicts</span><span class="p">]</span>
+</span><span id="__span-0-568"><a id="__codelineno-0-568" name="__codelineno-0-568"></a>    <span class="n">structural</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">StructuralSection</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+</span><span id="__span-0-569"><a id="__codelineno-0-569" name="__codelineno-0-569"></a>    <span class="n">collinearity</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">CollinearitySection</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+</span><span id="__span-0-570"><a id="__codelineno-0-570" name="__codelineno-0-570"></a>    <span class="n">sample</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">SampleSection</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+</span><span id="__span-0-571"><a id="__codelineno-0-571" name="__codelineno-0-571"></a>    <span class="n">starts</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">StartsSection</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+</span><span id="__span-0-572"><a id="__codelineno-0-572" name="__codelineno-0-572"></a>    <span class="n">profile</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ProfileSection</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+</span><span id="__span-0-573"><a id="__codelineno-0-573" name="__codelineno-0-573"></a>
+</span><span id="__span-0-574"><a id="__codelineno-0-574" name="__codelineno-0-574"></a>    <span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;after&quot;</span><span class="p">)</span>
+</span><span id="__span-0-575"><a id="__codelineno-0-575" name="__codelineno-0-575"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_check_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+</span><span id="__span-0-576"><a id="__codelineno-0-576" name="__codelineno-0-576"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Check that the verdicts hold the parameters, in order.&quot;&quot;&quot;</span>
+</span><span id="__span-0-577"><a id="__codelineno-0-577" name="__codelineno-0-577"></a>        <span class="k">if</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">verdicts</span><span class="p">)</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">:</span>
+</span><span id="__span-0-578"><a id="__codelineno-0-578" name="__codelineno-0-578"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+</span><span id="__span-0-579"><a id="__codelineno-0-579" name="__codelineno-0-579"></a>                <span class="sa">f</span><span class="s2">&quot;The verdicts must hold the parameters </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="si">}</span><span class="s2"> in &quot;</span>
+</span><span id="__span-0-580"><a id="__codelineno-0-580" name="__codelineno-0-580"></a>                <span class="sa">f</span><span class="s2">&quot;order, got </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">verdicts</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span>
+</span><span id="__span-0-581"><a id="__codelineno-0-581" name="__codelineno-0-581"></a>            <span class="p">)</span>
+</span><span id="__span-0-582"><a id="__codelineno-0-582" name="__codelineno-0-582"></a>        <span class="k">return</span> <span class="bp">self</span>
+</span><span id="__span-0-583"><a id="__codelineno-0-583" name="__codelineno-0-583"></a>
+</span><span id="__span-0-584"><a id="__codelineno-0-584" name="__codelineno-0-584"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">report</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IdentifiabilityReportData</span><span class="p">:</span>
+</span><span id="__span-0-585"><a id="__codelineno-0-585" name="__codelineno-0-585"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="__span-0-586"><a id="__codelineno-0-586" name="__codelineno-0-586"></a><span class="sd">        Report the identifiability of each parameter as plain data.</span>
+</span><span id="__span-0-587"><a id="__codelineno-0-587" name="__codelineno-0-587"></a>
+</span><span id="__span-0-588"><a id="__codelineno-0-588" name="__codelineno-0-588"></a><span class="sd">        Returns</span>
+</span><span id="__span-0-589"><a id="__codelineno-0-589" name="__codelineno-0-589"></a><span class="sd">        -------</span>
+</span><span id="__span-0-590"><a id="__codelineno-0-590" name="__codelineno-0-590"></a><span class="sd">        IdentifiabilityReportData</span>
+</span><span id="__span-0-591"><a id="__codelineno-0-591" name="__codelineno-0-591"></a><span class="sd">            ``parameters``: each parameter, in problem order, with its</span>
+</span><span id="__span-0-592"><a id="__codelineno-0-592" name="__codelineno-0-592"></a><span class="sd">            structural and practical verdicts; ``sections``: the evidence of</span>
+</span><span id="__span-0-593"><a id="__codelineno-0-593" name="__codelineno-0-593"></a><span class="sd">            each method that ran.</span>
+</span><span id="__span-0-594"><a id="__codelineno-0-594" name="__codelineno-0-594"></a><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="__span-0-595"><a id="__codelineno-0-595" name="__codelineno-0-595"></a>        <span class="k">return</span> <span class="n">identifiability_report</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+</span><span id="__span-0-596"><a id="__codelineno-0-596" name="__codelineno-0-596"></a>
+</span><span id="__span-0-597"><a id="__codelineno-0-597" name="__codelineno-0-597"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">merge</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">others</span><span class="p">:</span> <span class="s2">&quot;IdentifiabilityReport&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;IdentifiabilityReport&quot;</span><span class="p">:</span>
+</span><span id="__span-0-598"><a id="__codelineno-0-598" name="__codelineno-0-598"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="__span-0-599"><a id="__codelineno-0-599" name="__codelineno-0-599"></a><span class="sd">        Join this report with others of the same parameters.</span>
 </span><span id="__span-0-600"><a id="__codelineno-0-600" name="__codelineno-0-600"></a>
-</span><span id="__span-0-601"><a id="__codelineno-0-601" name="__codelineno-0-601"></a><span class="sd">        Parameters</span>
-</span><span id="__span-0-602"><a id="__codelineno-0-602" name="__codelineno-0-602"></a><span class="sd">        ----------</span>
-</span><span id="__span-0-603"><a id="__codelineno-0-603" name="__codelineno-0-603"></a><span class="sd">        *others : IdentifiabilityReport</span>
-</span><span id="__span-0-604"><a id="__codelineno-0-604" name="__codelineno-0-604"></a><span class="sd">            The reports to join.</span>
+</span><span id="__span-0-601"><a id="__codelineno-0-601" name="__codelineno-0-601"></a><span class="sd">        The sections are kept side by side. A verdict that the reports agree</span>
+</span><span id="__span-0-602"><a id="__codelineno-0-602" name="__codelineno-0-602"></a><span class="sd">        on stays, with the reasons of each; one they disagree on is</span>
+</span><span id="__span-0-603"><a id="__codelineno-0-603" name="__codelineno-0-603"></a><span class="sd">        ``conflicting``, with every reason. A structural verdict of ``None``</span>
+</span><span id="__span-0-604"><a id="__codelineno-0-604" name="__codelineno-0-604"></a><span class="sd">        adds its reasons and leaves the verdicts of the other reports.</span>
 </span><span id="__span-0-605"><a id="__codelineno-0-605" name="__codelineno-0-605"></a>
-</span><span id="__span-0-606"><a id="__codelineno-0-606" name="__codelineno-0-606"></a><span class="sd">        Returns</span>
-</span><span id="__span-0-607"><a id="__codelineno-0-607" name="__codelineno-0-607"></a><span class="sd">        -------</span>
-</span><span id="__span-0-608"><a id="__codelineno-0-608" name="__codelineno-0-608"></a><span class="sd">        IdentifiabilityReport</span>
-</span><span id="__span-0-609"><a id="__codelineno-0-609" name="__codelineno-0-609"></a><span class="sd">            The joined report.</span>
+</span><span id="__span-0-606"><a id="__codelineno-0-606" name="__codelineno-0-606"></a><span class="sd">        Parameters</span>
+</span><span id="__span-0-607"><a id="__codelineno-0-607" name="__codelineno-0-607"></a><span class="sd">        ----------</span>
+</span><span id="__span-0-608"><a id="__codelineno-0-608" name="__codelineno-0-608"></a><span class="sd">        *others : IdentifiabilityReport</span>
+</span><span id="__span-0-609"><a id="__codelineno-0-609" name="__codelineno-0-609"></a><span class="sd">            The reports to join.</span>
 </span><span id="__span-0-610"><a id="__codelineno-0-610" name="__codelineno-0-610"></a>
-</span><span id="__span-0-611"><a id="__codelineno-0-611" name="__codelineno-0-611"></a><span class="sd">        Raises</span>
-</span><span id="__span-0-612"><a id="__codelineno-0-612" name="__codelineno-0-612"></a><span class="sd">        ------</span>
-</span><span id="__span-0-613"><a id="__codelineno-0-613" name="__codelineno-0-613"></a><span class="sd">        ValueError</span>
-</span><span id="__span-0-614"><a id="__codelineno-0-614" name="__codelineno-0-614"></a><span class="sd">            If a report has other parameters.</span>
-</span><span id="__span-0-615"><a id="__codelineno-0-615" name="__codelineno-0-615"></a><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="__span-0-616"><a id="__codelineno-0-616" name="__codelineno-0-616"></a>        <span class="n">reports</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">others</span><span class="p">]</span>
-</span><span id="__span-0-617"><a id="__codelineno-0-617" name="__codelineno-0-617"></a>        <span class="k">for</span> <span class="n">other</span> <span class="ow">in</span> <span class="n">others</span><span class="p">:</span>
-</span><span id="__span-0-618"><a id="__codelineno-0-618" name="__codelineno-0-618"></a>            <span class="k">if</span> <span class="n">other</span><span class="o">.</span><span class="n">parameters</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">:</span>
-</span><span id="__span-0-619"><a id="__codelineno-0-619" name="__codelineno-0-619"></a>                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-</span><span id="__span-0-620"><a id="__codelineno-0-620" name="__codelineno-0-620"></a>                    <span class="sa">f</span><span class="s2">&quot;Reports of different parameters cannot merge: &quot;</span>
-</span><span id="__span-0-621"><a id="__codelineno-0-621" name="__codelineno-0-621"></a>                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="si">}</span><span class="s2"> and </span><span class="si">{</span><span class="n">other</span><span class="o">.</span><span class="n">parameters</span><span class="si">}</span><span class="s2">.&quot;</span>
-</span><span id="__span-0-622"><a id="__codelineno-0-622" name="__codelineno-0-622"></a>                <span class="p">)</span>
-</span><span id="__span-0-623"><a id="__codelineno-0-623" name="__codelineno-0-623"></a>        <span class="n">verdicts</span> <span class="o">=</span> <span class="p">{</span>
-</span><span id="__span-0-624"><a id="__codelineno-0-624" name="__codelineno-0-624"></a>            <span class="n">name</span><span class="p">:</span> <span class="n">ParameterVerdicts</span><span class="p">(</span>
-</span><span id="__span-0-625"><a id="__codelineno-0-625" name="__codelineno-0-625"></a>                <span class="n">structural</span><span class="o">=</span><span class="n">_merge_structural</span><span class="p">(</span>
-</span><span id="__span-0-626"><a id="__codelineno-0-626" name="__codelineno-0-626"></a>                    <span class="p">[</span>
-</span><span id="__span-0-627"><a id="__codelineno-0-627" name="__codelineno-0-627"></a>                        <span class="n">v</span>
-</span><span id="__span-0-628"><a id="__codelineno-0-628" name="__codelineno-0-628"></a>                        <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">reports</span>
-</span><span id="__span-0-629"><a id="__codelineno-0-629" name="__codelineno-0-629"></a>                        <span class="k">if</span> <span class="p">(</span><span class="n">v</span> <span class="o">:=</span> <span class="n">r</span><span class="o">.</span><span class="n">verdicts</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">structural</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-</span><span id="__span-0-630"><a id="__codelineno-0-630" name="__codelineno-0-630"></a>                    <span class="p">]</span>
-</span><span id="__span-0-631"><a id="__codelineno-0-631" name="__codelineno-0-631"></a>                <span class="p">),</span>
-</span><span id="__span-0-632"><a id="__codelineno-0-632" name="__codelineno-0-632"></a>                <span class="n">practical</span><span class="o">=</span><span class="n">_merge_practical</span><span class="p">(</span>
-</span><span id="__span-0-633"><a id="__codelineno-0-633" name="__codelineno-0-633"></a>                    <span class="p">[</span>
-</span><span id="__span-0-634"><a id="__codelineno-0-634" name="__codelineno-0-634"></a>                        <span class="n">v</span>
-</span><span id="__span-0-635"><a id="__codelineno-0-635" name="__codelineno-0-635"></a>                        <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">reports</span>
-</span><span id="__span-0-636"><a id="__codelineno-0-636" name="__codelineno-0-636"></a>                        <span class="k">if</span> <span class="p">(</span><span class="n">v</span> <span class="o">:=</span> <span class="n">r</span><span class="o">.</span><span class="n">verdicts</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">practical</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-</span><span id="__span-0-637"><a id="__codelineno-0-637" name="__codelineno-0-637"></a>                    <span class="p">]</span>
-</span><span id="__span-0-638"><a id="__codelineno-0-638" name="__codelineno-0-638"></a>                <span class="p">),</span>
-</span><span id="__span-0-639"><a id="__codelineno-0-639" name="__codelineno-0-639"></a>            <span class="p">)</span>
-</span><span id="__span-0-640"><a id="__codelineno-0-640" name="__codelineno-0-640"></a>            <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span>
-</span><span id="__span-0-641"><a id="__codelineno-0-641" name="__codelineno-0-641"></a>        <span class="p">}</span>
-</span><span id="__span-0-642"><a id="__codelineno-0-642" name="__codelineno-0-642"></a>        <span class="k">return</span> <span class="n">IdentifiabilityReport</span><span class="p">(</span>
-</span><span id="__span-0-643"><a id="__codelineno-0-643" name="__codelineno-0-643"></a>            <span class="n">parameters</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">,</span>
-</span><span id="__span-0-644"><a id="__codelineno-0-644" name="__codelineno-0-644"></a>            <span class="n">verdicts</span><span class="o">=</span><span class="n">verdicts</span><span class="p">,</span>
-</span><span id="__span-0-645"><a id="__codelineno-0-645" name="__codelineno-0-645"></a>            <span class="n">structural</span><span class="o">=</span><span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">reports</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">r</span><span class="o">.</span><span class="n">structural</span><span class="p">],</span>
-</span><span id="__span-0-646"><a id="__codelineno-0-646" name="__codelineno-0-646"></a>            <span class="n">collinearity</span><span class="o">=</span><span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">reports</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">r</span><span class="o">.</span><span class="n">collinearity</span><span class="p">],</span>
-</span><span id="__span-0-647"><a id="__codelineno-0-647" name="__codelineno-0-647"></a>            <span class="n">sample</span><span class="o">=</span><span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">reports</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">r</span><span class="o">.</span><span class="n">sample</span><span class="p">],</span>
-</span><span id="__span-0-648"><a id="__codelineno-0-648" name="__codelineno-0-648"></a>            <span class="n">starts</span><span class="o">=</span><span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">reports</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">r</span><span class="o">.</span><span class="n">starts</span><span class="p">],</span>
-</span><span id="__span-0-649"><a id="__codelineno-0-649" name="__codelineno-0-649"></a>            <span class="n">profile</span><span class="o">=</span><span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">reports</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">r</span><span class="o">.</span><span class="n">profile</span><span class="p">],</span>
-</span><span id="__span-0-650"><a id="__codelineno-0-650" name="__codelineno-0-650"></a>        <span class="p">)</span>
+</span><span id="__span-0-611"><a id="__codelineno-0-611" name="__codelineno-0-611"></a><span class="sd">        Returns</span>
+</span><span id="__span-0-612"><a id="__codelineno-0-612" name="__codelineno-0-612"></a><span class="sd">        -------</span>
+</span><span id="__span-0-613"><a id="__codelineno-0-613" name="__codelineno-0-613"></a><span class="sd">        IdentifiabilityReport</span>
+</span><span id="__span-0-614"><a id="__codelineno-0-614" name="__codelineno-0-614"></a><span class="sd">            The joined report.</span>
+</span><span id="__span-0-615"><a id="__codelineno-0-615" name="__codelineno-0-615"></a>
+</span><span id="__span-0-616"><a id="__codelineno-0-616" name="__codelineno-0-616"></a><span class="sd">        Raises</span>
+</span><span id="__span-0-617"><a id="__codelineno-0-617" name="__codelineno-0-617"></a><span class="sd">        ------</span>
+</span><span id="__span-0-618"><a id="__codelineno-0-618" name="__codelineno-0-618"></a><span class="sd">        ValueError</span>
+</span><span id="__span-0-619"><a id="__codelineno-0-619" name="__codelineno-0-619"></a><span class="sd">            If a report has other parameters.</span>
+</span><span id="__span-0-620"><a id="__codelineno-0-620" name="__codelineno-0-620"></a><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="__span-0-621"><a id="__codelineno-0-621" name="__codelineno-0-621"></a>        <span class="n">reports</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">others</span><span class="p">]</span>
+</span><span id="__span-0-622"><a id="__codelineno-0-622" name="__codelineno-0-622"></a>        <span class="k">for</span> <span class="n">other</span> <span class="ow">in</span> <span class="n">others</span><span class="p">:</span>
+</span><span id="__span-0-623"><a id="__codelineno-0-623" name="__codelineno-0-623"></a>            <span class="k">if</span> <span class="n">other</span><span class="o">.</span><span class="n">parameters</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">:</span>
+</span><span id="__span-0-624"><a id="__codelineno-0-624" name="__codelineno-0-624"></a>                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+</span><span id="__span-0-625"><a id="__codelineno-0-625" name="__codelineno-0-625"></a>                    <span class="sa">f</span><span class="s2">&quot;Reports of different parameters cannot merge: &quot;</span>
+</span><span id="__span-0-626"><a id="__codelineno-0-626" name="__codelineno-0-626"></a>                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="si">}</span><span class="s2"> and </span><span class="si">{</span><span class="n">other</span><span class="o">.</span><span class="n">parameters</span><span class="si">}</span><span class="s2">.&quot;</span>
+</span><span id="__span-0-627"><a id="__codelineno-0-627" name="__codelineno-0-627"></a>                <span class="p">)</span>
+</span><span id="__span-0-628"><a id="__codelineno-0-628" name="__codelineno-0-628"></a>        <span class="n">verdicts</span> <span class="o">=</span> <span class="p">{</span>
+</span><span id="__span-0-629"><a id="__codelineno-0-629" name="__codelineno-0-629"></a>            <span class="n">name</span><span class="p">:</span> <span class="n">ParameterVerdicts</span><span class="p">(</span>
+</span><span id="__span-0-630"><a id="__codelineno-0-630" name="__codelineno-0-630"></a>                <span class="n">structural</span><span class="o">=</span><span class="n">_merge_structural</span><span class="p">(</span>
+</span><span id="__span-0-631"><a id="__codelineno-0-631" name="__codelineno-0-631"></a>                    <span class="p">[</span>
+</span><span id="__span-0-632"><a id="__codelineno-0-632" name="__codelineno-0-632"></a>                        <span class="n">v</span>
+</span><span id="__span-0-633"><a id="__codelineno-0-633" name="__codelineno-0-633"></a>                        <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">reports</span>
+</span><span id="__span-0-634"><a id="__codelineno-0-634" name="__codelineno-0-634"></a>                        <span class="k">if</span> <span class="p">(</span><span class="n">v</span> <span class="o">:=</span> <span class="n">r</span><span class="o">.</span><span class="n">verdicts</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">structural</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+</span><span id="__span-0-635"><a id="__codelineno-0-635" name="__codelineno-0-635"></a>                    <span class="p">]</span>
+</span><span id="__span-0-636"><a id="__codelineno-0-636" name="__codelineno-0-636"></a>                <span class="p">),</span>
+</span><span id="__span-0-637"><a id="__codelineno-0-637" name="__codelineno-0-637"></a>                <span class="n">practical</span><span class="o">=</span><span class="n">_merge_practical</span><span class="p">(</span>
+</span><span id="__span-0-638"><a id="__codelineno-0-638" name="__codelineno-0-638"></a>                    <span class="p">[</span>
+</span><span id="__span-0-639"><a id="__codelineno-0-639" name="__codelineno-0-639"></a>                        <span class="n">v</span>
+</span><span id="__span-0-640"><a id="__codelineno-0-640" name="__codelineno-0-640"></a>                        <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">reports</span>
+</span><span id="__span-0-641"><a id="__codelineno-0-641" name="__codelineno-0-641"></a>                        <span class="k">if</span> <span class="p">(</span><span class="n">v</span> <span class="o">:=</span> <span class="n">r</span><span class="o">.</span><span class="n">verdicts</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">practical</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+</span><span id="__span-0-642"><a id="__codelineno-0-642" name="__codelineno-0-642"></a>                    <span class="p">]</span>
+</span><span id="__span-0-643"><a id="__codelineno-0-643" name="__codelineno-0-643"></a>                <span class="p">),</span>
+</span><span id="__span-0-644"><a id="__codelineno-0-644" name="__codelineno-0-644"></a>            <span class="p">)</span>
+</span><span id="__span-0-645"><a id="__codelineno-0-645" name="__codelineno-0-645"></a>            <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span>
+</span><span id="__span-0-646"><a id="__codelineno-0-646" name="__codelineno-0-646"></a>        <span class="p">}</span>
+</span><span id="__span-0-647"><a id="__codelineno-0-647" name="__codelineno-0-647"></a>        <span class="k">return</span> <span class="n">IdentifiabilityReport</span><span class="p">(</span>
+</span><span id="__span-0-648"><a id="__codelineno-0-648" name="__codelineno-0-648"></a>            <span class="n">parameters</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">,</span>
+</span><span id="__span-0-649"><a id="__codelineno-0-649" name="__codelineno-0-649"></a>            <span class="n">verdicts</span><span class="o">=</span><span class="n">verdicts</span><span class="p">,</span>
+</span><span id="__span-0-650"><a id="__codelineno-0-650" name="__codelineno-0-650"></a>            <span class="n">structural</span><span class="o">=</span><span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">reports</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">r</span><span class="o">.</span><span class="n">structural</span><span class="p">],</span>
+</span><span id="__span-0-651"><a id="__codelineno-0-651" name="__codelineno-0-651"></a>            <span class="n">collinearity</span><span class="o">=</span><span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">reports</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">r</span><span class="o">.</span><span class="n">collinearity</span><span class="p">],</span>
+</span><span id="__span-0-652"><a id="__codelineno-0-652" name="__codelineno-0-652"></a>            <span class="n">sample</span><span class="o">=</span><span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">reports</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">r</span><span class="o">.</span><span class="n">sample</span><span class="p">],</span>
+</span><span id="__span-0-653"><a id="__codelineno-0-653" name="__codelineno-0-653"></a>            <span class="n">starts</span><span class="o">=</span><span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">reports</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">r</span><span class="o">.</span><span class="n">starts</span><span class="p">],</span>
+</span><span id="__span-0-654"><a id="__codelineno-0-654" name="__codelineno-0-654"></a>            <span class="n">profile</span><span class="o">=</span><span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">reports</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">r</span><span class="o">.</span><span class="n">profile</span><span class="p">],</span>
+</span><span id="__span-0-655"><a id="__codelineno-0-655" name="__codelineno-0-655"></a>        <span class="p">)</span>
 </span></code></pre></div></td></tr></table></div>
               </details>
 
@@ -6221,29 +6227,29 @@ each method that ran.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>commol/identifiability/results.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-579">579</a></span>
-<span class="normal"><a href="#__codelineno-0-580">580</a></span>
-<span class="normal"><a href="#__codelineno-0-581">581</a></span>
-<span class="normal"><a href="#__codelineno-0-582">582</a></span>
-<span class="normal"><a href="#__codelineno-0-583">583</a></span>
-<span class="normal"><a href="#__codelineno-0-584">584</a></span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-584">584</a></span>
 <span class="normal"><a href="#__codelineno-0-585">585</a></span>
 <span class="normal"><a href="#__codelineno-0-586">586</a></span>
 <span class="normal"><a href="#__codelineno-0-587">587</a></span>
 <span class="normal"><a href="#__codelineno-0-588">588</a></span>
 <span class="normal"><a href="#__codelineno-0-589">589</a></span>
-<span class="normal"><a href="#__codelineno-0-590">590</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-579"><a id="__codelineno-0-579" name="__codelineno-0-579"></a><span class="k">def</span><span class="w"> </span><span class="nf">report</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IdentifiabilityReportData</span><span class="p">:</span>
-</span><span id="__span-0-580"><a id="__codelineno-0-580" name="__codelineno-0-580"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="__span-0-581"><a id="__codelineno-0-581" name="__codelineno-0-581"></a><span class="sd">    Report the identifiability of each parameter as plain data.</span>
-</span><span id="__span-0-582"><a id="__codelineno-0-582" name="__codelineno-0-582"></a>
-</span><span id="__span-0-583"><a id="__codelineno-0-583" name="__codelineno-0-583"></a><span class="sd">    Returns</span>
-</span><span id="__span-0-584"><a id="__codelineno-0-584" name="__codelineno-0-584"></a><span class="sd">    -------</span>
-</span><span id="__span-0-585"><a id="__codelineno-0-585" name="__codelineno-0-585"></a><span class="sd">    IdentifiabilityReportData</span>
-</span><span id="__span-0-586"><a id="__codelineno-0-586" name="__codelineno-0-586"></a><span class="sd">        ``parameters``: each parameter, in problem order, with its</span>
-</span><span id="__span-0-587"><a id="__codelineno-0-587" name="__codelineno-0-587"></a><span class="sd">        structural and practical verdicts; ``sections``: the evidence of</span>
-</span><span id="__span-0-588"><a id="__codelineno-0-588" name="__codelineno-0-588"></a><span class="sd">        each method that ran.</span>
-</span><span id="__span-0-589"><a id="__codelineno-0-589" name="__codelineno-0-589"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-590"><a id="__codelineno-0-590" name="__codelineno-0-590"></a>    <span class="k">return</span> <span class="n">identifiability_report</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+<span class="normal"><a href="#__codelineno-0-590">590</a></span>
+<span class="normal"><a href="#__codelineno-0-591">591</a></span>
+<span class="normal"><a href="#__codelineno-0-592">592</a></span>
+<span class="normal"><a href="#__codelineno-0-593">593</a></span>
+<span class="normal"><a href="#__codelineno-0-594">594</a></span>
+<span class="normal"><a href="#__codelineno-0-595">595</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-584"><a id="__codelineno-0-584" name="__codelineno-0-584"></a><span class="k">def</span><span class="w"> </span><span class="nf">report</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IdentifiabilityReportData</span><span class="p">:</span>
+</span><span id="__span-0-585"><a id="__codelineno-0-585" name="__codelineno-0-585"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="__span-0-586"><a id="__codelineno-0-586" name="__codelineno-0-586"></a><span class="sd">    Report the identifiability of each parameter as plain data.</span>
+</span><span id="__span-0-587"><a id="__codelineno-0-587" name="__codelineno-0-587"></a>
+</span><span id="__span-0-588"><a id="__codelineno-0-588" name="__codelineno-0-588"></a><span class="sd">    Returns</span>
+</span><span id="__span-0-589"><a id="__codelineno-0-589" name="__codelineno-0-589"></a><span class="sd">    -------</span>
+</span><span id="__span-0-590"><a id="__codelineno-0-590" name="__codelineno-0-590"></a><span class="sd">    IdentifiabilityReportData</span>
+</span><span id="__span-0-591"><a id="__codelineno-0-591" name="__codelineno-0-591"></a><span class="sd">        ``parameters``: each parameter, in problem order, with its</span>
+</span><span id="__span-0-592"><a id="__codelineno-0-592" name="__codelineno-0-592"></a><span class="sd">        structural and practical verdicts; ``sections``: the evidence of</span>
+</span><span id="__span-0-593"><a id="__codelineno-0-593" name="__codelineno-0-593"></a><span class="sd">        each method that ran.</span>
+</span><span id="__span-0-594"><a id="__codelineno-0-594" name="__codelineno-0-594"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-595"><a id="__codelineno-0-595" name="__codelineno-0-595"></a>    <span class="k">return</span> <span class="n">identifiability_report</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -6349,12 +6355,7 @@ adds its reasons and leaves the verdicts of the other reports.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>commol/identifiability/results.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-592">592</a></span>
-<span class="normal"><a href="#__codelineno-0-593">593</a></span>
-<span class="normal"><a href="#__codelineno-0-594">594</a></span>
-<span class="normal"><a href="#__codelineno-0-595">595</a></span>
-<span class="normal"><a href="#__codelineno-0-596">596</a></span>
-<span class="normal"><a href="#__codelineno-0-597">597</a></span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-597">597</a></span>
 <span class="normal"><a href="#__codelineno-0-598">598</a></span>
 <span class="normal"><a href="#__codelineno-0-599">599</a></span>
 <span class="normal"><a href="#__codelineno-0-600">600</a></span>
@@ -6407,65 +6408,70 @@ adds its reasons and leaves the verdicts of the other reports.</p>
 <span class="normal"><a href="#__codelineno-0-647">647</a></span>
 <span class="normal"><a href="#__codelineno-0-648">648</a></span>
 <span class="normal"><a href="#__codelineno-0-649">649</a></span>
-<span class="normal"><a href="#__codelineno-0-650">650</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-592"><a id="__codelineno-0-592" name="__codelineno-0-592"></a><span class="k">def</span><span class="w"> </span><span class="nf">merge</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">others</span><span class="p">:</span> <span class="s2">&quot;IdentifiabilityReport&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;IdentifiabilityReport&quot;</span><span class="p">:</span>
-</span><span id="__span-0-593"><a id="__codelineno-0-593" name="__codelineno-0-593"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="__span-0-594"><a id="__codelineno-0-594" name="__codelineno-0-594"></a><span class="sd">    Join this report with others of the same parameters.</span>
-</span><span id="__span-0-595"><a id="__codelineno-0-595" name="__codelineno-0-595"></a>
-</span><span id="__span-0-596"><a id="__codelineno-0-596" name="__codelineno-0-596"></a><span class="sd">    The sections are kept side by side. A verdict that the reports agree</span>
-</span><span id="__span-0-597"><a id="__codelineno-0-597" name="__codelineno-0-597"></a><span class="sd">    on stays, with the reasons of each; one they disagree on is</span>
-</span><span id="__span-0-598"><a id="__codelineno-0-598" name="__codelineno-0-598"></a><span class="sd">    ``conflicting``, with every reason. A structural verdict of ``None``</span>
-</span><span id="__span-0-599"><a id="__codelineno-0-599" name="__codelineno-0-599"></a><span class="sd">    adds its reasons and leaves the verdicts of the other reports.</span>
+<span class="normal"><a href="#__codelineno-0-650">650</a></span>
+<span class="normal"><a href="#__codelineno-0-651">651</a></span>
+<span class="normal"><a href="#__codelineno-0-652">652</a></span>
+<span class="normal"><a href="#__codelineno-0-653">653</a></span>
+<span class="normal"><a href="#__codelineno-0-654">654</a></span>
+<span class="normal"><a href="#__codelineno-0-655">655</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-597"><a id="__codelineno-0-597" name="__codelineno-0-597"></a><span class="k">def</span><span class="w"> </span><span class="nf">merge</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">others</span><span class="p">:</span> <span class="s2">&quot;IdentifiabilityReport&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;IdentifiabilityReport&quot;</span><span class="p">:</span>
+</span><span id="__span-0-598"><a id="__codelineno-0-598" name="__codelineno-0-598"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="__span-0-599"><a id="__codelineno-0-599" name="__codelineno-0-599"></a><span class="sd">    Join this report with others of the same parameters.</span>
 </span><span id="__span-0-600"><a id="__codelineno-0-600" name="__codelineno-0-600"></a>
-</span><span id="__span-0-601"><a id="__codelineno-0-601" name="__codelineno-0-601"></a><span class="sd">    Parameters</span>
-</span><span id="__span-0-602"><a id="__codelineno-0-602" name="__codelineno-0-602"></a><span class="sd">    ----------</span>
-</span><span id="__span-0-603"><a id="__codelineno-0-603" name="__codelineno-0-603"></a><span class="sd">    *others : IdentifiabilityReport</span>
-</span><span id="__span-0-604"><a id="__codelineno-0-604" name="__codelineno-0-604"></a><span class="sd">        The reports to join.</span>
+</span><span id="__span-0-601"><a id="__codelineno-0-601" name="__codelineno-0-601"></a><span class="sd">    The sections are kept side by side. A verdict that the reports agree</span>
+</span><span id="__span-0-602"><a id="__codelineno-0-602" name="__codelineno-0-602"></a><span class="sd">    on stays, with the reasons of each; one they disagree on is</span>
+</span><span id="__span-0-603"><a id="__codelineno-0-603" name="__codelineno-0-603"></a><span class="sd">    ``conflicting``, with every reason. A structural verdict of ``None``</span>
+</span><span id="__span-0-604"><a id="__codelineno-0-604" name="__codelineno-0-604"></a><span class="sd">    adds its reasons and leaves the verdicts of the other reports.</span>
 </span><span id="__span-0-605"><a id="__codelineno-0-605" name="__codelineno-0-605"></a>
-</span><span id="__span-0-606"><a id="__codelineno-0-606" name="__codelineno-0-606"></a><span class="sd">    Returns</span>
-</span><span id="__span-0-607"><a id="__codelineno-0-607" name="__codelineno-0-607"></a><span class="sd">    -------</span>
-</span><span id="__span-0-608"><a id="__codelineno-0-608" name="__codelineno-0-608"></a><span class="sd">    IdentifiabilityReport</span>
-</span><span id="__span-0-609"><a id="__codelineno-0-609" name="__codelineno-0-609"></a><span class="sd">        The joined report.</span>
+</span><span id="__span-0-606"><a id="__codelineno-0-606" name="__codelineno-0-606"></a><span class="sd">    Parameters</span>
+</span><span id="__span-0-607"><a id="__codelineno-0-607" name="__codelineno-0-607"></a><span class="sd">    ----------</span>
+</span><span id="__span-0-608"><a id="__codelineno-0-608" name="__codelineno-0-608"></a><span class="sd">    *others : IdentifiabilityReport</span>
+</span><span id="__span-0-609"><a id="__codelineno-0-609" name="__codelineno-0-609"></a><span class="sd">        The reports to join.</span>
 </span><span id="__span-0-610"><a id="__codelineno-0-610" name="__codelineno-0-610"></a>
-</span><span id="__span-0-611"><a id="__codelineno-0-611" name="__codelineno-0-611"></a><span class="sd">    Raises</span>
-</span><span id="__span-0-612"><a id="__codelineno-0-612" name="__codelineno-0-612"></a><span class="sd">    ------</span>
-</span><span id="__span-0-613"><a id="__codelineno-0-613" name="__codelineno-0-613"></a><span class="sd">    ValueError</span>
-</span><span id="__span-0-614"><a id="__codelineno-0-614" name="__codelineno-0-614"></a><span class="sd">        If a report has other parameters.</span>
-</span><span id="__span-0-615"><a id="__codelineno-0-615" name="__codelineno-0-615"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-616"><a id="__codelineno-0-616" name="__codelineno-0-616"></a>    <span class="n">reports</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">others</span><span class="p">]</span>
-</span><span id="__span-0-617"><a id="__codelineno-0-617" name="__codelineno-0-617"></a>    <span class="k">for</span> <span class="n">other</span> <span class="ow">in</span> <span class="n">others</span><span class="p">:</span>
-</span><span id="__span-0-618"><a id="__codelineno-0-618" name="__codelineno-0-618"></a>        <span class="k">if</span> <span class="n">other</span><span class="o">.</span><span class="n">parameters</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">:</span>
-</span><span id="__span-0-619"><a id="__codelineno-0-619" name="__codelineno-0-619"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-</span><span id="__span-0-620"><a id="__codelineno-0-620" name="__codelineno-0-620"></a>                <span class="sa">f</span><span class="s2">&quot;Reports of different parameters cannot merge: &quot;</span>
-</span><span id="__span-0-621"><a id="__codelineno-0-621" name="__codelineno-0-621"></a>                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="si">}</span><span class="s2"> and </span><span class="si">{</span><span class="n">other</span><span class="o">.</span><span class="n">parameters</span><span class="si">}</span><span class="s2">.&quot;</span>
-</span><span id="__span-0-622"><a id="__codelineno-0-622" name="__codelineno-0-622"></a>            <span class="p">)</span>
-</span><span id="__span-0-623"><a id="__codelineno-0-623" name="__codelineno-0-623"></a>    <span class="n">verdicts</span> <span class="o">=</span> <span class="p">{</span>
-</span><span id="__span-0-624"><a id="__codelineno-0-624" name="__codelineno-0-624"></a>        <span class="n">name</span><span class="p">:</span> <span class="n">ParameterVerdicts</span><span class="p">(</span>
-</span><span id="__span-0-625"><a id="__codelineno-0-625" name="__codelineno-0-625"></a>            <span class="n">structural</span><span class="o">=</span><span class="n">_merge_structural</span><span class="p">(</span>
-</span><span id="__span-0-626"><a id="__codelineno-0-626" name="__codelineno-0-626"></a>                <span class="p">[</span>
-</span><span id="__span-0-627"><a id="__codelineno-0-627" name="__codelineno-0-627"></a>                    <span class="n">v</span>
-</span><span id="__span-0-628"><a id="__codelineno-0-628" name="__codelineno-0-628"></a>                    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">reports</span>
-</span><span id="__span-0-629"><a id="__codelineno-0-629" name="__codelineno-0-629"></a>                    <span class="k">if</span> <span class="p">(</span><span class="n">v</span> <span class="o">:=</span> <span class="n">r</span><span class="o">.</span><span class="n">verdicts</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">structural</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-</span><span id="__span-0-630"><a id="__codelineno-0-630" name="__codelineno-0-630"></a>                <span class="p">]</span>
-</span><span id="__span-0-631"><a id="__codelineno-0-631" name="__codelineno-0-631"></a>            <span class="p">),</span>
-</span><span id="__span-0-632"><a id="__codelineno-0-632" name="__codelineno-0-632"></a>            <span class="n">practical</span><span class="o">=</span><span class="n">_merge_practical</span><span class="p">(</span>
-</span><span id="__span-0-633"><a id="__codelineno-0-633" name="__codelineno-0-633"></a>                <span class="p">[</span>
-</span><span id="__span-0-634"><a id="__codelineno-0-634" name="__codelineno-0-634"></a>                    <span class="n">v</span>
-</span><span id="__span-0-635"><a id="__codelineno-0-635" name="__codelineno-0-635"></a>                    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">reports</span>
-</span><span id="__span-0-636"><a id="__codelineno-0-636" name="__codelineno-0-636"></a>                    <span class="k">if</span> <span class="p">(</span><span class="n">v</span> <span class="o">:=</span> <span class="n">r</span><span class="o">.</span><span class="n">verdicts</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">practical</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-</span><span id="__span-0-637"><a id="__codelineno-0-637" name="__codelineno-0-637"></a>                <span class="p">]</span>
-</span><span id="__span-0-638"><a id="__codelineno-0-638" name="__codelineno-0-638"></a>            <span class="p">),</span>
-</span><span id="__span-0-639"><a id="__codelineno-0-639" name="__codelineno-0-639"></a>        <span class="p">)</span>
-</span><span id="__span-0-640"><a id="__codelineno-0-640" name="__codelineno-0-640"></a>        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span>
-</span><span id="__span-0-641"><a id="__codelineno-0-641" name="__codelineno-0-641"></a>    <span class="p">}</span>
-</span><span id="__span-0-642"><a id="__codelineno-0-642" name="__codelineno-0-642"></a>    <span class="k">return</span> <span class="n">IdentifiabilityReport</span><span class="p">(</span>
-</span><span id="__span-0-643"><a id="__codelineno-0-643" name="__codelineno-0-643"></a>        <span class="n">parameters</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">,</span>
-</span><span id="__span-0-644"><a id="__codelineno-0-644" name="__codelineno-0-644"></a>        <span class="n">verdicts</span><span class="o">=</span><span class="n">verdicts</span><span class="p">,</span>
-</span><span id="__span-0-645"><a id="__codelineno-0-645" name="__codelineno-0-645"></a>        <span class="n">structural</span><span class="o">=</span><span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">reports</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">r</span><span class="o">.</span><span class="n">structural</span><span class="p">],</span>
-</span><span id="__span-0-646"><a id="__codelineno-0-646" name="__codelineno-0-646"></a>        <span class="n">collinearity</span><span class="o">=</span><span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">reports</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">r</span><span class="o">.</span><span class="n">collinearity</span><span class="p">],</span>
-</span><span id="__span-0-647"><a id="__codelineno-0-647" name="__codelineno-0-647"></a>        <span class="n">sample</span><span class="o">=</span><span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">reports</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">r</span><span class="o">.</span><span class="n">sample</span><span class="p">],</span>
-</span><span id="__span-0-648"><a id="__codelineno-0-648" name="__codelineno-0-648"></a>        <span class="n">starts</span><span class="o">=</span><span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">reports</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">r</span><span class="o">.</span><span class="n">starts</span><span class="p">],</span>
-</span><span id="__span-0-649"><a id="__codelineno-0-649" name="__codelineno-0-649"></a>        <span class="n">profile</span><span class="o">=</span><span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">reports</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">r</span><span class="o">.</span><span class="n">profile</span><span class="p">],</span>
-</span><span id="__span-0-650"><a id="__codelineno-0-650" name="__codelineno-0-650"></a>    <span class="p">)</span>
+</span><span id="__span-0-611"><a id="__codelineno-0-611" name="__codelineno-0-611"></a><span class="sd">    Returns</span>
+</span><span id="__span-0-612"><a id="__codelineno-0-612" name="__codelineno-0-612"></a><span class="sd">    -------</span>
+</span><span id="__span-0-613"><a id="__codelineno-0-613" name="__codelineno-0-613"></a><span class="sd">    IdentifiabilityReport</span>
+</span><span id="__span-0-614"><a id="__codelineno-0-614" name="__codelineno-0-614"></a><span class="sd">        The joined report.</span>
+</span><span id="__span-0-615"><a id="__codelineno-0-615" name="__codelineno-0-615"></a>
+</span><span id="__span-0-616"><a id="__codelineno-0-616" name="__codelineno-0-616"></a><span class="sd">    Raises</span>
+</span><span id="__span-0-617"><a id="__codelineno-0-617" name="__codelineno-0-617"></a><span class="sd">    ------</span>
+</span><span id="__span-0-618"><a id="__codelineno-0-618" name="__codelineno-0-618"></a><span class="sd">    ValueError</span>
+</span><span id="__span-0-619"><a id="__codelineno-0-619" name="__codelineno-0-619"></a><span class="sd">        If a report has other parameters.</span>
+</span><span id="__span-0-620"><a id="__codelineno-0-620" name="__codelineno-0-620"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-621"><a id="__codelineno-0-621" name="__codelineno-0-621"></a>    <span class="n">reports</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">others</span><span class="p">]</span>
+</span><span id="__span-0-622"><a id="__codelineno-0-622" name="__codelineno-0-622"></a>    <span class="k">for</span> <span class="n">other</span> <span class="ow">in</span> <span class="n">others</span><span class="p">:</span>
+</span><span id="__span-0-623"><a id="__codelineno-0-623" name="__codelineno-0-623"></a>        <span class="k">if</span> <span class="n">other</span><span class="o">.</span><span class="n">parameters</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">:</span>
+</span><span id="__span-0-624"><a id="__codelineno-0-624" name="__codelineno-0-624"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+</span><span id="__span-0-625"><a id="__codelineno-0-625" name="__codelineno-0-625"></a>                <span class="sa">f</span><span class="s2">&quot;Reports of different parameters cannot merge: &quot;</span>
+</span><span id="__span-0-626"><a id="__codelineno-0-626" name="__codelineno-0-626"></a>                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="si">}</span><span class="s2"> and </span><span class="si">{</span><span class="n">other</span><span class="o">.</span><span class="n">parameters</span><span class="si">}</span><span class="s2">.&quot;</span>
+</span><span id="__span-0-627"><a id="__codelineno-0-627" name="__codelineno-0-627"></a>            <span class="p">)</span>
+</span><span id="__span-0-628"><a id="__codelineno-0-628" name="__codelineno-0-628"></a>    <span class="n">verdicts</span> <span class="o">=</span> <span class="p">{</span>
+</span><span id="__span-0-629"><a id="__codelineno-0-629" name="__codelineno-0-629"></a>        <span class="n">name</span><span class="p">:</span> <span class="n">ParameterVerdicts</span><span class="p">(</span>
+</span><span id="__span-0-630"><a id="__codelineno-0-630" name="__codelineno-0-630"></a>            <span class="n">structural</span><span class="o">=</span><span class="n">_merge_structural</span><span class="p">(</span>
+</span><span id="__span-0-631"><a id="__codelineno-0-631" name="__codelineno-0-631"></a>                <span class="p">[</span>
+</span><span id="__span-0-632"><a id="__codelineno-0-632" name="__codelineno-0-632"></a>                    <span class="n">v</span>
+</span><span id="__span-0-633"><a id="__codelineno-0-633" name="__codelineno-0-633"></a>                    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">reports</span>
+</span><span id="__span-0-634"><a id="__codelineno-0-634" name="__codelineno-0-634"></a>                    <span class="k">if</span> <span class="p">(</span><span class="n">v</span> <span class="o">:=</span> <span class="n">r</span><span class="o">.</span><span class="n">verdicts</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">structural</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+</span><span id="__span-0-635"><a id="__codelineno-0-635" name="__codelineno-0-635"></a>                <span class="p">]</span>
+</span><span id="__span-0-636"><a id="__codelineno-0-636" name="__codelineno-0-636"></a>            <span class="p">),</span>
+</span><span id="__span-0-637"><a id="__codelineno-0-637" name="__codelineno-0-637"></a>            <span class="n">practical</span><span class="o">=</span><span class="n">_merge_practical</span><span class="p">(</span>
+</span><span id="__span-0-638"><a id="__codelineno-0-638" name="__codelineno-0-638"></a>                <span class="p">[</span>
+</span><span id="__span-0-639"><a id="__codelineno-0-639" name="__codelineno-0-639"></a>                    <span class="n">v</span>
+</span><span id="__span-0-640"><a id="__codelineno-0-640" name="__codelineno-0-640"></a>                    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">reports</span>
+</span><span id="__span-0-641"><a id="__codelineno-0-641" name="__codelineno-0-641"></a>                    <span class="k">if</span> <span class="p">(</span><span class="n">v</span> <span class="o">:=</span> <span class="n">r</span><span class="o">.</span><span class="n">verdicts</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">practical</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+</span><span id="__span-0-642"><a id="__codelineno-0-642" name="__codelineno-0-642"></a>                <span class="p">]</span>
+</span><span id="__span-0-643"><a id="__codelineno-0-643" name="__codelineno-0-643"></a>            <span class="p">),</span>
+</span><span id="__span-0-644"><a id="__codelineno-0-644" name="__codelineno-0-644"></a>        <span class="p">)</span>
+</span><span id="__span-0-645"><a id="__codelineno-0-645" name="__codelineno-0-645"></a>        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span>
+</span><span id="__span-0-646"><a id="__codelineno-0-646" name="__codelineno-0-646"></a>    <span class="p">}</span>
+</span><span id="__span-0-647"><a id="__codelineno-0-647" name="__codelineno-0-647"></a>    <span class="k">return</span> <span class="n">IdentifiabilityReport</span><span class="p">(</span>
+</span><span id="__span-0-648"><a id="__codelineno-0-648" name="__codelineno-0-648"></a>        <span class="n">parameters</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">,</span>
+</span><span id="__span-0-649"><a id="__codelineno-0-649" name="__codelineno-0-649"></a>        <span class="n">verdicts</span><span class="o">=</span><span class="n">verdicts</span><span class="p">,</span>
+</span><span id="__span-0-650"><a id="__codelineno-0-650" name="__codelineno-0-650"></a>        <span class="n">structural</span><span class="o">=</span><span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">reports</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">r</span><span class="o">.</span><span class="n">structural</span><span class="p">],</span>
+</span><span id="__span-0-651"><a id="__codelineno-0-651" name="__codelineno-0-651"></a>        <span class="n">collinearity</span><span class="o">=</span><span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">reports</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">r</span><span class="o">.</span><span class="n">collinearity</span><span class="p">],</span>
+</span><span id="__span-0-652"><a id="__codelineno-0-652" name="__codelineno-0-652"></a>        <span class="n">sample</span><span class="o">=</span><span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">reports</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">r</span><span class="o">.</span><span class="n">sample</span><span class="p">],</span>
+</span><span id="__span-0-653"><a id="__codelineno-0-653" name="__codelineno-0-653"></a>        <span class="n">starts</span><span class="o">=</span><span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">reports</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">r</span><span class="o">.</span><span class="n">starts</span><span class="p">],</span>
+</span><span id="__span-0-654"><a id="__codelineno-0-654" name="__codelineno-0-654"></a>        <span class="n">profile</span><span class="o">=</span><span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">reports</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">r</span><span class="o">.</span><span class="n">profile</span><span class="p">],</span>
+</span><span id="__span-0-655"><a id="__codelineno-0-655" name="__codelineno-0-655"></a>    <span class="p">)</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -8299,18 +8305,22 @@ verdict is <code>poorly_determined</code>.</p>
               <div class="doc-md-description">
                 <p><code>1 − Var(sample) / Var(reference)</code> of each parameter, on its scale:
 near 0 when the sample spreads as the reference, near 1 when it sits
-on a value.</p>
+on a value, and 1 for a parameter constant in every draw, which the
+sample did not explore.</p>
               </div>
             </td>
           </tr>
           <tr class="doc-section-item">
             <td><code><span title="commol.identifiability.SampleSection.correlation">correlation</span></code></td>
             <td>
-                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="dict">dict</span>[<span title="str">str</span>, <span title="float">float</span>]]</code>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="dict">dict</span>[<span title="str">str</span>, <span title="float">float</span> | None]]</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The weighted correlation matrix, on the scale of each parameter.</p>
+                <p>The weighted correlation matrix, on the scale of each parameter; None
+with a parameter whose weighted variance is 0, which has no
+correlation: one constant in every draw, or any of a sample of one
+distinct draw.</p>
               </div>
             </td>
           </tr>
@@ -8441,7 +8451,8 @@ count of hidden ridges over-counts.</p>
             <td>
               <div class="doc-md-description">
                 <p>What the section warns of: an effective size below <code>p + 1</code> or
-below <code>30·p</code>, no directions, or hidden ridges.</p>
+below <code>30·p</code>, the parameters constant in every draw, no directions,
+or hidden ridges.</p>
               </div>
             </td>
           </tr>
@@ -8539,7 +8550,12 @@ below <code>30·p</code>, no directions, or hidden ridges.</p>
 <span class="normal"><a href="#__codelineno-0-452">452</a></span>
 <span class="normal"><a href="#__codelineno-0-453">453</a></span>
 <span class="normal"><a href="#__codelineno-0-454">454</a></span>
-<span class="normal"><a href="#__codelineno-0-455">455</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-373"><a id="__codelineno-0-373" name="__codelineno-0-373"></a><span class="k">class</span><span class="w"> </span><span class="nc">SampleSection</span><span class="p">(</span><span class="n">_FrozenResult</span><span class="p">):</span>
+<span class="normal"><a href="#__codelineno-0-455">455</a></span>
+<span class="normal"><a href="#__codelineno-0-456">456</a></span>
+<span class="normal"><a href="#__codelineno-0-457">457</a></span>
+<span class="normal"><a href="#__codelineno-0-458">458</a></span>
+<span class="normal"><a href="#__codelineno-0-459">459</a></span>
+<span class="normal"><a href="#__codelineno-0-460">460</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-373"><a id="__codelineno-0-373" name="__codelineno-0-373"></a><span class="k">class</span><span class="w"> </span><span class="nc">SampleSection</span><span class="p">(</span><span class="n">_FrozenResult</span><span class="p">):</span>
 </span><span id="__span-0-374"><a id="__codelineno-0-374" name="__codelineno-0-374"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="__span-0-375"><a id="__codelineno-0-375" name="__codelineno-0-375"></a><span class="sd">    The evidence of `SampleIdentifiability`: what the sample learned about</span>
 </span><span id="__span-0-376"><a id="__codelineno-0-376" name="__codelineno-0-376"></a><span class="sd">    each parameter against its reference.</span>
@@ -8566,62 +8582,67 @@ below <code>30·p</code>, no directions, or hidden ridges.</p>
 </span><span id="__span-0-397"><a id="__codelineno-0-397" name="__codelineno-0-397"></a><span class="sd">    contraction : dict[str, float]</span>
 </span><span id="__span-0-398"><a id="__codelineno-0-398" name="__codelineno-0-398"></a><span class="sd">        ``1 − Var(sample) / Var(reference)`` of each parameter, on its scale:</span>
 </span><span id="__span-0-399"><a id="__codelineno-0-399" name="__codelineno-0-399"></a><span class="sd">        near 0 when the sample spreads as the reference, near 1 when it sits</span>
-</span><span id="__span-0-400"><a id="__codelineno-0-400" name="__codelineno-0-400"></a><span class="sd">        on a value.</span>
-</span><span id="__span-0-401"><a id="__codelineno-0-401" name="__codelineno-0-401"></a><span class="sd">    correlation : dict[str, dict[str, float]]</span>
-</span><span id="__span-0-402"><a id="__codelineno-0-402" name="__codelineno-0-402"></a><span class="sd">        The weighted correlation matrix, on the scale of each parameter.</span>
-</span><span id="__span-0-403"><a id="__codelineno-0-403" name="__codelineno-0-403"></a><span class="sd">    correlated_pairs : list[CorrelatedPair]</span>
-</span><span id="__span-0-404"><a id="__codelineno-0-404" name="__codelineno-0-404"></a><span class="sd">        The pairs above the threshold.</span>
-</span><span id="__span-0-405"><a id="__codelineno-0-405" name="__codelineno-0-405"></a><span class="sd">    modes : dict[str, list[float]]</span>
-</span><span id="__span-0-406"><a id="__codelineno-0-406" name="__codelineno-0-406"></a><span class="sd">        The modes of the marginal of each parameter, in parameter units.</span>
-</span><span id="__span-0-407"><a id="__codelineno-0-407" name="__codelineno-0-407"></a><span class="sd">    mass_below : dict[str, float]</span>
-</span><span id="__span-0-408"><a id="__codelineno-0-408" name="__codelineno-0-408"></a><span class="sd">        The weight of the draws where the distribution function of the</span>
-</span><span id="__span-0-409"><a id="__codelineno-0-409" name="__codelineno-0-409"></a><span class="sd">        reference is below `bound_share`.</span>
-</span><span id="__span-0-410"><a id="__codelineno-0-410" name="__codelineno-0-410"></a><span class="sd">    mass_above : dict[str, float]</span>
-</span><span id="__span-0-411"><a id="__codelineno-0-411" name="__codelineno-0-411"></a><span class="sd">        The weight of the draws where it is above ``1 − bound_share``.</span>
-</span><span id="__span-0-412"><a id="__codelineno-0-412" name="__codelineno-0-412"></a><span class="sd">    at_bound : dict[str, list[BoundSideName]]</span>
-</span><span id="__span-0-413"><a id="__codelineno-0-413" name="__codelineno-0-413"></a><span class="sd">        The sides whose finite bound, not the data, sets that side of the</span>
-</span><span id="__span-0-414"><a id="__codelineno-0-414" name="__codelineno-0-414"></a><span class="sd">        marginal of each parameter. It does not set the verdict.</span>
-</span><span id="__span-0-415"><a id="__codelineno-0-415" name="__codelineno-0-415"></a><span class="sd">    overlap : dict[str, float]</span>
-</span><span id="__span-0-416"><a id="__codelineno-0-416" name="__codelineno-0-416"></a><span class="sd">        ``Σ_b min(w_b, 1/B)`` of each parameter over `bins` bins of equal</span>
-</span><span id="__span-0-417"><a id="__codelineno-0-417" name="__codelineno-0-417"></a><span class="sd">        reference mass: 1 when the sample spreads as its reference, ``1/B``</span>
-</span><span id="__span-0-418"><a id="__codelineno-0-418" name="__codelineno-0-418"></a><span class="sd">        when it sits in one bin.</span>
-</span><span id="__span-0-419"><a id="__codelineno-0-419" name="__codelineno-0-419"></a><span class="sd">    bins : int</span>
-</span><span id="__span-0-420"><a id="__codelineno-0-420" name="__codelineno-0-420"></a><span class="sd">        The number of bins ``B = ⌈2 n_eff^{1/3}⌉`` of the overlap.</span>
-</span><span id="__span-0-421"><a id="__codelineno-0-421" name="__codelineno-0-421"></a><span class="sd">    directions : list[Direction]</span>
-</span><span id="__span-0-422"><a id="__codelineno-0-422" name="__codelineno-0-422"></a><span class="sd">        The directions of the parameters, from the least contracted; empty</span>
-</span><span id="__span-0-423"><a id="__codelineno-0-423" name="__codelineno-0-423"></a><span class="sd">        when the sample has at most as many distinct draws as parameters.</span>
-</span><span id="__span-0-424"><a id="__codelineno-0-424" name="__codelineno-0-424"></a><span class="sd">    hidden_ridges : int | None</span>
-</span><span id="__span-0-425"><a id="__codelineno-0-425" name="__codelineno-0-425"></a><span class="sd">        How many directions among the parameters called ``determined`` have</span>
-</span><span id="__span-0-426"><a id="__codelineno-0-426" name="__codelineno-0-426"></a><span class="sd">        a contraction, corrected by a Bayesian bootstrap, below</span>
-</span><span id="__span-0-427"><a id="__codelineno-0-427" name="__codelineno-0-427"></a><span class="sd">        `contraction_threshold`: a ridge that no pair shows. None without</span>
-</span><span id="__span-0-428"><a id="__codelineno-0-428" name="__codelineno-0-428"></a><span class="sd">        directions.</span>
-</span><span id="__span-0-429"><a id="__codelineno-0-429" name="__codelineno-0-429"></a><span class="sd">    draws_per_parameter : float</span>
-</span><span id="__span-0-430"><a id="__codelineno-0-430" name="__codelineno-0-430"></a><span class="sd">        The effective size per parameter, ``n_eff / p``; below about 30 the</span>
-</span><span id="__span-0-431"><a id="__codelineno-0-431" name="__codelineno-0-431"></a><span class="sd">        count of hidden ridges over-counts.</span>
-</span><span id="__span-0-432"><a id="__codelineno-0-432" name="__codelineno-0-432"></a><span class="sd">    warnings : list[str]</span>
-</span><span id="__span-0-433"><a id="__codelineno-0-433" name="__codelineno-0-433"></a><span class="sd">        What the section warns of: an effective size below ``p + 1`` or</span>
-</span><span id="__span-0-434"><a id="__codelineno-0-434" name="__codelineno-0-434"></a><span class="sd">        below ``30·p``, no directions, or hidden ridges.</span>
-</span><span id="__span-0-435"><a id="__codelineno-0-435" name="__codelineno-0-435"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-436"><a id="__codelineno-0-436" name="__codelineno-0-436"></a>
-</span><span id="__span-0-437"><a id="__codelineno-0-437" name="__codelineno-0-437"></a>    <span class="n">reference</span><span class="p">:</span> <span class="n">SampleReference</span>
-</span><span id="__span-0-438"><a id="__codelineno-0-438" name="__codelineno-0-438"></a>    <span class="n">correlation_threshold</span><span class="p">:</span> <span class="nb">float</span>
-</span><span id="__span-0-439"><a id="__codelineno-0-439" name="__codelineno-0-439"></a>    <span class="n">contraction_threshold</span><span class="p">:</span> <span class="nb">float</span>
-</span><span id="__span-0-440"><a id="__codelineno-0-440" name="__codelineno-0-440"></a>    <span class="n">bound_share</span><span class="p">:</span> <span class="nb">float</span>
-</span><span id="__span-0-441"><a id="__codelineno-0-441" name="__codelineno-0-441"></a>    <span class="n">log_parameters</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
-</span><span id="__span-0-442"><a id="__codelineno-0-442" name="__codelineno-0-442"></a>    <span class="n">effective_size</span><span class="p">:</span> <span class="nb">float</span>
-</span><span id="__span-0-443"><a id="__codelineno-0-443" name="__codelineno-0-443"></a>    <span class="n">contraction</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span>
-</span><span id="__span-0-444"><a id="__codelineno-0-444" name="__codelineno-0-444"></a>    <span class="n">correlation</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]</span>
-</span><span id="__span-0-445"><a id="__codelineno-0-445" name="__codelineno-0-445"></a>    <span class="n">correlated_pairs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">CorrelatedPair</span><span class="p">]</span>
-</span><span id="__span-0-446"><a id="__codelineno-0-446" name="__codelineno-0-446"></a>    <span class="n">modes</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]]</span>
-</span><span id="__span-0-447"><a id="__codelineno-0-447" name="__codelineno-0-447"></a>    <span class="n">mass_below</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span>
-</span><span id="__span-0-448"><a id="__codelineno-0-448" name="__codelineno-0-448"></a>    <span class="n">mass_above</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span>
-</span><span id="__span-0-449"><a id="__codelineno-0-449" name="__codelineno-0-449"></a>    <span class="n">at_bound</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="n">BoundSideName</span><span class="p">]]</span>
-</span><span id="__span-0-450"><a id="__codelineno-0-450" name="__codelineno-0-450"></a>    <span class="n">overlap</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span>
-</span><span id="__span-0-451"><a id="__codelineno-0-451" name="__codelineno-0-451"></a>    <span class="n">bins</span><span class="p">:</span> <span class="nb">int</span>
-</span><span id="__span-0-452"><a id="__codelineno-0-452" name="__codelineno-0-452"></a>    <span class="n">directions</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Direction</span><span class="p">]</span>
-</span><span id="__span-0-453"><a id="__codelineno-0-453" name="__codelineno-0-453"></a>    <span class="n">hidden_ridges</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span>
-</span><span id="__span-0-454"><a id="__codelineno-0-454" name="__codelineno-0-454"></a>    <span class="n">draws_per_parameter</span><span class="p">:</span> <span class="nb">float</span>
-</span><span id="__span-0-455"><a id="__codelineno-0-455" name="__codelineno-0-455"></a>    <span class="n">warnings</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+</span><span id="__span-0-400"><a id="__codelineno-0-400" name="__codelineno-0-400"></a><span class="sd">        on a value, and 1 for a parameter constant in every draw, which the</span>
+</span><span id="__span-0-401"><a id="__codelineno-0-401" name="__codelineno-0-401"></a><span class="sd">        sample did not explore.</span>
+</span><span id="__span-0-402"><a id="__codelineno-0-402" name="__codelineno-0-402"></a><span class="sd">    correlation : dict[str, dict[str, float | None]]</span>
+</span><span id="__span-0-403"><a id="__codelineno-0-403" name="__codelineno-0-403"></a><span class="sd">        The weighted correlation matrix, on the scale of each parameter; None</span>
+</span><span id="__span-0-404"><a id="__codelineno-0-404" name="__codelineno-0-404"></a><span class="sd">        with a parameter whose weighted variance is 0, which has no</span>
+</span><span id="__span-0-405"><a id="__codelineno-0-405" name="__codelineno-0-405"></a><span class="sd">        correlation: one constant in every draw, or any of a sample of one</span>
+</span><span id="__span-0-406"><a id="__codelineno-0-406" name="__codelineno-0-406"></a><span class="sd">        distinct draw.</span>
+</span><span id="__span-0-407"><a id="__codelineno-0-407" name="__codelineno-0-407"></a><span class="sd">    correlated_pairs : list[CorrelatedPair]</span>
+</span><span id="__span-0-408"><a id="__codelineno-0-408" name="__codelineno-0-408"></a><span class="sd">        The pairs above the threshold.</span>
+</span><span id="__span-0-409"><a id="__codelineno-0-409" name="__codelineno-0-409"></a><span class="sd">    modes : dict[str, list[float]]</span>
+</span><span id="__span-0-410"><a id="__codelineno-0-410" name="__codelineno-0-410"></a><span class="sd">        The modes of the marginal of each parameter, in parameter units.</span>
+</span><span id="__span-0-411"><a id="__codelineno-0-411" name="__codelineno-0-411"></a><span class="sd">    mass_below : dict[str, float]</span>
+</span><span id="__span-0-412"><a id="__codelineno-0-412" name="__codelineno-0-412"></a><span class="sd">        The weight of the draws where the distribution function of the</span>
+</span><span id="__span-0-413"><a id="__codelineno-0-413" name="__codelineno-0-413"></a><span class="sd">        reference is below `bound_share`.</span>
+</span><span id="__span-0-414"><a id="__codelineno-0-414" name="__codelineno-0-414"></a><span class="sd">    mass_above : dict[str, float]</span>
+</span><span id="__span-0-415"><a id="__codelineno-0-415" name="__codelineno-0-415"></a><span class="sd">        The weight of the draws where it is above ``1 − bound_share``.</span>
+</span><span id="__span-0-416"><a id="__codelineno-0-416" name="__codelineno-0-416"></a><span class="sd">    at_bound : dict[str, list[BoundSideName]]</span>
+</span><span id="__span-0-417"><a id="__codelineno-0-417" name="__codelineno-0-417"></a><span class="sd">        The sides whose finite bound, not the data, sets that side of the</span>
+</span><span id="__span-0-418"><a id="__codelineno-0-418" name="__codelineno-0-418"></a><span class="sd">        marginal of each parameter. It does not set the verdict.</span>
+</span><span id="__span-0-419"><a id="__codelineno-0-419" name="__codelineno-0-419"></a><span class="sd">    overlap : dict[str, float]</span>
+</span><span id="__span-0-420"><a id="__codelineno-0-420" name="__codelineno-0-420"></a><span class="sd">        ``Σ_b min(w_b, 1/B)`` of each parameter over `bins` bins of equal</span>
+</span><span id="__span-0-421"><a id="__codelineno-0-421" name="__codelineno-0-421"></a><span class="sd">        reference mass: 1 when the sample spreads as its reference, ``1/B``</span>
+</span><span id="__span-0-422"><a id="__codelineno-0-422" name="__codelineno-0-422"></a><span class="sd">        when it sits in one bin.</span>
+</span><span id="__span-0-423"><a id="__codelineno-0-423" name="__codelineno-0-423"></a><span class="sd">    bins : int</span>
+</span><span id="__span-0-424"><a id="__codelineno-0-424" name="__codelineno-0-424"></a><span class="sd">        The number of bins ``B = ⌈2 n_eff^{1/3}⌉`` of the overlap.</span>
+</span><span id="__span-0-425"><a id="__codelineno-0-425" name="__codelineno-0-425"></a><span class="sd">    directions : list[Direction]</span>
+</span><span id="__span-0-426"><a id="__codelineno-0-426" name="__codelineno-0-426"></a><span class="sd">        The directions of the parameters, from the least contracted; empty</span>
+</span><span id="__span-0-427"><a id="__codelineno-0-427" name="__codelineno-0-427"></a><span class="sd">        when the sample has at most as many distinct draws as parameters.</span>
+</span><span id="__span-0-428"><a id="__codelineno-0-428" name="__codelineno-0-428"></a><span class="sd">    hidden_ridges : int | None</span>
+</span><span id="__span-0-429"><a id="__codelineno-0-429" name="__codelineno-0-429"></a><span class="sd">        How many directions among the parameters called ``determined`` have</span>
+</span><span id="__span-0-430"><a id="__codelineno-0-430" name="__codelineno-0-430"></a><span class="sd">        a contraction, corrected by a Bayesian bootstrap, below</span>
+</span><span id="__span-0-431"><a id="__codelineno-0-431" name="__codelineno-0-431"></a><span class="sd">        `contraction_threshold`: a ridge that no pair shows. None without</span>
+</span><span id="__span-0-432"><a id="__codelineno-0-432" name="__codelineno-0-432"></a><span class="sd">        directions.</span>
+</span><span id="__span-0-433"><a id="__codelineno-0-433" name="__codelineno-0-433"></a><span class="sd">    draws_per_parameter : float</span>
+</span><span id="__span-0-434"><a id="__codelineno-0-434" name="__codelineno-0-434"></a><span class="sd">        The effective size per parameter, ``n_eff / p``; below about 30 the</span>
+</span><span id="__span-0-435"><a id="__codelineno-0-435" name="__codelineno-0-435"></a><span class="sd">        count of hidden ridges over-counts.</span>
+</span><span id="__span-0-436"><a id="__codelineno-0-436" name="__codelineno-0-436"></a><span class="sd">    warnings : list[str]</span>
+</span><span id="__span-0-437"><a id="__codelineno-0-437" name="__codelineno-0-437"></a><span class="sd">        What the section warns of: an effective size below ``p + 1`` or</span>
+</span><span id="__span-0-438"><a id="__codelineno-0-438" name="__codelineno-0-438"></a><span class="sd">        below ``30·p``, the parameters constant in every draw, no directions,</span>
+</span><span id="__span-0-439"><a id="__codelineno-0-439" name="__codelineno-0-439"></a><span class="sd">        or hidden ridges.</span>
+</span><span id="__span-0-440"><a id="__codelineno-0-440" name="__codelineno-0-440"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-441"><a id="__codelineno-0-441" name="__codelineno-0-441"></a>
+</span><span id="__span-0-442"><a id="__codelineno-0-442" name="__codelineno-0-442"></a>    <span class="n">reference</span><span class="p">:</span> <span class="n">SampleReference</span>
+</span><span id="__span-0-443"><a id="__codelineno-0-443" name="__codelineno-0-443"></a>    <span class="n">correlation_threshold</span><span class="p">:</span> <span class="nb">float</span>
+</span><span id="__span-0-444"><a id="__codelineno-0-444" name="__codelineno-0-444"></a>    <span class="n">contraction_threshold</span><span class="p">:</span> <span class="nb">float</span>
+</span><span id="__span-0-445"><a id="__codelineno-0-445" name="__codelineno-0-445"></a>    <span class="n">bound_share</span><span class="p">:</span> <span class="nb">float</span>
+</span><span id="__span-0-446"><a id="__codelineno-0-446" name="__codelineno-0-446"></a>    <span class="n">log_parameters</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+</span><span id="__span-0-447"><a id="__codelineno-0-447" name="__codelineno-0-447"></a>    <span class="n">effective_size</span><span class="p">:</span> <span class="nb">float</span>
+</span><span id="__span-0-448"><a id="__codelineno-0-448" name="__codelineno-0-448"></a>    <span class="n">contraction</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span>
+</span><span id="__span-0-449"><a id="__codelineno-0-449" name="__codelineno-0-449"></a>    <span class="n">correlation</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]]</span>
+</span><span id="__span-0-450"><a id="__codelineno-0-450" name="__codelineno-0-450"></a>    <span class="n">correlated_pairs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">CorrelatedPair</span><span class="p">]</span>
+</span><span id="__span-0-451"><a id="__codelineno-0-451" name="__codelineno-0-451"></a>    <span class="n">modes</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]]</span>
+</span><span id="__span-0-452"><a id="__codelineno-0-452" name="__codelineno-0-452"></a>    <span class="n">mass_below</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span>
+</span><span id="__span-0-453"><a id="__codelineno-0-453" name="__codelineno-0-453"></a>    <span class="n">mass_above</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span>
+</span><span id="__span-0-454"><a id="__codelineno-0-454" name="__codelineno-0-454"></a>    <span class="n">at_bound</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="n">BoundSideName</span><span class="p">]]</span>
+</span><span id="__span-0-455"><a id="__codelineno-0-455" name="__codelineno-0-455"></a>    <span class="n">overlap</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span>
+</span><span id="__span-0-456"><a id="__codelineno-0-456" name="__codelineno-0-456"></a>    <span class="n">bins</span><span class="p">:</span> <span class="nb">int</span>
+</span><span id="__span-0-457"><a id="__codelineno-0-457" name="__codelineno-0-457"></a>    <span class="n">directions</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Direction</span><span class="p">]</span>
+</span><span id="__span-0-458"><a id="__codelineno-0-458" name="__codelineno-0-458"></a>    <span class="n">hidden_ridges</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span>
+</span><span id="__span-0-459"><a id="__codelineno-0-459" name="__codelineno-0-459"></a>    <span class="n">draws_per_parameter</span><span class="p">:</span> <span class="nb">float</span>
+</span><span id="__span-0-460"><a id="__codelineno-0-460" name="__codelineno-0-460"></a>    <span class="n">warnings</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
 </span></code></pre></div></td></tr></table></div>
               </details>
 
@@ -9014,12 +9035,7 @@ its bound width.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>commol/identifiability/results.py</code></summary>
-                <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-458">458</a></span>
-<span class="normal"><a href="#__codelineno-0-459">459</a></span>
-<span class="normal"><a href="#__codelineno-0-460">460</a></span>
-<span class="normal"><a href="#__codelineno-0-461">461</a></span>
-<span class="normal"><a href="#__codelineno-0-462">462</a></span>
-<span class="normal"><a href="#__codelineno-0-463">463</a></span>
+                <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-463">463</a></span>
 <span class="normal"><a href="#__codelineno-0-464">464</a></span>
 <span class="normal"><a href="#__codelineno-0-465">465</a></span>
 <span class="normal"><a href="#__codelineno-0-466">466</a></span>
@@ -9037,30 +9053,35 @@ its bound width.</p>
 <span class="normal"><a href="#__codelineno-0-478">478</a></span>
 <span class="normal"><a href="#__codelineno-0-479">479</a></span>
 <span class="normal"><a href="#__codelineno-0-480">480</a></span>
-<span class="normal"><a href="#__codelineno-0-481">481</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-458"><a id="__codelineno-0-458" name="__codelineno-0-458"></a><span class="k">class</span><span class="w"> </span><span class="nc">StartsSection</span><span class="p">(</span><span class="n">_FrozenResult</span><span class="p">):</span>
-</span><span id="__span-0-459"><a id="__codelineno-0-459" name="__codelineno-0-459"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="__span-0-460"><a id="__codelineno-0-460" name="__codelineno-0-460"></a><span class="sd">    The evidence of `StartsIdentifiability`.</span>
-</span><span id="__span-0-461"><a id="__codelineno-0-461" name="__codelineno-0-461"></a>
-</span><span id="__span-0-462"><a id="__codelineno-0-462" name="__codelineno-0-462"></a><span class="sd">    Attributes</span>
-</span><span id="__span-0-463"><a id="__codelineno-0-463" name="__codelineno-0-463"></a><span class="sd">    ----------</span>
-</span><span id="__span-0-464"><a id="__codelineno-0-464" name="__codelineno-0-464"></a><span class="sd">    parameter_tolerance : float</span>
-</span><span id="__span-0-465"><a id="__codelineno-0-465" name="__codelineno-0-465"></a><span class="sd">        The share of its bound width above which a parameter differs.</span>
-</span><span id="__span-0-466"><a id="__codelineno-0-466" name="__codelineno-0-466"></a><span class="sd">    loss_tolerance : float</span>
-</span><span id="__span-0-467"><a id="__codelineno-0-467" name="__codelineno-0-467"></a><span class="sd">        The share of the best loss within which two losses are equal.</span>
-</span><span id="__span-0-468"><a id="__codelineno-0-468" name="__codelineno-0-468"></a><span class="sd">    near_best : list[int]</span>
-</span><span id="__span-0-469"><a id="__codelineno-0-469" name="__codelineno-0-469"></a><span class="sd">        The converged starts within the loss tolerance of the best.</span>
-</span><span id="__span-0-470"><a id="__codelineno-0-470" name="__codelineno-0-470"></a><span class="sd">    spread : dict[str, float]</span>
-</span><span id="__span-0-471"><a id="__codelineno-0-471" name="__codelineno-0-471"></a><span class="sd">        The largest difference of each parameter between them, as a share of</span>
-</span><span id="__span-0-472"><a id="__codelineno-0-472" name="__codelineno-0-472"></a><span class="sd">        its bound width.</span>
-</span><span id="__span-0-473"><a id="__codelineno-0-473" name="__codelineno-0-473"></a><span class="sd">    flagged : list[str]</span>
-</span><span id="__span-0-474"><a id="__codelineno-0-474" name="__codelineno-0-474"></a><span class="sd">        The parameters whose spread is above the tolerance.</span>
-</span><span id="__span-0-475"><a id="__codelineno-0-475" name="__codelineno-0-475"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-476"><a id="__codelineno-0-476" name="__codelineno-0-476"></a>
-</span><span id="__span-0-477"><a id="__codelineno-0-477" name="__codelineno-0-477"></a>    <span class="n">parameter_tolerance</span><span class="p">:</span> <span class="nb">float</span>
-</span><span id="__span-0-478"><a id="__codelineno-0-478" name="__codelineno-0-478"></a>    <span class="n">loss_tolerance</span><span class="p">:</span> <span class="nb">float</span>
-</span><span id="__span-0-479"><a id="__codelineno-0-479" name="__codelineno-0-479"></a>    <span class="n">near_best</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span>
-</span><span id="__span-0-480"><a id="__codelineno-0-480" name="__codelineno-0-480"></a>    <span class="n">spread</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span>
-</span><span id="__span-0-481"><a id="__codelineno-0-481" name="__codelineno-0-481"></a>    <span class="n">flagged</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+<span class="normal"><a href="#__codelineno-0-481">481</a></span>
+<span class="normal"><a href="#__codelineno-0-482">482</a></span>
+<span class="normal"><a href="#__codelineno-0-483">483</a></span>
+<span class="normal"><a href="#__codelineno-0-484">484</a></span>
+<span class="normal"><a href="#__codelineno-0-485">485</a></span>
+<span class="normal"><a href="#__codelineno-0-486">486</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-463"><a id="__codelineno-0-463" name="__codelineno-0-463"></a><span class="k">class</span><span class="w"> </span><span class="nc">StartsSection</span><span class="p">(</span><span class="n">_FrozenResult</span><span class="p">):</span>
+</span><span id="__span-0-464"><a id="__codelineno-0-464" name="__codelineno-0-464"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="__span-0-465"><a id="__codelineno-0-465" name="__codelineno-0-465"></a><span class="sd">    The evidence of `StartsIdentifiability`.</span>
+</span><span id="__span-0-466"><a id="__codelineno-0-466" name="__codelineno-0-466"></a>
+</span><span id="__span-0-467"><a id="__codelineno-0-467" name="__codelineno-0-467"></a><span class="sd">    Attributes</span>
+</span><span id="__span-0-468"><a id="__codelineno-0-468" name="__codelineno-0-468"></a><span class="sd">    ----------</span>
+</span><span id="__span-0-469"><a id="__codelineno-0-469" name="__codelineno-0-469"></a><span class="sd">    parameter_tolerance : float</span>
+</span><span id="__span-0-470"><a id="__codelineno-0-470" name="__codelineno-0-470"></a><span class="sd">        The share of its bound width above which a parameter differs.</span>
+</span><span id="__span-0-471"><a id="__codelineno-0-471" name="__codelineno-0-471"></a><span class="sd">    loss_tolerance : float</span>
+</span><span id="__span-0-472"><a id="__codelineno-0-472" name="__codelineno-0-472"></a><span class="sd">        The share of the best loss within which two losses are equal.</span>
+</span><span id="__span-0-473"><a id="__codelineno-0-473" name="__codelineno-0-473"></a><span class="sd">    near_best : list[int]</span>
+</span><span id="__span-0-474"><a id="__codelineno-0-474" name="__codelineno-0-474"></a><span class="sd">        The converged starts within the loss tolerance of the best.</span>
+</span><span id="__span-0-475"><a id="__codelineno-0-475" name="__codelineno-0-475"></a><span class="sd">    spread : dict[str, float]</span>
+</span><span id="__span-0-476"><a id="__codelineno-0-476" name="__codelineno-0-476"></a><span class="sd">        The largest difference of each parameter between them, as a share of</span>
+</span><span id="__span-0-477"><a id="__codelineno-0-477" name="__codelineno-0-477"></a><span class="sd">        its bound width.</span>
+</span><span id="__span-0-478"><a id="__codelineno-0-478" name="__codelineno-0-478"></a><span class="sd">    flagged : list[str]</span>
+</span><span id="__span-0-479"><a id="__codelineno-0-479" name="__codelineno-0-479"></a><span class="sd">        The parameters whose spread is above the tolerance.</span>
+</span><span id="__span-0-480"><a id="__codelineno-0-480" name="__codelineno-0-480"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-481"><a id="__codelineno-0-481" name="__codelineno-0-481"></a>
+</span><span id="__span-0-482"><a id="__codelineno-0-482" name="__codelineno-0-482"></a>    <span class="n">parameter_tolerance</span><span class="p">:</span> <span class="nb">float</span>
+</span><span id="__span-0-483"><a id="__codelineno-0-483" name="__codelineno-0-483"></a>    <span class="n">loss_tolerance</span><span class="p">:</span> <span class="nb">float</span>
+</span><span id="__span-0-484"><a id="__codelineno-0-484" name="__codelineno-0-484"></a>    <span class="n">near_best</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span>
+</span><span id="__span-0-485"><a id="__codelineno-0-485" name="__codelineno-0-485"></a>    <span class="n">spread</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span>
+</span><span id="__span-0-486"><a id="__codelineno-0-486" name="__codelineno-0-486"></a>    <span class="n">flagged</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
 </span></code></pre></div></td></tr></table></div>
               </details>
 
@@ -9184,12 +9205,7 @@ cross the threshold.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>commol/identifiability/results.py</code></summary>
-                <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-484">484</a></span>
-<span class="normal"><a href="#__codelineno-0-485">485</a></span>
-<span class="normal"><a href="#__codelineno-0-486">486</a></span>
-<span class="normal"><a href="#__codelineno-0-487">487</a></span>
-<span class="normal"><a href="#__codelineno-0-488">488</a></span>
-<span class="normal"><a href="#__codelineno-0-489">489</a></span>
+                <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-489">489</a></span>
 <span class="normal"><a href="#__codelineno-0-490">490</a></span>
 <span class="normal"><a href="#__codelineno-0-491">491</a></span>
 <span class="normal"><a href="#__codelineno-0-492">492</a></span>
@@ -9208,31 +9224,36 @@ cross the threshold.</p>
 <span class="normal"><a href="#__codelineno-0-505">505</a></span>
 <span class="normal"><a href="#__codelineno-0-506">506</a></span>
 <span class="normal"><a href="#__codelineno-0-507">507</a></span>
-<span class="normal"><a href="#__codelineno-0-508">508</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-484"><a id="__codelineno-0-484" name="__codelineno-0-484"></a><span class="k">class</span><span class="w"> </span><span class="nc">ProfileSection</span><span class="p">(</span><span class="n">_FrozenResult</span><span class="p">):</span>
-</span><span id="__span-0-485"><a id="__codelineno-0-485" name="__codelineno-0-485"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="__span-0-486"><a id="__codelineno-0-486" name="__codelineno-0-486"></a><span class="sd">    The evidence of a `ProfileLikelihood`.</span>
-</span><span id="__span-0-487"><a id="__codelineno-0-487" name="__codelineno-0-487"></a>
-</span><span id="__span-0-488"><a id="__codelineno-0-488" name="__codelineno-0-488"></a><span class="sd">    Attributes</span>
-</span><span id="__span-0-489"><a id="__codelineno-0-489" name="__codelineno-0-489"></a><span class="sd">    ----------</span>
-</span><span id="__span-0-490"><a id="__codelineno-0-490" name="__codelineno-0-490"></a><span class="sd">    threshold : {&quot;chi_square&quot;, &quot;beale&quot;, &quot;bootstrap_calibrated&quot;}</span>
-</span><span id="__span-0-491"><a id="__codelineno-0-491" name="__codelineno-0-491"></a><span class="sd">        The rule of the threshold.</span>
-</span><span id="__span-0-492"><a id="__codelineno-0-492" name="__codelineno-0-492"></a><span class="sd">    confidence_level : float</span>
-</span><span id="__span-0-493"><a id="__codelineno-0-493" name="__codelineno-0-493"></a><span class="sd">        The level of each pointwise interval.</span>
-</span><span id="__span-0-494"><a id="__codelineno-0-494" name="__codelineno-0-494"></a><span class="sd">    tolerance : float</span>
-</span><span id="__span-0-495"><a id="__codelineno-0-495" name="__codelineno-0-495"></a><span class="sd">        The numerical tolerance of the statistic.</span>
-</span><span id="__span-0-496"><a id="__codelineno-0-496" name="__codelineno-0-496"></a><span class="sd">    verdicts : dict[str, ProfileVerdictName | None]</span>
-</span><span id="__span-0-497"><a id="__codelineno-0-497" name="__codelineno-0-497"></a><span class="sd">        The verdict of each profiled parameter; None when its threshold is</span>
-</span><span id="__span-0-498"><a id="__codelineno-0-498" name="__codelineno-0-498"></a><span class="sd">        below the tolerance.</span>
-</span><span id="__span-0-499"><a id="__codelineno-0-499" name="__codelineno-0-499"></a><span class="sd">    intervals : dict[str, tuple[float | None, float | None]]</span>
-</span><span id="__span-0-500"><a id="__codelineno-0-500" name="__codelineno-0-500"></a><span class="sd">        The interval of each profiled parameter; None on a side that does not</span>
-</span><span id="__span-0-501"><a id="__codelineno-0-501" name="__codelineno-0-501"></a><span class="sd">        cross the threshold.</span>
-</span><span id="__span-0-502"><a id="__codelineno-0-502" name="__codelineno-0-502"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-503"><a id="__codelineno-0-503" name="__codelineno-0-503"></a>
-</span><span id="__span-0-504"><a id="__codelineno-0-504" name="__codelineno-0-504"></a>    <span class="n">threshold</span><span class="p">:</span> <span class="n">ProfileThresholdName</span>
-</span><span id="__span-0-505"><a id="__codelineno-0-505" name="__codelineno-0-505"></a>    <span class="n">confidence_level</span><span class="p">:</span> <span class="nb">float</span>
-</span><span id="__span-0-506"><a id="__codelineno-0-506" name="__codelineno-0-506"></a>    <span class="n">tolerance</span><span class="p">:</span> <span class="nb">float</span>
-</span><span id="__span-0-507"><a id="__codelineno-0-507" name="__codelineno-0-507"></a>    <span class="n">verdicts</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ProfileVerdictName</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span>
-</span><span id="__span-0-508"><a id="__codelineno-0-508" name="__codelineno-0-508"></a>    <span class="n">intervals</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]]</span>
+<span class="normal"><a href="#__codelineno-0-508">508</a></span>
+<span class="normal"><a href="#__codelineno-0-509">509</a></span>
+<span class="normal"><a href="#__codelineno-0-510">510</a></span>
+<span class="normal"><a href="#__codelineno-0-511">511</a></span>
+<span class="normal"><a href="#__codelineno-0-512">512</a></span>
+<span class="normal"><a href="#__codelineno-0-513">513</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-489"><a id="__codelineno-0-489" name="__codelineno-0-489"></a><span class="k">class</span><span class="w"> </span><span class="nc">ProfileSection</span><span class="p">(</span><span class="n">_FrozenResult</span><span class="p">):</span>
+</span><span id="__span-0-490"><a id="__codelineno-0-490" name="__codelineno-0-490"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="__span-0-491"><a id="__codelineno-0-491" name="__codelineno-0-491"></a><span class="sd">    The evidence of a `ProfileLikelihood`.</span>
+</span><span id="__span-0-492"><a id="__codelineno-0-492" name="__codelineno-0-492"></a>
+</span><span id="__span-0-493"><a id="__codelineno-0-493" name="__codelineno-0-493"></a><span class="sd">    Attributes</span>
+</span><span id="__span-0-494"><a id="__codelineno-0-494" name="__codelineno-0-494"></a><span class="sd">    ----------</span>
+</span><span id="__span-0-495"><a id="__codelineno-0-495" name="__codelineno-0-495"></a><span class="sd">    threshold : {&quot;chi_square&quot;, &quot;beale&quot;, &quot;bootstrap_calibrated&quot;}</span>
+</span><span id="__span-0-496"><a id="__codelineno-0-496" name="__codelineno-0-496"></a><span class="sd">        The rule of the threshold.</span>
+</span><span id="__span-0-497"><a id="__codelineno-0-497" name="__codelineno-0-497"></a><span class="sd">    confidence_level : float</span>
+</span><span id="__span-0-498"><a id="__codelineno-0-498" name="__codelineno-0-498"></a><span class="sd">        The level of each pointwise interval.</span>
+</span><span id="__span-0-499"><a id="__codelineno-0-499" name="__codelineno-0-499"></a><span class="sd">    tolerance : float</span>
+</span><span id="__span-0-500"><a id="__codelineno-0-500" name="__codelineno-0-500"></a><span class="sd">        The numerical tolerance of the statistic.</span>
+</span><span id="__span-0-501"><a id="__codelineno-0-501" name="__codelineno-0-501"></a><span class="sd">    verdicts : dict[str, ProfileVerdictName | None]</span>
+</span><span id="__span-0-502"><a id="__codelineno-0-502" name="__codelineno-0-502"></a><span class="sd">        The verdict of each profiled parameter; None when its threshold is</span>
+</span><span id="__span-0-503"><a id="__codelineno-0-503" name="__codelineno-0-503"></a><span class="sd">        below the tolerance.</span>
+</span><span id="__span-0-504"><a id="__codelineno-0-504" name="__codelineno-0-504"></a><span class="sd">    intervals : dict[str, tuple[float | None, float | None]]</span>
+</span><span id="__span-0-505"><a id="__codelineno-0-505" name="__codelineno-0-505"></a><span class="sd">        The interval of each profiled parameter; None on a side that does not</span>
+</span><span id="__span-0-506"><a id="__codelineno-0-506" name="__codelineno-0-506"></a><span class="sd">        cross the threshold.</span>
+</span><span id="__span-0-507"><a id="__codelineno-0-507" name="__codelineno-0-507"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-508"><a id="__codelineno-0-508" name="__codelineno-0-508"></a>
+</span><span id="__span-0-509"><a id="__codelineno-0-509" name="__codelineno-0-509"></a>    <span class="n">threshold</span><span class="p">:</span> <span class="n">ProfileThresholdName</span>
+</span><span id="__span-0-510"><a id="__codelineno-0-510" name="__codelineno-0-510"></a>    <span class="n">confidence_level</span><span class="p">:</span> <span class="nb">float</span>
+</span><span id="__span-0-511"><a id="__codelineno-0-511" name="__codelineno-0-511"></a>    <span class="n">tolerance</span><span class="p">:</span> <span class="nb">float</span>
+</span><span id="__span-0-512"><a id="__codelineno-0-512" name="__codelineno-0-512"></a>    <span class="n">verdicts</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ProfileVerdictName</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span>
+</span><span id="__span-0-513"><a id="__codelineno-0-513" name="__codelineno-0-513"></a>    <span class="n">intervals</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]]</span>
 </span></code></pre></div></td></tr></table></div>
               </details>
 
@@ -10120,7 +10141,7 @@ none), its reasons and combinations.</p>
 </span><span id="__span-0-138"><a id="__codelineno-0-138" name="__codelineno-0-138"></a>    <span class="n">log_parameters</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
 </span><span id="__span-0-139"><a id="__codelineno-0-139" name="__codelineno-0-139"></a>    <span class="n">effective_size</span><span class="p">:</span> <span class="nb">float</span>
 </span><span id="__span-0-140"><a id="__codelineno-0-140" name="__codelineno-0-140"></a>    <span class="n">contraction</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span>
-</span><span id="__span-0-141"><a id="__codelineno-0-141" name="__codelineno-0-141"></a>    <span class="n">correlation</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]</span>
+</span><span id="__span-0-141"><a id="__codelineno-0-141" name="__codelineno-0-141"></a>    <span class="n">correlation</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]]</span>
 </span><span id="__span-0-142"><a id="__codelineno-0-142" name="__codelineno-0-142"></a>    <span class="n">correlated_pairs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">CorrelatedPairData</span><span class="p">]</span>
 </span><span id="__span-0-143"><a id="__codelineno-0-143" name="__codelineno-0-143"></a>    <span class="n">modes</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]]</span>
 </span><span id="__span-0-144"><a id="__codelineno-0-144" name="__codelineno-0-144"></a>    <span class="n">mass_below</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span>

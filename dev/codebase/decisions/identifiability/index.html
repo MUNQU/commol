@@ -4175,7 +4175,8 @@ on, and makes one they disagree on <code>conflicting</code>, with every reason.
 Thresholds and tolerances of the methods are required arguments: they are
 modelling judgments. Rust decides each verdict and gives its causes
 (<code>StructuralAnalysis::verdicts</code>; <code>Collinearity::verdicts</code>: insensitive, the
-parameters it is collinear with; <code>SampleIdentifiability::verdicts</code>: a contraction below the threshold,
+parameters it is collinear with; <code>SampleIdentifiability::verdicts</code>: constant in
+every draw, a contraction below the threshold,
 the parameters it is correlated with, its number of modes, and the bounds
 that set a side, which do not set the verdict; <code>SampleIdentifiability::size</code>,
 an effective size below <code>p + 1</code>;
@@ -4216,8 +4217,7 @@ the verdict. The shape measures
 read <code>θ</code>, or <code>ln θ</code> for <code>log_parameters</code>; the masses at each side and the
 overlap read the distribution function of the reference.</p>
 <ul>
-<li>
-<p><strong>The effective size.</strong> Kish's size is the number of equally weighted
+<li><strong>The effective size.</strong> Kish's size is the number of equally weighted
   draws the weights are worth (the size whose mean has the same variance),
   and a covariance of <code>p</code> parameters from <code>m</code> equal draws is singular when
   <code>m ≤ p</code>. Below <code>p + 1</code> (<code>SampleSize::TooFew</code>) the sample is worth fewer
@@ -4232,7 +4232,12 @@ overlap read the distribution function of the reference.</p>
   <code>STANDARD_ERRORS</code>, not a setting; a Kish size within <code>10⁻⁹</code> of a floor,
   as of equal weights, is at it. Below <code>FEW_DRAWS_PER_PARAMETER · p</code> (30·p,
   <code>SampleSize::Few</code>) the verdicts hold and the section names the effective
-  size, since the count of hidden ridges over-counts there.</p>
+  size, since the count of hidden ridges over-counts there.</li>
+<li>
+<p><strong>A constant parameter</strong> (<code>SampleVerdict::constant</code>): each weighted squared
+  deviation on its scale is 0 (a deviation below about 1e-161, or a draw of
+  negligible weight) over more than one distinct draw. The sample did not
+  explore it, so it is poorly determined, with correlations of None.</p>
 </li>
 <li>
 <p><strong>Modes.</strong> A weighted Gaussian kernel density with Silverman's bandwidth
@@ -4328,6 +4333,14 @@ the marginals of the guard over four references and three sizes.</p>
 <td>No user can choose them better than the estimator.</td>
 </tr>
 <tr>
+<td>A relative tolerance, or equality of the values, as the test of a constant column</td>
+<td>No data judge a tolerance: a narrow posterior is what a sample that determines a parameter looks like. Distinct values whose variance underflows to 0 keep a correlation of <code>0/0</code>.</td>
+</tr>
+<tr>
+<td>The covariance of <code>commol_statistics</code> with a rounding fix</td>
+<td>It has another divisor (<code>1 − Σ wᵢ²</code>) and other readers; its rounding is a change of its own.</td>
+</tr>
+<tr>
 <td>The rank of the weighted covariance as the floor</td>
 <td>500 distinct rows with 0.999 of the weight on one have full rank and a contraction near 1.</td>
 </tr>
@@ -4349,7 +4362,13 @@ the marginals of the guard over four references and three sizes.</p>
 <code>log_parameters_set_the_scale_of_every_shape_measure</code>,
 <code>directions_and_their_contraction</code>, <code>the_count_of_hidden_ridges</code>,
 <code>the_directions_do_not_depend_on_units</code>,
-<code>a_sample_of_too_few_effective_draws_has_no_determined_parameter</code>),
+<code>a_sample_of_too_few_effective_draws_has_no_determined_parameter</code>,
+<code>a_parameter_constant_in_every_draw_is_poorly_determined</code>,
+<code>unequal_weights_leave_the_variance_of_a_constant_parameter_at_zero</code>,
+<code>a_constant_parameter_of_few_distinct_draws_is_constant</code>,
+<code>a_parameter_that_varies_in_one_draw_is_not_constant</code>,
+<code>an_outlier_of_negligible_weight_keeps_a_ridge</code>,
+<code>a_sample_of_one_distinct_draw_is_too_few_and_not_constant</code>),
 <code>tests/uncertainty/test_identifiability_sample.py</code>.</p>
 
 
