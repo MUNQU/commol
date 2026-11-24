@@ -397,9 +397,13 @@ class SampleSection(_FrozenResult):
     contraction : dict[str, float]
         ``1 − Var(sample) / Var(reference)`` of each parameter, on its scale:
         near 0 when the sample spreads as the reference, near 1 when it sits
-        on a value.
-    correlation : dict[str, dict[str, float]]
-        The weighted correlation matrix, on the scale of each parameter.
+        on a value, and 1 for a parameter constant in every draw, which the
+        sample did not explore.
+    correlation : dict[str, dict[str, float | None]]
+        The weighted correlation matrix, on the scale of each parameter; None
+        with a parameter whose weighted variance is 0, which has no
+        correlation: one constant in every draw, or any of a sample of one
+        distinct draw.
     correlated_pairs : list[CorrelatedPair]
         The pairs above the threshold.
     modes : dict[str, list[float]]
@@ -431,7 +435,8 @@ class SampleSection(_FrozenResult):
         count of hidden ridges over-counts.
     warnings : list[str]
         What the section warns of: an effective size below ``p + 1`` or
-        below ``30·p``, no directions, or hidden ridges.
+        below ``30·p``, the parameters constant in every draw, no directions,
+        or hidden ridges.
     """
 
     reference: SampleReference
@@ -441,7 +446,7 @@ class SampleSection(_FrozenResult):
     log_parameters: list[str]
     effective_size: float
     contraction: dict[str, float]
-    correlation: dict[str, dict[str, float]]
+    correlation: dict[str, dict[str, float | None]]
     correlated_pairs: list[CorrelatedPair]
     modes: dict[str, list[float]]
     mass_below: dict[str, float]

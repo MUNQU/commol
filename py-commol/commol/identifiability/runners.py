@@ -310,8 +310,8 @@ def _sample_warnings(
     method: "SampleIdentifiability",
 ) -> list[str]:
     """The warnings of a `SampleSection`: an effective size below ``p + 1``
-    or below ``FEW_DRAWS_PER_PARAMETER · p``, no directions, or hidden
-    ridges."""
+    or below ``FEW_DRAWS_PER_PARAMETER · p``, the parameters constant in
+    every draw, no directions, or hidden ridges."""
     p = len(names)
     size = f"{analysis.effective_size:.3g}"
     parameters = _plural(p, "parameter")
@@ -328,6 +328,16 @@ def _sample_warnings(
             f"The effective size {size} is below {per_parameter:g} · p = "
             f"{per_parameter * p:g} for {parameters}: the count of hidden "
             "ridges over-counts."
+        )
+    constant = [
+        name
+        for name, verdict in zip(names, analysis.verdicts, strict=True)
+        if verdict.constant
+    ]
+    if constant:
+        warnings.append(
+            f"Constant in every draw: {', '.join(constant)}. The sample did not "
+            "explore these parameters, so it cannot say that the data fix them."
         )
     if analysis.hidden_ridges is None:
         warnings.append(
@@ -406,6 +416,8 @@ def run_sample_identifiability(
                 f"p + 1 = {len(names) + 1} for "
                 f"{_plural(len(names), 'parameter')}."
             )
+        if verdict.constant:
+            reasons.append("Sample: constant in every draw.")
         if verdict.low_contraction:
             reasons.append(
                 f"Sample: contraction {contraction:.2f}, below "

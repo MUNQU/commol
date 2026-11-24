@@ -123,7 +123,8 @@ on, and makes one they disagree on `conflicting`, with every reason.
 Thresholds and tolerances of the methods are required arguments: they are
 modelling judgments. Rust decides each verdict and gives its causes
 (`StructuralAnalysis::verdicts`; `Collinearity::verdicts`: insensitive, the
-parameters it is collinear with; `SampleIdentifiability::verdicts`: a contraction below the threshold,
+parameters it is collinear with; `SampleIdentifiability::verdicts`: constant in
+every draw, a contraction below the threshold,
 the parameters it is correlated with, its number of modes, and the bounds
 that set a side, which do not set the verdict; `SampleIdentifiability::size`,
 an effective size below `p + 1`;
@@ -170,6 +171,10 @@ overlap read the distribution function of the reference.
   as of equal weights, is at it. Below `FEW_DRAWS_PER_PARAMETER · p` (30·p,
   `SampleSize::Few`) the verdicts hold and the section names the effective
   size, since the count of hidden ridges over-counts there.
+- **A constant parameter** (`SampleVerdict::constant`): each weighted squared
+  deviation on its scale is 0 (a deviation below about 1e-161, or a draw of
+  negligible weight) over more than one distinct draw. The sample did not
+  explore it, so it is poorly determined, with correlations of None.
 
 - **Modes.** A weighted Gaussian kernel density with Silverman's bandwidth
   `h`, reflected at each finite bound, on a grid over the draws ± 3`h` cut
@@ -221,6 +226,8 @@ the marginals of the guard over four references and three sizes.
 | A threshold of Marchenko–Pastur | It hides real directions: a direction of 0.45 is found in 2 % of samples. |
 | A direction as a `Combination` | A combination is a product of powers that the rank of the sensitivities determines exactly; a direction has a contraction and mixes natural and log scales. |
 | The thresholds of the estimators as settings | No user can choose them better than the estimator. |
+| A relative tolerance, or equality of the values, as the test of a constant column | No data judge a tolerance: a narrow posterior is what a sample that determines a parameter looks like. Distinct values whose variance underflows to 0 keep a correlation of `0/0`. |
+| The covariance of `commol_statistics` with a rounding fix | It has another divisor (`1 − Σ wᵢ²`) and other readers; its rounding is a change of its own. |
 | The rank of the weighted covariance as the floor | 500 distinct rows with 0.999 of the weight on one have full rank and a contraction near 1. |
 | A setting for the floor of the effective size | Below `p + 1` equivalent draws no covariance estimate exists to judge, and above it `contraction_threshold` and the warning at `30·p` already judge; a lower floor admits verdicts from one draw. |
 | Only a warning below the floor, with the verdicts as they are | The verdict is the field a user reads; a contraction near 1 from one draw reads `determined`. |
@@ -233,5 +240,11 @@ the marginals of the guard over four references and three sizes.
 `log_parameters_set_the_scale_of_every_shape_measure`,
 `directions_and_their_contraction`, `the_count_of_hidden_ridges`,
 `the_directions_do_not_depend_on_units`,
-`a_sample_of_too_few_effective_draws_has_no_determined_parameter`),
+`a_sample_of_too_few_effective_draws_has_no_determined_parameter`,
+`a_parameter_constant_in_every_draw_is_poorly_determined`,
+`unequal_weights_leave_the_variance_of_a_constant_parameter_at_zero`,
+`a_constant_parameter_of_few_distinct_draws_is_constant`,
+`a_parameter_that_varies_in_one_draw_is_not_constant`,
+`an_outlier_of_negligible_weight_keeps_a_ridge`,
+`a_sample_of_one_distinct_draw_is_too_few_and_not_constant`),
 `tests/uncertainty/test_identifiability_sample.py`.

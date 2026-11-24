@@ -370,6 +370,9 @@ fn collinearity(
 pub struct PySampleVerdict {
     /// "determined" or "poorly_determined"
     verdict: String,
+    /// Whether it is constant in every draw of a sample of more than one
+    /// distinct draw
+    constant: bool,
     /// Whether its contraction is below the threshold
     low_contraction: bool,
     /// The other parameters, by index, correlated with it above the
@@ -386,6 +389,7 @@ impl From<SampleVerdict> for PySampleVerdict {
     fn from(verdict: SampleVerdict) -> Self {
         Self {
             verdict: verdict.verdict.name().to_string(),
+            constant: verdict.constant,
             low_contraction: verdict.low_contraction,
             correlated_with: verdict.correlated_with,
             modes: verdict.modes,
@@ -425,8 +429,9 @@ pub struct PySampleAnalysis {
     size: &'static str,
     /// The contraction of each parameter against its reference
     contraction: Vec<f64>,
-    /// The weighted correlation matrix
-    correlation: Vec<Vec<f64>>,
+    /// The weighted correlation matrix; None with a parameter of weighted
+    /// variance 0
+    correlation: Vec<Vec<Option<f64>>>,
     /// The pairs `(j, k, r)` whose absolute correlation is above the
     /// threshold
     correlated_pairs: Vec<(usize, usize, f64)>,
