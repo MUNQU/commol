@@ -73,8 +73,9 @@ def _guide_calibrator(
     optimizer: NelderMeadConfig | None = None,
 ) -> Calibrator:
     """The product model of the guide: the rate reads ``k1 * s``, with ``k1``
-    in ``[0.2, 0.8]`` and ``s`` in ``[0.5, 2]``; by default Nelder-Mead runs
-    to an sd_tolerance of 1e-15."""
+    in ``[0.2, 0.8]`` and ``s`` in ``[0.5, 2]``; by default Nelder-Mead has an
+    sd_tolerance of 1e-15, which a fit on the ridge does not reach: such a
+    fit takes all of its 1000 iterations."""
     builder = abc_builder(
         ab="k1 * s * A * B / total",
         parameters={"k1": None, "s": None, "k2": None},
@@ -89,7 +90,7 @@ def _guide_calibrator(
         ],
         observation_models={"B": NormalObservations(sd=10.0)},
         optimization_config=optimizer
-        or NelderMeadConfig(max_iterations=4000, sd_tolerance=1e-15),
+        or NelderMeadConfig(max_iterations=1000, sd_tolerance=1e-15),
         seed=42,
     )
     return Calibrator(Simulation(model), problem)
