@@ -819,6 +819,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A `"pulse"` series acts on step 0 with a point at `-0.0`, in every engine,
+  as `"step_function"` and `"linear"` do. Before, the point was accepted and
+  never read, so the pulse at step 0 did nothing, with no message. In Rust,
+  a `StochasticEvents` whose seed or parameter is set at a stop at `-0.0`
+  acts the pulse of step 0, which it missed. See
+  [Series parameters](../guide/building-models.md#series-parameters).
+
 - `SampleIdentifiability` calls no parameter `determined` when the effective
   size of the distinct draws is below `p + 1` for `p` parameters, worth
   fewer equal draws than a covariance of the parameters needs: each

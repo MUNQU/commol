@@ -206,16 +206,16 @@ impl SeriesParameter {
     }
 
     /// The value of the series at `step` (pulse) or at `t` (step function,
-    /// linear).
+    /// linear). A series compares its positions as numbers, so `-0.0` is 0.
     pub(crate) fn evaluate(&self, step: f64, t: f64) -> f64 {
         match self.mode {
-            SeriesMode::Pulse => match self
-                .data
-                .binary_search_by(|(position, _)| position.total_cmp(&step))
-            {
-                Ok(idx) => self.data[idx].1,
-                Err(_) => 0.0,
-            },
+            SeriesMode::Pulse => {
+                let pos = self.data.partition_point(|(position, _)| *position < step);
+                match self.data.get(pos) {
+                    Some(&(position, value)) if position == step => value,
+                    _ => 0.0,
+                }
+            }
             SeriesMode::StepFunction => {
                 let pos = self.data.partition_point(|(position, _)| *position <= t);
                 if pos == 0 { 0.0 } else { self.data[pos - 1].1 }
@@ -453,6 +453,31 @@ mod tests {
         assert_eq!(series.evaluate(1.0, 1.5), 1.0);
         assert_eq!(series.evaluate(2.0, 2.0), 0.0);
         assert_eq!(series.evaluate(5.0, 5.0), 2.0);
+    }
+
+    #[test]
+    fn a_pulse_at_minus_zero_is_read_at_step_zero() {
+        for zero in [0.0, -0.0] {
+            let alone = series(vec![(zero, 2.0)], SeriesMode::Pulse);
+            let among = series(vec![(4.0, 1.0), (zero, 2.0), (1.0, 3.0)], SeriesMode::Pulse);
+
+            for step in [0.0, -0.0] {
+                assert_eq!(alone.evaluate(step, step), 2.0, "{zero:?} at {step:?}");
+                assert_eq!(among.evaluate(step, step), 2.0, "{zero:?} at {step:?}");
+            }
+            assert_eq!(alone.evaluate(1.0, 1.0), 0.0);
+            assert_eq!(among.evaluate(1.0, 1.0), 3.0);
+        }
+    }
+
+    #[test]
+    fn a_pulse_at_a_large_step_acts_on_that_step_only() {
+        // Steps are exact: the tolerance of `same_position` spans whole steps
+        // from 1e9 on.
+        let series = series(vec![(3e9, 2.0)], SeriesMode::Pulse);
+
+        assert_eq!(series.evaluate(3e9 - 1.0, 3e9 - 1.0), 0.0);
+        assert_eq!(series.evaluate(3e9, 3e9), 2.0);
     }
 
     #[test]

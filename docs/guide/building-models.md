@@ -211,7 +211,9 @@ the series reads `step` or `t` (`SeriesParameter::evaluate` in
 A series has at least one point, each position finite, not negative and in
 one point only, and each value finite. `SeriesValue(...)` checks its points
 with the rule of the engine (`check_series` in
-`crates/commol-model/src/rules.rs`), which the model compiler also reads.
+`crates/commol-model/src/rules.rs`), which the model compiler also reads. A
+point at `-0.0` is at position 0, so a series with points at `-0.0` and at
+`0.0` is refused.
 
 The engine decides which positions its model type accepts.
 `ModelBuilder.build` and `Model.update_parameters` reject a position the engine

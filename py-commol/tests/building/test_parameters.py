@@ -2,6 +2,7 @@
 
 import math
 import warnings
+from typing import get_args
 
 import pytest
 from pydantic import ValidationError
@@ -11,6 +12,7 @@ from commol._model.parameter import Parameter
 from commol.engines.engine import EngineName
 from tests.support import (
     ENGINE_REL,
+    STOCHASTIC_ENGINES,
     a_to_b_builder,
     abc_builder,
     assert_close,
@@ -157,6 +159,30 @@ class TestSeriesParameters:
 
         with pytest.raises(ValueError, match="'k' is a pulse at 1.5"):
             build_ode(builder)
+
+    def test_a_pulse_at_minus_zero_acts_on_step_zero(self) -> None:
+        builder = a_to_b_builder(parameters={}, rate="d")
+        builder.add_parameter("d", [(2, 0.25), (-0.0, 0.5)], mode="pulse")
+
+        b = Simulation(build(builder)).run(3)["B"]
+
+        assert_close(b, [0, 500, 500, 625], rel=ENGINE_REL)
+
+    @pytest.mark.parametrize("engine", get_args(EngineName))
+    def test_every_engine_runs_a_pulse_at_minus_zero_as_one_at_zero(
+        self, engine: EngineName
+    ) -> None:
+        seed = 7 if engine in STOCHASTIC_ENGINES else None
+        runs = []
+        for at in (0.0, -0.0):
+            builder = a_to_b_builder(parameters={}, rate="d")
+            builder.add_parameter("d", [(at, 0.5)], mode="pulse")
+            simulation = Simulation(builder.build(builder.structure, engine=engine))
+            runs.append(simulation.run(3, seed=seed)["B"])
+        at_zero, at_minus_zero = runs
+
+        assert 0 < at_zero[1] == at_zero[3]
+        assert at_minus_zero == at_zero
 
     def test_update_parameters_replaces_a_series(self) -> None:
         # A pulse moves its value times A on the step of its point only; a
