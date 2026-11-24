@@ -310,8 +310,12 @@ impl Noise {
 }
 
 /// The smallest `P(Y > y)` of a sum read as the complement of the counts up
-/// to `y`: it keeps the relative accuracy of `f64` to about `1e-14`, and
-/// spares the sum above for all but the upper tail.
+/// to `y`: it spares the sum above for all but the upper tail. A complement
+/// errs by at most `1 / COMPLEMENT_TAIL` times the error of the mass up to
+/// `y`, which grows with `|log p(0)|`. Its largest relative errors measured,
+/// not bounds: about 5e-10 for `M` up to 10⁴, 1e-8 at 10⁵ and 1e-7 at 3·10⁵
+/// (`φ` from 0 to 0.05, or 0.01 at 3·10⁵, 2 or 7 equal parts, `y` from 1.9 to
+/// 2.4 sd above `M`).
 const COMPLEMENT_TAIL: f64 = 0.01;
 
 /// The count `y`, a whole number of at least 0, as an index.
@@ -321,43 +325,60 @@ fn count(y: f64) -> usize {
 }
 
 /// The tails at the count `y` of a sum of negative binomials of
-/// overdispersion `phi` and means `parts`: `P(Y < y)` sums the recursion up
-/// to `y`; `P(Y > y)` is its complement while that is at least
-/// [`COMPLEMENT_TAIL`], and otherwise the sum of the counts above `y` until
-/// a term is negligible, so it keeps its relative accuracy in the upper
-/// tail. The sum above costs `O(K·n)` in the last count `n` it reaches,
-/// which a heavy tail (`φ μ` large) puts far beyond `y`; it fails at
-/// [`MAX_COUNTS`], at once when [`ends_within_counts`] shows it cannot end.
+/// overdispersion `phi` and means `parts`, from the recursion tilted to `y`.
+/// While `P(Y > y)` is at least [`COMPLEMENT_TAIL`], `P(Y < y)` sums the
+/// counts below `y` and `P(Y > y)` is the complement. In the upper tail
+/// `P(Y > y)` sums the counts above `y` until a term is negligible, so it
+/// keeps its relative accuracy, and the larger of `P(Y < y)` and `p(y)` is
+/// the complement: the three sum to 1.
+///
+/// The counts below `y` are not summed where [`Recursion::log_tail_bound`]
+/// shows the upper tail, as their terms can underflow there. Elsewhere those
+/// that hold the mass cannot (`docs/codebase/decisions/sums-of-parts.md`).
+///
+/// The sum above costs `O(K·n)` in the last count `n` it reaches, which a
+/// heavy tail (`φ μ` large) puts far beyond `y`; it fails at [`MAX_COUNTS`],
+/// at once when [`ends_within_counts`] shows it cannot end.
 fn exact_tails(parts: &[f64], phi: f64, y: f64) -> Result<Tails, UnendedSum> {
     let last = count(y);
+    let mean: f64 = parts.iter().sum();
     let mut recursion = Recursion::new(parts, phi, y, false);
     recursion.extend_to(last)?;
     let probability = |recursion: &Recursion, n: usize| libm::exp(recursion.log_probability(n));
-    let below = (0..last).fold(0.0, |sum, n| sum + probability(&recursion, n));
     let at = probability(&recursion, last);
-    let complement = (1.0 - below) - at;
-    if complement >= COMPLEMENT_TAIL {
-        return Ok(Tails {
-            below,
-            at,
-            above: complement,
-        });
+    let upper = recursion.log_tail_bound(parts, y) < libm::log(COMPLEMENT_TAIL);
+    let below = (!upper).then(|| (0..last).fold(0.0, |sum, n| sum + probability(&recursion, n)));
+    if let Some(below) = below {
+        let above = (1.0 - below) - at;
+        if above >= COMPLEMENT_TAIL {
+            return Ok(Tails { below, at, above });
+        }
     }
     if !ends_within_counts(parts, phi) {
         return Err(recursion.unended());
     }
-    let mean: f64 = parts.iter().sum();
-    let mut above = 0.0;
-    let mut n = last;
-    loop {
+    // The jumps `hⱼ` fall, so the sum is discrete self-decomposable and has
+    // one mode, and `n p(n) = Σⱼ hⱼ p(n − j)` with `Σⱼ hⱼ = M` puts it at
+    // most at `M`: with no mass at `y` above `M` there is none above `y`.
+    let (mut n, mut term, mut above) = (last, at, 0.0);
+    while !(n as f64 > mean && term <= NEGLIGIBLE * above) {
         n += 1;
         recursion.extend_to(n)?;
-        let term = probability(&recursion, n);
+        term = probability(&recursion, n);
         above += term;
-        if n as f64 > mean && term <= NEGLIGIBLE * above {
-            return Ok(Tails { below, at, above });
-        }
     }
+    Ok(match below {
+        Some(below) if below <= at => Tails {
+            below,
+            at: (1.0 - above) - below,
+            above,
+        },
+        _ => Tails {
+            below: (1.0 - above) - at,
+            at,
+            above,
+        },
+    })
 }
 
 /// Whether the sum of negative binomials of overdispersion `phi` and means
@@ -621,6 +642,30 @@ impl Recursion {
         }
     }
 
+    /// An upper bound of `log P(Y ≥ y)`, the one of Chernoff at the tilt:
+    /// `K(ln ρ) − y ln ρ` with the cumulant function
+    /// `K(ln ρ) = −Σₜ ln(1 − φμₜ(ρ − 1))/φ` of the sum (`Σₜ μₜ(ρ − 1)` at
+    /// `φμₜ = 0`), over the means `parts` of the sum; 0 for `ρ ≤ 1`, at a
+    /// total of at most `M`.
+    fn log_tail_bound(&self, parts: &[f64], y: f64) -> f64 {
+        if self.rho <= 1.0 {
+            return 0.0;
+        }
+        let rise = self.rho - 1.0;
+        let cumulant: f64 = parts
+            .iter()
+            .map(|&mu| {
+                let a = self.phi * mu;
+                if a == 0.0 {
+                    mu * rise
+                } else {
+                    -mu * libm::log1p(-a * rise) / a
+                }
+            })
+            .sum();
+        cumulant - y * self.log_rho
+    }
+
     /// `log p(n)` of a computed count `n`; `−∞` where it has no mass.
     fn log_probability(&self, n: usize) -> f64 {
         self.log_scale + libm::log(self.values[n]) - n as f64 * self.log_rho
@@ -651,15 +696,26 @@ impl Recursion {
 
 /// The tilt `ρ` whose tilted sum has the mean `target`:
 /// `Σₜ ρμₜ / (1 + φμₜ(1 − ρ)) = target`, below `1 / max qₜ`, where the
-/// tilted jumps stop converging; 1 for a target or a mean of 0.
+/// tilted jumps stop converging; 1 for a target or a mean of 0. The tilted
+/// mean is at least `ρM` above `ρ = 1` and at most `ρM` below it, so `ρ` lies
+/// between 1 and `target/M`, where the bisection starts. It resolves `ρ` down
+/// to about `1e-60`, and holds it up to the largest number: with `φ > 0` and
+/// `M` above about `1e60 · target`, or with `M` below `target/f64::MAX`, the
+/// terms can underflow, and the log density is `−∞`. Measured against the
+/// negative binomial of equal parts: for totals up to 200, parts of mean
+/// `1e-306` to `1e62` and `φ` from 0 to `1e150` the log density holds to
+/// 1e-9.
 fn tilt(parts: &[f64], phi: f64, q: &[f64], target: f64) -> f64 {
     let mean: f64 = parts.iter().sum();
     if target <= 0.0 || mean <= 0.0 {
         return 1.0;
     }
     let largest = q.iter().copied().fold(0.0, f64::max);
+    // A mean near the smallest number overflows the ratio, and the tails
+    // need a tilt that is a number.
+    let ratio = (target / mean).min(f64::MAX);
     if largest == 0.0 {
-        return target / mean;
+        return ratio;
     }
     let tilted = |rho: f64| -> f64 {
         parts
@@ -667,7 +723,11 @@ fn tilt(parts: &[f64], phi: f64, q: &[f64], target: f64) -> f64 {
             .map(|&mu| rho * mu / (1.0 + phi * mu * (1.0 - rho)))
             .sum()
     };
-    let (mut low, mut high) = (0.0, 1.0 / largest);
+    let (mut low, mut high) = if ratio < 1.0 {
+        (ratio, 1.0)
+    } else {
+        (1.0, ratio.min(1.0 / largest))
+    };
     for _ in 0..200 {
         let middle = 0.5 * (low + high);
         if middle <= low || middle >= high {

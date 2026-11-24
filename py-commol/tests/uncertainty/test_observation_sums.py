@@ -257,6 +257,45 @@ class TestSums:
         ).run()
         assert math.isfinite(fit.final_loss)
 
+    def test_an_outlier_of_an_exact_sum_has_a_pit_near_one(self) -> None:
+        # Weekly totals of mean 70 in 7 parts: one at the mean, and others up
+        # to 1400 times it. At φ = 0 the exact sum is Poisson(70), and its
+        # PIT and its quantile residuals are those of that model, at the same
+        # place within the mass of each total.
+        totals = [70.0, 200.0, 1500.0, 99_999.0]
+        point = ParameterSample.equally_weighted(
+            ["c"], [(0.0, 50.0)], [[FLOW]], SampleMethod(name="point")
+        )
+        observations = _sums(totals, 7)
+        pits, residuals = [], []
+        for model in (
+            NegativeBinomialObservations(overdispersion=0.0, sum="exact"),
+            PoissonObservations(),
+        ):
+            calibrator = Calibrator(
+                _flow_simulation(), _problem(observations, {"B": model})
+            )
+            predictive = Predictive(calibrator, point, [0, 28])
+            pits.append(
+                scores.pit(
+                    predictive, observations, DistributionNoise()
+                ).per_observation
+            )
+            residuals.append(
+                scores.quantile_residuals(
+                    predictive, observations, DistributionNoise()
+                ).per_observation
+            )
+
+        exact, poisson = pits
+        assert exact == pytest.approx(poisson, rel=1e-12)
+        assert 0.3 < exact[0] < 0.7
+        assert exact[1:] == [1.0, 1.0, 1.0]
+        exact, poisson = residuals
+        assert exact == pytest.approx(poisson, rel=1e-9)
+        assert exact[1] > 10.0
+        assert exact[2:] == [math.inf, math.inf]
+
     def test_poisson_and_normal_sums_read_the_sum_of_their_means(self) -> None:
         flow, value = 10.0, 27.0
         poisson = Calibrator(

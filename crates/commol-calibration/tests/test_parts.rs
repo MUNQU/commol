@@ -4,8 +4,8 @@
 
 use commol_calibration::{
     Argument, CalibrationParameter, CalibrationProblem, DerivativesError, DiscrepancyConfig,
-    EvaluationError, MAX_COUNTS, Noise, ObservationModel, ObservedDataPoint, Sum, UnendedSum,
-    Violation, Workspace,
+    EvaluationError, MAX_COUNTS, Noise, ObservationModel, ObservedDataPoint, Sum, Tails,
+    UnendedSum, Violation, Workspace,
 };
 use commol_core::{Model, SimulationEngine};
 use commol_difference::DifferenceEquations;
@@ -210,12 +210,13 @@ fn convolution(parts: &[f64], phi: f64, last: usize) -> Vec<f64> {
 
 #[test]
 fn the_exact_sum_is_the_convolution_of_its_parts() {
-    let cases: [(&[f64], f64); 6] = [
+    let cases: [(&[f64], f64); 7] = [
         (&[3.0, 10.0, 7.5, 0.5], 0.3),
         (&[3.0, 10.0, 7.5, 0.5], 1.0),
         (&[12.0, 0.0, 4.0], 2.0),
         (&[3.0, 10.0, 7.5, 0.5], 0.0),
         (&[3.0, 10.0, 7.5, 0.5], 1e-12),
+        (&[3.0, 10.0, 7.5, 0.5], 1e-100),
         // log p(0) is about −787: p(0) is below the smallest number.
         (&[300.0, 300.0, 300.0], 1e-3),
     ];
@@ -247,39 +248,21 @@ fn the_exact_sum_is_the_convolution_of_its_parts() {
         sum: Some(Sum::Exact),
     };
     assert!(exact.sum_log_density(0.0, &[300.0, 300.0, 300.0]).unwrap() < -745.0);
+    // Near φ = 0 the tilt to a total far above the mean is that of φ = 0.
+    let limit = Noise::NegativeBinomial {
+        overdispersion: 1e-100,
+        sum: Some(Sum::Exact),
+    };
+    let density = limit.sum_log_density(1500.0, &[50.0, 50.0]).unwrap();
+    let poisson = Noise::Poisson.log_density(1500.0, 100.0);
+    assert!(relative(density, poisson) < 1e-12, "{density}");
 }
 
 #[test]
 fn the_tails_of_a_sum() {
     let parts = [3.0, 10.0, 7.5, 0.5];
     let mean: f64 = parts.iter().sum();
-    let close = |actual: f64, expected: f64| (actual - expected).abs() <= 1e-12 * expected.abs();
-    // The exact reading: the sums of the convolution below and above y,
-    // the tail above far beyond the mean.
-    for phi in [0.3, 2.0] {
-        let last = 1500;
-        let probabilities: Vec<f64> = convolution(&parts, phi, last)
-            .into_iter()
-            .map(f64::exp)
-            .collect();
-        let exact = Noise::NegativeBinomial {
-            overdispersion: phi,
-            sum: Some(Sum::Exact),
-        };
-        for y in [0usize, 4, 21, 60, 150] {
-            let tails = exact.sum_tails(y as f64, &parts).unwrap();
-            let below: f64 = probabilities[..y].iter().sum();
-            let above: f64 = probabilities[y + 1..].iter().sum();
-            let case = format!("φ = {phi}, y = {y}: {tails:?}");
-            assert!(close(tails.at, probabilities[y]), "{case}");
-            assert!(
-                y == 0 && tails.below == 0.0 || close(tails.below, below),
-                "{case}"
-            );
-            assert!(close(tails.above, above), "{case} against {above:e}");
-        }
-    }
-    // The other readings are those of their model of the total.
+    // Every reading but the exact one is that of its model of the total.
     let phi = 0.8;
     let squares: f64 = parts.iter().map(|mu| mu * mu).sum();
     let matched = Noise::NegativeBinomial {
@@ -310,6 +293,167 @@ fn the_tails_of_a_sum() {
         moments.sum_tails(4.0, &[5.0]).unwrap(),
         moments.tails(4.0, 5.0)
     );
+}
+
+/// The exact tails of the total `y` of a sum of parts of means `parts`.
+fn exact_tails(phi: f64, y: f64, parts: &[f64]) -> Tails {
+    let exact = Noise::NegativeBinomial {
+        overdispersion: phi,
+        sum: Some(Sum::Exact),
+    };
+    exact.sum_tails(y, parts).unwrap()
+}
+
+#[test]
+fn an_exact_sum_far_above_its_mean_is_in_its_upper_tail() {
+    // Totals so far above the mean that no number holds the mass from them
+    // on, up to the last count of the exact reading.
+    let outlier = Tails {
+        below: 1.0,
+        at: 0.0,
+        above: 0.0,
+    };
+    let last = (MAX_COUNTS - 1) as f64;
+    for (phi, y, parts) in [
+        (0.0, 1500.0, &[50.0, 50.0][..]),
+        (0.0, 2790.0, &[500.0, 500.0]),
+        (0.0, 4000.0, &[500.0, 500.0]),
+        (0.0, 99_999.0, &[50.0, 50.0]),
+        (0.0, 99_999.0, &[5e3, 5e3]),
+        (1e-100, 1500.0, &[50.0, 50.0]),
+        (1e-9, 1500.0, &[50.0, 50.0]),
+        (0.01, 99_999.0, &[50.0, 50.0]),
+        (0.01, 99_999.0, &[500.0, 500.0]),
+        (0.01, last, &[500.0, 500.0]),
+        // Parts of mean 0, and of a mean near the smallest number.
+        (0.0, 1500.0, &[0.0, 100.0, 0.0]),
+        (0.5, 7.0, &[0.0, 0.0]),
+        (0.0, 7.0, &[1e-310, 1e-310]),
+        (0.5, 7.0, &[1e-310, 1e-310]),
+    ] {
+        let case = format!("φ = {phi}, y = {y}, {parts:?}");
+        assert_eq!(exact_tails(phi, y, parts), outlier, "{case}");
+    }
+}
+
+/// Asserts that `tails` split the mass 1, each in `[0, 1]`, and that each
+/// is `expected` to the relative accuracy `accuracy`.
+fn assert_tails(tails: Tails, expected: Tails, accuracy: f64, case: &str) {
+    for (actual, expected) in [
+        (tails.below, expected.below),
+        (tails.at, expected.at),
+        (tails.above, expected.above),
+    ] {
+        assert!((0.0..=1.0).contains(&actual), "{case}: {tails:?}");
+        assert!(
+            (actual - expected).abs() <= accuracy * expected,
+            "{case}: {tails:?} against {expected:e}"
+        );
+    }
+    let mass = tails.below + tails.at + tails.above;
+    assert!(
+        (mass - 1.0).abs() < 1e-15,
+        "{case}: {tails:?} of mass {mass}"
+    );
+}
+
+#[test]
+fn the_tails_of_an_exact_sum_split_its_mass() {
+    // Totals far below the mean.
+    let floor = Tails {
+        below: 0.0,
+        at: 0.0,
+        above: 1.0,
+    };
+    for (phi, y, parts) in [
+        (0.0, 0.0, &[500.0, 500.0]),
+        (0.0, 40.0, &[500.0, 500.0]),
+        (0.0, 99_999.0, &[2e5, 2e5]),
+        (1e-3, 10.0, &[5e5, 5e5]),
+        (0.0, 99_999.0, &[1e100, 1e100]),
+        (1e-100, 10.0, &[500.0, 500.0]),
+    ] {
+        let case = format!("φ = {phi}, y = {y}, {parts:?}");
+        assert_eq!(exact_tails(phi, y, parts), floor, "{case}");
+    }
+
+    // The sum of K equal parts is NB(M, φ/K), whose tails are incomplete
+    // beta functions (at φ = 0 those of the Poisson, incomplete gamma ones):
+    // from far below the mean to far above it. These references, not the
+    // exact tails, limit the accuracy: at M = 100, φ = 1e-5 and y = 30 they
+    // err by 3e-12.
+    for (mean, phi) in [
+        (20.0f64, 0.0),
+        (100.0, 0.0),
+        (2e3, 0.0),
+        (1e3, 1e-3),
+        (100.0, 1e-100),
+        (100.0, 1e-5),
+        (100.0, 0.01),
+        (2e3, 0.01),
+        (100.0, 0.5),
+        (2e3, 0.5),
+        (100.0, 30.0),
+        // All but 1 % of the mass is at 0, so P(Y > 0) is summed.
+        (1.0, 1e4),
+    ] {
+        let parts = [mean / 4.0; 4];
+        let total = Noise::NegativeBinomial {
+            overdispersion: phi / 4.0,
+            sum: None,
+        };
+        for share in [
+            0.0, 0.3, 0.9, 1.0, 1.02, 1.1, 1.4, 2.0, 3.0, 6.0, 15.0, 60.0,
+        ] {
+            let y = (share * mean).round();
+            let expected = total.tails(y, mean);
+            // The smallest numbers hold fewer digits.
+            if [expected.below, expected.at, expected.above]
+                .iter()
+                .any(|&tail| tail > 0.0 && tail < 1e-290)
+            {
+                continue;
+            }
+            let case = format!("M = {mean}, φ = {phi}, y = {y}");
+            assert_tails(exact_tails(phi, y, &parts), expected, 1e-11, &case);
+        }
+    }
+
+    // Far above a mean of heavy tail, where `P(Y > y)` is 1.1 %: the sum
+    // above `y` would not end. The reference is NB(M, φ/K) to 60 digits.
+    let heavy = Tails {
+        below: 0.988_878_190_461_087_3,
+        at: 4.286_569_937_261_549e-7,
+        above: 0.011_121_380_881_919,
+    };
+    let tails = exact_tails(1e3, 8906.0, &[250.0; 4]);
+    assert_tails(tails, heavy, 1e-12, "φ = 1000, M = 1000, y = 8906");
+
+    // Parts of unequal means, against their convolution up to a count far
+    // above the mean, to the accuracy of its log densities.
+    for (parts, phi, last, accuracy) in [
+        (&[3.0, 10.0, 7.5, 0.5][..], 0.3, 1500usize, 1e-12),
+        (&[3.0, 10.0, 7.5, 0.5], 2.0, 1500, 1e-12),
+        (&[90.0, 0.5, 0.0, 9.5], 0.0, 1100, 1e-11),
+        (&[90.0, 0.5, 0.0, 9.5], 1e-12, 1100, 1e-11),
+        (&[90.0, 0.5, 0.0, 9.5], 0.02, 1200, 1e-11),
+        (&[30.0, 1e-3, 0.5], 0.5, 1100, 1e-11),
+        (&[1.0, 1e-6], 20.0, 1000, 1e-11),
+    ] {
+        let probabilities: Vec<f64> = convolution(parts, phi, last)
+            .into_iter()
+            .map(f64::exp)
+            .collect();
+        for y in [0usize, 1, 4, 21, 60, 150, 300] {
+            let expected = Tails {
+                below: probabilities[..y].iter().sum(),
+                at: probabilities[y],
+                above: probabilities[y + 1..].iter().sum(),
+            };
+            let case = format!("φ = {phi}, y = {y}, {parts:?}");
+            assert_tails(exact_tails(phi, y as f64, parts), expected, accuracy, &case);
+        }
+    }
 }
 
 #[test]
@@ -507,20 +651,22 @@ fn a_sum_of_no_mean_or_no_dispersion_has_finite_information() {
             vec![-1.0, -1.0, 0.0]
         );
 
-        // At φ = 0 the sum is Poisson(M): 1/M for each pair of means, and
-        // for φ the variance of its score, (Σμ²)²/(2M²).
+        // At φ = 0, and at its limit, the sum is Poisson(M): 1/M for each
+        // pair of means, and for φ the variance of its score, (Σμ²)²/(2M²).
         let parts = [1.0, 2.0];
-        let information = nb(0.0, sum).sum_information(&parts).unwrap();
-        for entry in [0, 1, 3, 4] {
+        for phi in [0.0, 1e-100] {
+            let information = nb(phi, sum).sum_information(&parts).unwrap();
+            for entry in [0, 1, 3, 4] {
+                assert!(
+                    relative(information[entry], 1.0 / 3.0) < 1e-9,
+                    "{sum:?} {phi} {information:?}"
+                );
+            }
             assert!(
-                relative(information[entry], 1.0 / 3.0) < 1e-9,
-                "{sum:?} {information:?}"
+                relative(information[8], 25.0 / 18.0) < 1e-9,
+                "{sum:?} {phi} {information:?}"
             );
         }
-        assert!(
-            relative(information[8], 25.0 / 18.0) < 1e-9,
-            "{sum:?} {information:?}"
-        );
     }
 }
 
