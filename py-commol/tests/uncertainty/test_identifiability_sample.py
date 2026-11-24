@@ -1,15 +1,21 @@
 """Identifiability from a sample: what it learned against its reference, the
 reasons of its verdicts and the warnings of its section."""
 
+import json
 import math
 import random
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
 from commol import Calibrator
 from commol.distributions import Beta, Gamma, Priors
-from commol.identifiability import SampleIdentifiability, SampleSection
+from commol.identifiability import (
+    IdentifiabilityReport,
+    SampleIdentifiability,
+    SampleSection,
+)
 from commol.uncertainty import ParameterSample, SampleMethod
 
 GIVEN = SampleMethod(name="given")
@@ -19,6 +25,10 @@ THRESHOLDS = {
     "bound_share": 0.05,
 }
 BOUNDS = [(0.0, 0.5), (0.0, 0.3)]
+CONSTANT_K2 = (
+    "Constant in every draw: k2. The sample did not explore these parameters, so "
+    "it cannot say that the data fix them."
+)
 
 
 def _section(
@@ -37,9 +47,15 @@ def _reasons(
     calibrator: Calibrator, sample: ParameterSample
 ) -> dict[str, tuple[str, list[str]]]:
     """The practical verdict and reasons of each parameter of `sample`."""
-    report = calibrator.identifiability(
-        SampleIdentifiability(sample=sample, reference="bounds", **THRESHOLDS)
+    return _verdicts(
+        calibrator.identifiability(
+            SampleIdentifiability(sample=sample, reference="bounds", **THRESHOLDS)
+        )
     )
+
+
+def _verdicts(report: IdentifiabilityReport) -> dict[str, tuple[str, list[str]]]:
+    """The practical verdict and reasons of each parameter of `report`."""
     return {
         name: (verdict.practical.verdict, verdict.practical.reasons)
         for name, verdict in report.verdicts.items()
@@ -323,6 +339,119 @@ def test_a_sample_of_one_effective_draw_determines_nothing(
     assert data["parameters"]["k1"]["practical"] == {
         "verdict": "poorly_determined",
         "reasons": [reason],
+    }
+
+
+def test_a_parameter_constant_in_every_draw_is_not_determined(
+    calibrator: Calibrator, tmp_path: Path
+) -> None:
+    # k1 spreads over its bounds in 100 equal draws; k2 never moves.
+    k1 = [0.5 * (i + 0.5) / 100 for i in range(100)]
+    sample = ParameterSample.equally_weighted(
+        ["k1", "k2"], BOUNDS, [[k, 0.05] for k in k1], GIVEN
+    )
+
+    report = calibrator.identifiability(
+        SampleIdentifiability(sample=sample, reference="bounds", **THRESHOLDS)
+    )
+    section = report.sample[0]
+
+    reason = "Sample: constant in every draw."
+    assert section.effective_size == pytest.approx(100.0)
+    assert section.contraction["k2"] == 1.0
+    assert section.correlation == {
+        "k1": {"k1": 1.0, "k2": None},
+        "k2": {"k1": None, "k2": None},
+    }
+    assert section.correlated_pairs == []
+    assert section.modes["k2"] == [0.05]
+    assert section.warnings == [CONSTANT_K2]
+    assert _verdicts(report) == {
+        "k1": ("poorly_determined", ["Sample: contraction 0.00, below 0.5."]),
+        "k2": ("poorly_determined", [reason]),
+    }
+    # The report as plain data, and the file of the report.
+    data = report.report()
+    assert data["sections"]["sample"][0]["correlation"] == section.correlation
+    assert data["parameters"]["k2"]["practical"] == {
+        "verdict": "poorly_determined",
+        "reasons": [reason],
+    }
+    path = tmp_path / "report.json"
+    report.to_json(path)
+    assert IdentifiabilityReport.from_json(path) == report
+    saved = json.loads(path.read_text(encoding="utf-8"))
+    assert saved["sample"][0]["correlation"]["k2"] == {"k1": None, "k2": None}
+
+
+def test_a_constant_parameter_of_a_weighted_sample_has_its_reason_and_warning(
+    calibrator: Calibrator,
+) -> None:
+    # Draws of unequal weights: 0.1 is a value whose weighted mean rounds. The
+    # draw of another k2 has no weight. Against the priors, 60 draws of k1 near
+    # 0.1; then one draw holds nearly all the weight.
+    rows = [[0.1 + 0.001 * (i % 7), 0.1] for i in range(60)] + [[0.4, 0.2]]
+    spread = [-0.01 * i for i in range(60)] + [-math.inf]
+    heavy = [0.0] + [-20.0] * 59 + [-math.inf]
+    reports = {
+        name: calibrator.identifiability(
+            SampleIdentifiability(
+                sample=ParameterSample(
+                    names=["k1", "k2"],
+                    bounds=BOUNDS,
+                    values=rows,
+                    log_weights=log_weights,
+                    method=GIVEN,
+                ),
+                reference="prior",
+                priors=Priors.uniform_on_bounds(),
+                **THRESHOLDS,
+            )
+        )
+        for name, log_weights in (("spread", spread), ("heavy", heavy))
+    }
+
+    section = reports["spread"].sample[0]
+    assert section.contraction["k2"] == 1.0
+    assert section.correlation["k2"] == {"k1": None, "k2": None}
+    assert section.at_bound["k2"] == []
+    assert section.warnings[-1] == CONSTANT_K2
+    assert _verdicts(reports["spread"])["k2"] == (
+        "poorly_determined",
+        ["Sample: constant in every draw."],
+    )
+    # Too few effective draws and a constant column: both reasons and warnings.
+    few = reports["heavy"].sample[0]
+    assert few.warnings[0].startswith("The effective size 1 is below p + 1 = 3")
+    assert few.warnings[1] == CONSTANT_K2
+    verdicts = _verdicts(reports["heavy"])
+    size = "Sample: effective size 1, below p + 1 = 3 for 2 parameters."
+    assert verdicts["k1"] == ("poorly_determined", [size])
+    assert verdicts["k2"] == (
+        "poorly_determined",
+        [size, "Sample: constant in every draw."],
+    )
+
+
+def test_a_sample_of_one_distinct_draw_warns_of_its_size_alone(
+    calibrator: Calibrator,
+) -> None:
+    # Every parameter is constant because the sample holds one distinct draw.
+    sample = ParameterSample.equally_weighted(
+        ["k1", "k2"], BOUNDS, [[0.1, 0.1]] * 50, GIVEN
+    )
+
+    section = _section(calibrator, sample)
+
+    undefined = {"k1": None, "k2": None}
+    assert section.correlation == {"k1": undefined, "k2": undefined}
+    size, directions = section.warnings
+    assert size.startswith("The effective size 1 is below p + 1 = 3")
+    assert "no directions" in directions
+    reasons = ["Sample: effective size 1, below p + 1 = 3 for 2 parameters."]
+    assert _reasons(calibrator, sample) == {
+        "k1": ("poorly_determined", reasons),
+        "k2": ("poorly_determined", reasons),
     }
 
 

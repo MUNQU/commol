@@ -234,7 +234,7 @@ fn a_ridge_gives_a_correlated_pair() {
     let c: Vec<f64> = normals(500, 3).iter().map(|z| 0.5 + 0.1 * z).collect();
     let result = sample_identifiability(&sample(&[a, b, c]), &bounds(0.9), 0).unwrap();
 
-    assert!((result.correlation[0][1] + 1.0).abs() < 1e-9);
+    assert!((result.correlation[0][1].unwrap() + 1.0).abs() < 1e-9);
     assert_eq!(result.correlated_pairs.len(), 1);
     assert_eq!(
         (result.correlated_pairs[0].0, result.correlated_pairs[0].1),
@@ -249,7 +249,7 @@ fn a_sample_gives_the_verdict_of_each_parameter() {
     let c: Vec<f64> = normals(500, 3).iter().map(|z| 0.5 + 0.1 * z).collect();
     let result = sample_identifiability(&sample(&[a, b, c]), &bounds(0.9), 0).unwrap();
 
-    let r = result.correlation[0][1];
+    let r = result.correlation[0][1].unwrap();
     let verdicts = &result.verdicts;
     assert_eq!(verdicts[0].verdict, PracticalVerdict::PoorlyDetermined);
     assert_eq!(verdicts[0].correlated_with, [(1, r)]);
@@ -270,7 +270,7 @@ fn a_correlation_equal_to_the_threshold_is_not_above_it() {
     let y = vec![0.75, 0.5, 0.25, 0.5];
     let result = sample_identifiability(&sample(&[x, y]), &bounds(0.5), 0).unwrap();
 
-    assert_eq!(result.correlation[0][1], 0.5);
+    assert_eq!(result.correlation[0][1], Some(0.5));
     assert!(result.correlated_pairs.is_empty());
 }
 
@@ -1740,4 +1740,206 @@ fn a_sample_of_too_few_effective_draws_has_no_determined_parameter() {
     assert_eq!(at(4, 4, &mut generator), SampleSize::TooFew);
     assert_eq!(at(30, 1, &mut generator), SampleSize::Enough);
     assert_eq!(at(29, 1, &mut generator), SampleSize::Few);
+}
+
+/// A sample on `[0, 1]` of `columns` with `log_weights`.
+fn weighted(columns: &[Vec<f64>], log_weights: &[f64]) -> ParameterSample {
+    let equal = sample(columns);
+    ParameterSample::new(
+        equal.names().to_vec(),
+        equal.bounds().to_vec(),
+        equal.values().to_vec(),
+        log_weights,
+        None,
+    )
+    .unwrap()
+}
+
+#[test]
+fn a_parameter_constant_in_every_draw_is_poorly_determined() {
+    // A spread, a constant and a tight parameter in 1000 equal draws. The
+    // weighted mean of 0.05 rounds, and the variance is 0 all the same.
+    let n = 1000;
+    let spread: Vec<f64> = (0..n).map(|i| (i as f64 + 0.5) / n as f64).collect();
+    let tight: Vec<f64> = normals(n, 1).iter().map(|z| 0.5 + 0.01 * z).collect();
+    let columns = [spread, vec![0.05; n], tight];
+    let result = sample_identifiability(&sample(&columns), &bounds(0.9), 0).unwrap();
+
+    assert_eq!(result.size, SampleSize::Enough);
+    assert_eq!(result.contraction[1], 1.0);
+    let verdict = &result.verdicts[1];
+    assert_eq!(verdict.verdict, PracticalVerdict::PoorlyDetermined);
+    assert!(verdict.constant && !verdict.low_contraction, "{verdict:?}");
+    assert!(verdict.correlated_with.is_empty(), "{verdict:?}");
+    assert_eq!(result.modes[1], [0.05]);
+    for k in 0..3 {
+        assert_eq!(result.correlation[1][k], None);
+        assert_eq!(result.correlation[k][1], None);
+    }
+    // The others keep their correlation and their verdicts.
+    assert_eq!(result.correlation[0][0], Some(1.0));
+    assert!(result.correlation[0][2].unwrap().abs() < 0.1);
+    let others = [&result.verdicts[0], &result.verdicts[2]];
+    assert!(others.iter().all(|v| !v.constant), "{others:?}");
+    assert!(others[0].low_contraction);
+    assert_eq!(others[1].verdict, PracticalVerdict::Determined);
+    // The direction of the constant parameter is the most contracted.
+    let last = result.directions.last().unwrap();
+    assert!((last.loadings[1].abs() - 1.0).abs() < 1e-12, "{last:?}");
+    assert_eq!(result.hidden_ridges, Some(0));
+}
+
+#[test]
+fn unequal_weights_leave_the_variance_of_a_constant_parameter_at_zero() {
+    // Two constants, one at the upper bound: no pair of them and no bound
+    // that sets a side, on either scale. Two parameters whose values differ
+    // have a variance of 0 too: one in a deviation whose square underflows,
+    // one in a draw of so little weight that the weighted square does.
+    let n = 100;
+    let mut generator = Generator::from_seed(31);
+    let mut columns = vec![
+        draws(n, &mut generator, |g| 0.5 + 0.1 * g.uniform()),
+        vec![0.1; n],
+        vec![1.0; n],
+        (0..n).map(|i| 1e-170 * (i % 2) as f64).collect(),
+        vec![0.1; n],
+    ];
+    let mut log_weights: Vec<f64> = (0..n).map(|i| -0.01 * i as f64).collect();
+    for (column, value) in columns.iter_mut().zip([0.55, 0.1, 1.0, 0.0, 0.25]) {
+        column.push(value);
+    }
+    log_weights.push(-738.0);
+    // A draw of weight 0 differs in the constants: no statistic reads it.
+    for (column, value) in columns.iter_mut().zip([0.5, 0.2, 0.2, 0.5, 0.5]) {
+        column.push(value);
+    }
+    log_weights.push(f64::NEG_INFINITY);
+    for log_parameters in [vec![], vec!["p1".to_string(), "p2".to_string()]] {
+        let settings = SampleIdentifiabilitySettings {
+            log_parameters,
+            ..bounds(0.9)
+        };
+        let result =
+            sample_identifiability(&weighted(&columns, &log_weights), &settings, 0).unwrap();
+
+        assert_eq!(result.distinct_rows, n + 1);
+        assert!(result.correlated_pairs.is_empty());
+        assert!(!result.verdicts[0].constant);
+        for j in 1..5 {
+            let verdict = &result.verdicts[j];
+            assert_eq!(verdict.verdict, PracticalVerdict::PoorlyDetermined);
+            assert!(verdict.constant, "{verdict:?}");
+            assert_eq!(result.contraction[j], 1.0);
+            assert_eq!(result.correlation[j], vec![None; 5]);
+        }
+        for (j, value) in [(1, 0.1), (2, 1.0)] {
+            assert!(result.verdicts[j].at_bound.is_empty());
+            assert_eq!(result.modes[j], [value]);
+        }
+    }
+}
+
+#[test]
+fn a_parameter_that_varies_in_one_draw_is_not_constant() {
+    // One draw of 100 is the next number above 0.1: its variance is about
+    // 2·10⁻³⁶, below the rounding of 0.1 squared and above 0.
+    let n = 100;
+    let mut generator = Generator::from_seed(32);
+    let spread = draws(n, &mut generator, |g| 0.5 + 0.1 * g.uniform());
+    let mut nearly = vec![0.1; n];
+    nearly[40] = 0.1f64.next_up();
+    let log_weights: Vec<f64> = (0..n).map(|i| -0.01 * i as f64).collect();
+    let result =
+        sample_identifiability(&weighted(&[spread, nearly], &log_weights), &bounds(0.9), 0)
+            .unwrap();
+
+    assert!(result.verdicts.iter().all(|v| !v.constant));
+    assert_eq!(result.verdicts[1].verdict, PracticalVerdict::Determined);
+    assert_eq!(result.correlation[1][1], Some(1.0));
+    assert!(result.correlation[0][1].unwrap().abs() < 0.5);
+}
+
+#[test]
+fn an_outlier_of_negligible_weight_keeps_a_ridge() {
+    // 200 equal draws on a line, and an outlier of negligible weight that is
+    // the first or the last of the distinct draws: it takes no digit from the
+    // others.
+    let line: Vec<f64> = (0..200).map(|i| i as f64 / 200.0).collect();
+    let mut values: Vec<Vec<f64>> = line.iter().map(|a| vec![0.2 + 0.2 * a, 2.0 + a]).collect();
+    let settings = with_priors(
+        &[
+            Family::Uniform,
+            Family::LogNormal {
+                mu: 0.0,
+                sigma: 3.0,
+            },
+        ],
+        &[],
+    );
+    for (first, exponent) in [0.0, 0.5]
+        .into_iter()
+        .flat_map(|first| [8, 12, 15, 18].map(|exponent| (first, exponent)))
+    {
+        let outlier = 10f64.powi(exponent);
+        values.push(vec![first, outlier]);
+        let mut log_weights = vec![0.0; 200];
+        log_weights.push(-2.0 * outlier.ln() - 20.0);
+        let of = |values: &[Vec<f64>], log_weights: &[f64]| {
+            let sample = ParameterSample::new(
+                vec!["p0".to_string(), "p1".to_string()],
+                vec![(0.0, 0.5), (0.0, f64::INFINITY)],
+                values.to_vec(),
+                log_weights,
+                None,
+            )
+            .unwrap();
+            sample_identifiability(&sample, &settings, 0).unwrap()
+        };
+        let result = of(&values, &log_weights);
+
+        let r = result.correlation[0][1].unwrap();
+        assert!(r > 0.999_99, "{first}, {exponent}: {r}");
+        assert_eq!(result.correlated_pairs, [(0, 1, r)]);
+        assert!(
+            result
+                .verdicts
+                .iter()
+                .all(|v| v.verdict == PracticalVerdict::PoorlyDetermined),
+            "{first}, {exponent}: {:?}",
+            result.verdicts
+        );
+        // The 200 draws tie for the largest weight: the order of the draws
+        // of the sample changes nothing.
+        let reversed: Vec<Vec<f64>> = values.iter().rev().cloned().collect();
+        log_weights.reverse();
+        assert_eq!(of(&reversed, &log_weights), result);
+        values.pop();
+    }
+}
+
+#[test]
+fn a_constant_parameter_of_few_distinct_draws_is_constant() {
+    // Three distinct draws of three parameters: no directions, too few
+    // effective draws, and a constant parameter all the same.
+    let columns = [vec![0.1, 0.5, 0.8], vec![0.3; 3], vec![0.6, 0.2, 0.9]];
+    let result = sample_identifiability(&sample(&columns), &bounds(0.9), 0).unwrap();
+
+    assert_eq!((result.distinct_rows, result.size), (3, SampleSize::TooFew));
+    assert_eq!(result.hidden_ridges, None);
+    let constant: Vec<bool> = result.verdicts.iter().map(|v| v.constant).collect();
+    assert_eq!(constant, [false, true, false]);
+    assert_eq!(result.correlation[1], vec![None; 3]);
+}
+
+#[test]
+fn a_sample_of_one_distinct_draw_is_too_few_and_not_constant() {
+    let result =
+        sample_identifiability(&sample(&[vec![0.1; 50], vec![0.7; 50]]), &bounds(0.9), 0).unwrap();
+
+    assert_eq!((result.distinct_rows, result.size), (1, SampleSize::TooFew));
+    assert_eq!(result.correlation, vec![vec![None; 2]; 2]);
+    for verdict in &result.verdicts {
+        assert_eq!(verdict.verdict, PracticalVerdict::PoorlyDetermined);
+        assert!(!verdict.constant, "{verdict:?}");
+    }
 }

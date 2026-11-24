@@ -303,17 +303,18 @@ distinct draws (`effective_size`).
 | Field | Meaning | Read it against the reference |
 |---|---|---|
 | `contraction` | `1 − Var(sample) / Var(reference)`, with the variance of the weighted draws | Near 0: the sample spreads as the reference, the data add nothing. Near 1: it sits on one value. Below 0: it spreads more than the reference |
-| `correlation`, `correlated_pairs` | The weighted correlations, and the pairs above `correlation_threshold` | A pair that moves together is fitted only together |
+| `correlation`, `correlated_pairs` | The weighted correlations, `None` with a parameter whose weighted variance is 0 (constant in every draw, or a sample of one distinct draw), and the pairs above `correlation_threshold` | A pair that moves together is fitted only together |
 | `modes` | The modes of each marginal, in parameter units | Two modes are two sets of values that fit |
 | `mass_below`, `mass_above` | The weight of the draws where the distribution function of the reference is below `ε`, and above `1 − ε` | A sample of its reference has `ε` at each side; more says the sample leans to that side |
 | `at_bound` | The sides whose finite bound sets that side of the marginal | See below |
 | `overlap`, `bins` | `Σ_b min(w_b, 1/B)` over `B = ⌈2 n_eff^{1/3}⌉` bins of equal reference mass (Rice's rule) | 1 for a sample of its reference, `1/B` for a sample in one bin |
 | `directions` | The eigenvectors of the covariance with each parameter divided by the standard deviation of its reference (`Direction`): a `contraction`, the `loadings` and the `scales` | A direction of contraction near 0 is a combination the data do not inform |
-| `hidden_ridges`, `draws_per_parameter`, `warnings` | How many directions among the `determined` parameters contract less than `contraction_threshold`, `n_eff / p`, and what the section warns of | A ridge that no pair shows; an effective size below `p + 1` or `30·p` |
+| `hidden_ridges`, `draws_per_parameter`, `warnings` | How many directions among the `determined` parameters contract less than `contraction_threshold`, `n_eff / p`, and what the section warns of | A ridge that no pair shows; an effective size below `p + 1` or `30·p`; a parameter constant in every draw |
 
 A parameter is `poorly_determined` when the effective size is below `p + 1`
-for `p` parameters, its contraction is below `contraction_threshold`, it is
-in a correlated pair, or its marginal has two or more modes. The count of
+for `p` parameters, it is constant in every draw of a sample of more than one
+distinct draw, its contraction is below `contraction_threshold`, it is in a
+correlated pair, or its marginal has two or more modes. The count of
 hidden ridges corrects the contraction of each direction by a Bayesian
 bootstrap whose weights are drawn from the seed of the calibrator
 (`Calibrator.seed`), so `problem.seed` repeats it.
@@ -434,6 +435,21 @@ print(logged.at_bound["k2"])  # ['lower']
   weights are worth. No setting moves it: below `p + 1` no covariance
   estimate exists to judge. Between `p + 1` and `30·p`, `warnings` names
   the effective size.
+- **A parameter constant in every draw.** A sampler that never moved a
+  parameter, a value fixed by hand or a column copied from a point estimate
+  has a weighted variance of 0 and a contraction of 1: the sample did not
+  explore it, so it cannot say that the data fix it. Its verdict is
+  `poorly_determined`, with the reason "Sample: constant in every draw.",
+  `warnings` names it, and its correlations are `None`. A draw of weight 0
+  does not count. The criterion is a variance of 0 on the scale of the
+  parameter, with no tolerance: on the natural scale, one draw that differs
+  in the last digit leaves a contraction near 1, which does not make the
+  parameter poorly determined. Values that the arithmetic does not tell apart
+  are constant: neighbouring numbers with one `ln`, for `log_parameters`, or
+  values with a weighted squared deviation of 0, which is a deviation below
+  about `1e-161`, or a draw of negligible weight (in 50 draws, 0.1 against
+  0.25 in one draw of log weight −738 reads constant). When the sample holds
+  one distinct draw, the effective size is the reason.
 - **Hidden ridges.** Below `n_eff ≈ 30·p` the count of hidden ridges
   over-counts: the eigenvalues of a sample covariance spread with the
   dimension, and the bootstrap correction does not remove all of it.

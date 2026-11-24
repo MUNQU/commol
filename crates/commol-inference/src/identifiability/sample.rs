@@ -5,10 +5,11 @@
 //! the sample leaves as spread as the reference.
 //!
 //! A parameter is poorly determined when the effective size of the sample
-//! is below `p + 1` for `p` parameters, its contraction is below the
-//! threshold, it is correlated with another above the threshold, or its
-//! marginal has several modes; otherwise it is determined. A bound that sets
-//! a side (`at_bound`) is a cause apart, which does not set the verdict.
+//! is below `p + 1` for `p` parameters, it is constant in every draw, its
+//! contraction is below the threshold, it is correlated with another above
+//! the threshold, or its marginal has several modes; otherwise it is
+//! determined. A bound that sets a side (`at_bound`) is a cause apart, which
+//! does not set the verdict.
 //!
 //! Every statistic reads the distinct rows of the sample, each with the sum
 //! of the weights of its copies ([`ParameterSample::distinct`]). The shape
@@ -87,10 +88,14 @@ impl SampleSize {
 /// The verdict of one parameter and its causes.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SampleVerdict {
-    /// Poorly determined when the sample is [`SampleSize::TooFew`], its
-    /// contraction is below the threshold, it is correlated with another
-    /// parameter, or its marginal has several modes.
+    /// Poorly determined when the sample is [`SampleSize::TooFew`], it is
+    /// constant in every draw, its contraction is below the threshold, it is
+    /// correlated with another parameter, or its marginal has several modes.
     pub verdict: PracticalVerdict,
+    /// Whether its weighted variance is 0 over the distinct draws of a sample
+    /// of more than one: it is constant in every draw to working precision,
+    /// on its scale, and the sample did not explore it.
+    pub constant: bool,
     /// Whether its contraction is below the threshold.
     pub low_contraction: bool,
     /// The other parameters, ascending, whose absolute correlation with it is
@@ -131,8 +136,9 @@ pub struct SampleIdentifiability {
     /// near 0 when the sample spreads as the reference, near 1 when it sits
     /// on one value.
     pub contraction: Vec<f64>,
-    /// The weighted correlation matrix, on the scale of each parameter.
-    pub correlation: Vec<Vec<f64>>,
+    /// The weighted correlation matrix, on the scale of each parameter; None
+    /// with a parameter whose weighted variance is 0, which has none.
+    pub correlation: Vec<Vec<Option<f64>>>,
     /// The pairs `(j, k, r)`, `j < k`, whose absolute correlation `r` is
     /// above the threshold.
     pub correlated_pairs: Vec<(usize, usize, f64)>,
@@ -172,6 +178,14 @@ pub struct SampleIdentifiability {
 /// parameters needs not to be singular, so its spread says nothing of what
 /// the data fix: every verdict is poorly determined
 /// ([`SampleSize::TooFew`]), whatever the contraction.
+///
+/// A parameter whose weighted variance is 0 over more than one distinct draw
+/// is constant in every draw to working precision, on its scale: it holds one
+/// value, values that its scale does not tell apart (`ln` of two neighbouring
+/// numbers), or values with a weighted squared deviation of 0: a deviation
+/// below about 1e-161, or a draw of negligible weight. The sample did not
+/// explore it, so its contraction of 1 says nothing of what the data fix and
+/// its verdict is poorly determined ([`SampleVerdict::constant`]).
 ///
 /// The density of each marginal is a weighted Gaussian kernel density on the
 /// scale of the parameter, with Silverman's bandwidth
@@ -243,17 +257,23 @@ pub fn sample_identifiability(
     let contraction: Vec<f64> = (0..p)
         .map(|j| 1.0 - covariance[j][j] / (deviations[j] * deviations[j]))
         .collect();
-    let correlation: Vec<Vec<f64>> = (0..p)
+    let spreads: Vec<bool> = (0..p).map(|j| covariance[j][j] != 0.0).collect();
+    let correlation: Vec<Vec<Option<f64>>> = (0..p)
         .map(|j| {
             (0..p)
-                .map(|k| covariance[j][k] / (covariance[j][j] * covariance[k][k]).sqrt())
+                .map(|k| {
+                    (spreads[j] && spreads[k])
+                        .then(|| covariance[j][k] / (covariance[j][j] * covariance[k][k]).sqrt())
+                })
                 .collect()
         })
         .collect();
     let mut correlated_pairs = Vec::new();
     for (j, row) in correlation.iter().enumerate() {
         for (k, &r) in row.iter().enumerate().skip(j + 1) {
-            if r.abs() > settings.correlation_threshold {
+            if let Some(r) = r
+                && r.abs() > settings.correlation_threshold
+            {
                 correlated_pairs.push((j, k, r));
             }
         }
@@ -339,14 +359,17 @@ pub fn sample_identifiability(
                     }
                 })
                 .collect();
+            let constant = rows > 1 && !spreads[j];
             let low_contraction = contraction[j] < settings.contraction_threshold;
             SampleVerdict {
                 verdict: PracticalVerdict::of(
                     too_few
+                        || constant
                         || low_contraction
                         || !correlated_with.is_empty()
                         || modes[j].len() >= 2,
                 ),
+                constant,
                 low_contraction,
                 correlated_with,
                 modes: modes[j].len(),
@@ -428,15 +451,25 @@ fn references(
 /// The weighted covariance of `columns`, the covariance of the distribution
 /// the draws put their weights on: `Σ wᵢ (xᵢ − x̄)(yᵢ − ȳ)` for weights that
 /// sum to 1. It is the same for a sample and its distinct draws, never above
-/// the largest variance on the bounds, and 0 for one row. Each column is
-/// centred once, so each entry is one pass over the rows.
+/// the largest variance on the bounds, and exactly 0 for a column of one
+/// value, whatever its weights: a column is centred by its value in the draw
+/// of largest weight (the last of those that tie, in the order of the rows)
+/// and then by the mean of what is left. That draw is one the covariance
+/// reads, so an outlier of negligible weight takes no digit from the others.
+/// Each column is centred once, so each entry is one pass over the rows.
 fn scaled_covariance(columns: &[Vec<f64>], weights: &[f64]) -> Vec<Vec<f64>> {
     let total: f64 = weights.iter().sum();
+    let (heaviest, _) = weights
+        .iter()
+        .enumerate()
+        .max_by(|a, b| a.1.total_cmp(b.1))
+        .expect("a sample has a draw");
     let centred: Vec<Vec<f64>> = columns
         .iter()
         .map(|column| {
-            let mean = column.iter().zip(weights).map(|(x, w)| w * x).sum::<f64>() / total;
-            column.iter().map(|x| x - mean).collect()
+            let shifted: Vec<f64> = column.iter().map(|x| x - column[heaviest]).collect();
+            let mean = shifted.iter().zip(weights).map(|(x, w)| w * x).sum::<f64>() / total;
+            shifted.iter().map(|x| x - mean).collect()
         })
         .collect();
     let p = columns.len();

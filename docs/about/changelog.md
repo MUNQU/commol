@@ -290,6 +290,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ParameterSample::distinct`, `Distribution::log_variance`,
   `Distribution::smoothed_at_bound` and `Stream::SampleDirections` are
   new. See [A sample](../guide/uncertainty/identifiability.md#a-sample).
+- **Breaking:** `SampleSection.correlation`, and its key in
+  `SampleSectionData`, hold `None` with a parameter whose weighted variance
+  is 0: one constant in every draw, or any of a sample of one distinct draw.
+  Before, they held `NaN` or rounding noise. Check an entry for `None` before
+  you compute with it. In Rust, `SampleIdentifiability::correlation` is
+  `Vec<Vec<Option<f64>>>`. See
+  [A sample](../guide/uncertainty/identifiability.md#a-sample).
 - **Breaking:** a build logs one `INFO` record, with the number of bins,
   parameters, transitions and outputs; the records of each bin,
   accumulator, stratification, matrix, parameter and transition of a
@@ -823,6 +830,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   warnings name the effective size, since the count of hidden ridges
   over-counts there. In Rust, `SampleIdentifiability::size`,
   `identifiability::SampleSize` and `FEW_DRAWS_PER_PARAMETER` are new. See
+  [Limits of a sample](../guide/uncertainty/identifiability.md#limits-of-a-sample).
+
+- `SampleIdentifiability` calls no parameter `determined` that is constant in
+  every draw of a sample of more than one distinct draw: its verdict is
+  `poorly_determined` with the reason "Sample: constant in every draw.", and
+  the warnings of the section name it. Before, its contraction of 1 read
+  `determined`, and its correlations were `NaN`, or `±1` between two constants
+  under weights whose mean rounds; they are now `None`. In Rust,
+  `SampleVerdict::constant` is new. See
   [Limits of a sample](../guide/uncertainty/identifiability.md#limits-of-a-sample).
 
 - An observation at `at=-0.0` beside an observation or a constraint at

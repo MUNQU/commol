@@ -129,7 +129,9 @@ class SampleIdentifiability(
     Practical identifiability from any parameter sample: what it learned
     about each parameter against its reference (the bounds or the priors).
 
-    A parameter is ``poorly_determined`` when its contraction is below
+    A parameter is ``poorly_determined`` when the effective size of the
+    sample is below ``p + 1`` for ``p`` parameters, it is constant in every
+    draw of a sample of more than one distinct draw, its contraction is below
     `contraction_threshold`, its correlation with another is above
     `correlation_threshold`, or its marginal has several modes. The section
     also gives the mass of each parameter in the outer `bound_share` of its

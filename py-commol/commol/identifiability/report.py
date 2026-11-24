@@ -138,7 +138,7 @@ class SampleSectionData(TypedDict):
     log_parameters: list[str]
     effective_size: float
     contraction: dict[str, float]
-    correlation: dict[str, dict[str, float]]
+    correlation: dict[str, dict[str, float | None]]
     correlated_pairs: list[CorrelatedPairData]
     modes: dict[str, list[float]]
     mass_below: dict[str, float]
