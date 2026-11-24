@@ -164,7 +164,7 @@ A series gives a parameter its value from `(position, value)` points on the axis
 | `"step_function"` | `t`    | 0                      | the value                   | the value of the last point | the value of the last point |
 | `"linear"`        | `t`    | 0                      | the value                   | linear interpolation in `t` | 0                           |
 
-A series has at least one point, each position finite, not negative and in one point only, and each value finite. `SeriesValue(...)` checks its points with the rule of the engine (`check_series` in `crates/commol-model/src/rules.rs`), which the model compiler also reads.
+A series has at least one point, each position finite, not negative and in one point only, and each value finite. `SeriesValue(...)` checks its points with the rule of the engine (`check_series` in `crates/commol-model/src/rules.rs`), which the model compiler also reads. A point at `-0.0` is at position 0, so a series with points at `-0.0` and at `0.0` is refused.
 
 The engine decides which positions its model type accepts. `ModelBuilder.build` and `Model.update_parameters` reject a position the engine cannot run with `ValueError`, whose message names the parameter (`check_model` in `crates/commol-model/src/builder.rs`). A rejected update leaves the model unchanged.
 

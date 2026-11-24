@@ -6253,6 +6253,14 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
+<p>A <code>"pulse"</code> series acts on step 0 with a point at <code>-0.0</code>, in every engine,
+  as <code>"step_function"</code> and <code>"linear"</code> do. Before, the point was accepted and
+  never read, so the pulse at step 0 did nothing, with no message. In Rust,
+  a <code>StochasticEvents</code> whose seed or parameter is set at a stop at <code>-0.0</code>
+  acts the pulse of step 0, which it missed. See
+  <a href="../../guide/building-models/#series-parameters">Series parameters</a>.</p>
+</li>
+<li>
 <p><code>SampleIdentifiability</code> calls no parameter <code>determined</code> when the effective
   size of the distinct draws is below <code>p + 1</code> for <code>p</code> parameters, worth
   fewer equal draws than a covariance of the parameters needs: each
