@@ -6270,6 +6270,21 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   second position 0, which changed its singular values.</p>
 </li>
 <li>
+<p>The PIT and the quantile residuals of a total far above its mean under
+  <code>NegativeBinomialObservations(sum="exact")</code> put it in its upper tail.
+  Before, at about 15 times the mean for a mean of 100 and
+  <code>overdispersion</code> 0, and closer for a larger mean, <code>P(Y &lt; y)</code> read about
+  0 and <code>P(Y &gt; y)</code> about 1: an extreme upper outlier had a PIT of about 0
+  and a quantile residual at the lower end. Just before that point the tails
+  lost a part of the mass. <code>P(Y &lt; y)</code>, <code>p(y)</code> and <code>P(Y &gt; y)</code> now sum to 1.</p>
+</li>
+<li>
+<p><code>NegativeBinomialObservations(sum="exact")</code> reads an <code>overdispersion</code>
+  between 0 and about <code>1e-60</code> as the limit it is near. Before, the log
+  density of a total above 1 was <code>−∞</code> there, its scores were NaN, and its
+  tails and its information were wrong.</p>
+</li>
+<li>
 <p>An observation of value 0 at a predicted mean of exactly 0 of a
   <code>PoissonObservations</code>, <code>NegativeBinomialObservations</code> or
   <code>BinomialObservations</code> (and a binomial count of all its trials at a mean
@@ -6292,6 +6307,31 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   reached them as a NaN. <code>InformationMatchingEta</code> reports a curvature that
   is singular to working precision as singular. Before, it reported that
   the scores were all 0.</p>
+</li>
+<li>
+<p>A prediction or a derivative that is not finite at the fit, such as a
+  difference of finite runs that overflows, raises a <code>RuntimeError</code> from
+  <code>Laplace</code>, <code>Sandwich</code> and <code>InformationMatchingEta</code>, and a derivative also
+  from <code>LaplaceMixture</code>, at an end inside the support. The error names the
+  observation and, for a derivative, the parameter. Before, the error gave
+  another cause. It was a <code>RuntimeError</code> of a mean on the edge of its
+  observation model, or a <code>ValueError</code>: with observation models, of a value
+  with no probability at the fit or a score that is not finite; with
+  <code>loss_function="rmse"</code>, of a curvature that is not positive definite; from
+  <code>InformationMatchingEta</code>, of scores that are all 0. Or there was no error: a
+  term with no curvature (an <code>sd</code> whose square overflows, a weight of 0 in
+  Rust) gave <code>Sandwich</code> an infinite covariance and, in Rust, a source of
+  derivatives whose prediction is not finite gave a loss a finite curvature,
+  with any weight, and gradients that are not finite. <code>loss_function="mae"</code>
+  keeps its <code>ValueError</code>, that it has no curvature. A <code>Laplace</code> or a
+  <code>LaplaceMixture</code> whose matrix was right is refused too: one with
+  <code>curvature="hessian"</code> or, in Rust, one with the entry in a term of weight 0.
+  The error of a curvature that is not finite with finite derivatives says
+  that a derivative may be too large for its square. In Rust,
+  <code>Curvature::gauss_newton</code> and <code>Curvature::hessian</code> return
+  <code>MethodError::Failed</code>, also where they returned <code>MethodError::Invalid</code> at a
+  prediction or a derivative that is not finite, and
+  <code>Discrepancy::check_curvature</code> is new.</p>
 </li>
 <li>
 <p>The curvature of a <code>NegativeBinomialObservations</code> of <code>overdispersion</code> 0,

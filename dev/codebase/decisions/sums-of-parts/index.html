@@ -3062,6 +3062,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-tails-of-an-exact-sum-split-its-mass" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The tails of an exact sum split its mass
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#an-exact-sum-ends-at-a-fixed-count" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3901,6 +3912,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-tails-of-an-exact-sum-split-its-mass" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The tails of an exact sum split its mass
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#an-exact-sum-ends-at-a-fixed-count" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3934,8 +3956,8 @@
 <h1 id="sums-of-parts">Sums of parts<a class="headerlink" href="#sums-of-parts" title="Permanent link">&para;</a></h1>
 <p><a href="../../design-decisions/">Back to Design decisions</a></p>
 <p>How an observation model reads the sum of the parts of a window: the density
-of each model's sum, and the cap of the exact sum of negative binomials. What
-the parts of a window are, and which readers read them, is on
+of each model's sum, and the tails and the cap of the exact sum of negative
+binomials. What the parts of a window are, and which readers read them, is on
 <a href="../observations/#the-parts-of-a-window-are-observations-of-every-reader">Observations</a>.</p>
 <h2 id="a-model-reads-the-sum-of-the-parts">A model reads the sum of the parts<a class="headerlink" href="#a-model-reads-the-sum-of-the-parts" title="Permanent link">&para;</a></h2>
 <p><code>Noise::sum_log_density</code>, <code>sum_scores</code> and <code>sum_information</code>
@@ -3948,10 +3970,13 @@ negative binomial series with parts needs <code>sum</code> (<code>Sum::Exact</co
 apart and the terms scaled down past <code>1e150</code>. The jumps of a part are
 geometric, so each part keeps its share of the sum over the jumps as a state
 updated once per count: <code>O(K)</code> per count, <code>O(K · y)</code> up to a total <code>y</code>, with
-no jump cut and only sums of positive terms for the density. <code>"moments"</code> is
-<code>NB(M, φ · Σμₜ²/M²)</code>. Every other model refuses parts. The draws read the sum
-as the density does (<code>draw_sum</code> of <code>predictive.rs</code>): each part, summed, or
-the matched negative binomial for <code>"moments"</code>.</p>
+no jump cut and only sums of positive terms for the density. The terms are
+tilted to the observed total, so its log density holds where its density is no
+number; <code>tilt</code> searches between 1 and <code>y/M</code>, at any <code>φ</code>, and its doc comment says
+from which means the terms underflow. <code>"moments"</code> is <code>NB(M, φ · Σμₜ²/M²)</code>. Every
+other model refuses parts. The draws read the sum as the density does (<code>draw_sum</code>
+of <code>predictive.rs</code>): each part, summed, or the matched negative binomial for
+<code>"moments"</code>.</p>
 <p><strong>Rule:</strong> a term of several parts reads the density of their sum, and its
 draws, scores and information read that same density; a model with no closed
 form for the sum refuses parts.</p>
@@ -4007,6 +4032,67 @@ form for the sum refuses parts.</p>
 <code>crates/commol-inference/tests/test_predictive.rs::draws_of_a_sum_have_the_variance_of_their_parts</code>,
 <code>tests/uncertainty/test_observation_sums.py::TestSums</code>,
 <code>tests/uncertainty/test_part_sums_coverage.py::TestPartSums</code>.</p>
+<h2 id="the-tails-of-an-exact-sum-split-its-mass">The tails of an exact sum split its mass<a class="headerlink" href="#the-tails-of-an-exact-sum-split-its-mass" title="Permanent link">&para;</a></h2>
+<p><code>exact_tails</code> (<code>likelihood/sums.rs</code>) reads <code>P(Y &lt; y)</code>, <code>p(y)</code> and <code>P(Y &gt; y)</code> from
+the recursion tilted to <code>y</code>. While <code>P(Y &gt; y)</code> is at least
+<code>COMPLEMENT_TAIL = 0.01</code> it is the complement of the counts up to <code>y</code>. Below, it
+is the sum of the counts above <code>y</code>, and the larger of the other two is the
+complement: the three sum to 1 and none leaves <code>[0, 1]</code>. Far above the mean the
+terms near <code>M</code> underflow, so the counts below <code>y</code> are not summed once the
+Chernoff bound at the tilt (<code>Recursion::log_tail_bound</code>) shows
+<code>P(Y ≥ y) &lt; COMPLEMENT_TAIL</code>. Where it does not, those that hold the mass cannot
+underflow:</p>
+<ul>
+<li>With <code>θ = ln ρ</code> and <code>K</code> the cumulant function of the sum, the tilted mass of a
+  count <code>n</code> is <code>p(n) e^(θn − K(θ))</code>, and no term is below it.</li>
+<li>Up to <code>M</code>, <code>θ ≤ 0</code> and <code>θn − K(θ) ≥ θy − K(θ) ≥ 0</code> for <code>n ≤ y</code>.</li>
+<li>Above <code>M</code>, <code>K′</code> is convex and rises from <code>M</code> to <code>y</code>, so <code>K(θ) − θM</code> is at most
+  <code>θy − K(θ)</code>, at most <code>−ln COMPLEMENT_TAIL ≈ 4.605</code>, and <code>K″ ≥ σ²</code> gives
+  <code>θσ ≤ 3.1</code>. From <code>8.6σ</code> below <code>M</code>, under which <code>1e-16</code> of the mass lies, the
+  terms are at least <code>p(n) e^−32</code>.</li>
+</ul>
+<p>Errors measured for <a href="https://github.com/MUNQU/commol/issues/524">#524</a>, not
+bounds. Against 45 digits (3 940 cases: <code>M</code> from 0.01 to 10⁴, <code>φ</code> from 0 to 10³,
+totals from 0 to 100 sd above <code>M</code>, equal, unequal and zero parts) the tails err
+by 1e-14 in the median. The worst are the complements near <code>COMPLEMENT_TAIL</code>,
+which lose digits with <code>|log p(0)|</code>. Against 25 digits or more (2 000
+cases: <code>M</code> from 10² to 3·10⁵, <code>φ</code> from 0 to 0.05, or 0.01 at 3·10⁵, 2 or 7 equal
+parts, totals from 1.9 to 2.4 sd above <code>M</code>) they err by up to about 5e-10 for <code>M</code>
+up to 10⁴, 1e-8 at 10⁵ and 1e-7 at 3·10⁵.</p>
+<p><strong>Rule:</strong> the tails of a total, however far from the mean, are a partition of the mass, each on its side.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The sum of the terms below <code>y</code> at every <code>y</code></td>
+<td>Their underflow gives an extreme upper outlier <code>P(Y &lt; y) ≈ 0</code>, as at <code>M = 100, φ = 0, y = 1500</code>, and a part of the mass in between, as at <code>M = 1000, φ = 0, y = 2790</code> in two parts, where they sum to 0.459.</td>
+</tr>
+<tr>
+<td>A bound of <code>p(y)</code> below which the counts below <code>y</code> are not summed</td>
+<td>A constant with no meaning of its own; the Chernoff bound asks the question of <code>COMPLEMENT_TAIL</code>, gives the same tails in 23 940 cases, and spares the sum below sooner.</td>
+</tr>
+<tr>
+<td>The sum above <code>y</code> at every <code>y &gt; M</code></td>
+<td>With a heavy tail it reaches far beyond <code>y</code>, or past the cap, for totals near the mean, where the complement is as accurate.</td>
+</tr>
+<tr>
+<td>A recursion with no tilt for the tails</td>
+<td>Past the mean its terms fall into the subnormal numbers, which lose the digits of a tail below about <code>1e-290</code>, and stay there: 0.4 s instead of 0.02 s at <code>M = 70, φ = 0.5, y = 999 999</code>.</td>
+</tr>
+<tr>
+<td>A second recursion, with no tilt, for the counts below <code>y</code></td>
+<td>Twice the cost for a mass that is the complement.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>crates/commol-calibration/tests/test_parts.rs::an_exact_sum_far_above_its_mean_is_in_its_upper_tail</code>,
+<code>crates/commol-calibration/tests/test_parts.rs::the_tails_of_an_exact_sum_split_its_mass</code>,
+<code>tests/uncertainty/test_observation_sums.py::TestSums::test_an_outlier_of_an_exact_sum_has_a_pit_near_one</code>.</p>
 <h2 id="an-exact-sum-ends-at-a-fixed-count">An exact sum ends at a fixed count<a class="headerlink" href="#an-exact-sum-ends-at-a-fixed-count" title="Permanent link">&para;</a></h2>
 <p><code>"exact"</code> computes the counts below <code>MAX_COUNTS = 1 000 000</code> (<code>likelihood/sums.rs</code>).
 <code>Recursion::extend_to</code> refuses a count at the cap before computing it. Before

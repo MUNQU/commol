@@ -4263,6 +4263,11 @@ skewed sample, not draws outside it. A fit <strong>on</strong> a bound of its pa
 parameter has one finite bound) raises a <code>ValueError</code>: its
 variance on the unbounded scale is infinite there, and a
 <a href="../profiles/">profile likelihood</a> describes it.</p>
+<p>A curvature needs finite predictions and derivatives. One that is not finite
+at the fit raises a <code>RuntimeError</code> that names the observation and, for a
+derivative, the parameter, whatever the weight and the noise of the
+observation. The runs can be finite and their difference overflow: change the
+units or the <code>scale</code> of that observation.</p>
 <h2 id="laplace-approximation-and-the-delta-method">Laplace approximation and the delta method<a class="headerlink" href="#laplace-approximation-and-the-delta-method" title="Permanent link">&para;</a></h2>
 <p><code>Laplace(draws, curvature="gauss_newton", starts=1)</code> fits the problem (<code>Calibrator.run(starts)</code>) and
 returns a <code>LaplaceResult</code>: the fit, the covariance <code>Σ = H⁻¹</code> of the normal on the
