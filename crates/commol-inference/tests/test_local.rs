@@ -23,7 +23,9 @@ use commol_inference::local::{
     sandwich_approximation,
 };
 use commol_inference::psis::smooth;
-use commol_inference::sensitivity::{Design, FiniteDifferences, SensitivityError};
+use commol_inference::sensitivity::{
+    Design, FiniteDifferences, Sensitivities, SensitivityError, SensitivitySource,
+};
 use commol_inference::smc::LikelihoodTarget;
 use commol_inference::target::Target;
 use commol_inference::transform::Transform;
@@ -754,6 +756,236 @@ fn a_count_with_no_probability_at_its_mean_has_no_curvature() {
             .starts_with("Observation 'x' at 0 has no probability at the fit"),
         "{error}"
     );
+}
+
+/// Finite differences of a problem whose sensitivities `change` changes.
+struct Changed<F: Fn(&mut Sensitivities) + Sync> {
+    source: FiniteDifferences<Curve>,
+    change: F,
+}
+
+impl<F: Fn(&mut Sensitivities) + Sync> SensitivitySource for Changed<F> {
+    fn parameters(&self) -> &[CalibrationParameter] {
+        self.source.parameters()
+    }
+
+    fn jacobian(&self, values: &[f64]) -> Result<Sensitivities, SensitivityError> {
+        let mut sensitivities = self.source.jacobian(values)?;
+        (self.change)(&mut sensitivities);
+        Ok(sensitivities)
+    }
+
+    fn scales(&self, sensitivities: &Sensitivities) -> Vec<f64> {
+        self.source.scales(sensitivities)
+    }
+}
+
+/// The message of the Gauss–Newton curvature of `problem` at `fit` with the
+/// finite differences that `change` changes, of kind [`MethodError::Failed`].
+fn changed_failure(
+    problem: &CalibrationProblem<Curve>,
+    fit: &[f64],
+    change: impl Fn(&mut Sensitivities) + Sync,
+) -> String {
+    let source = FiniteDifferences::new(problem, Design::Observations).unwrap();
+    match Curvature::gauss_newton(problem, &Changed { source, change }, fit) {
+        Err(MethodError::Failed(message)) => message,
+        other => panic!("{other:?}"),
+    }
+}
+
+/// [`line_problem`] with the weight `weight` for its observation at 3.
+fn line_of_weight(weight: f64) -> CalibrationProblem<Curve> {
+    let problem = line_problem();
+    let values: Vec<f64> = problem.observed_data().iter().map(|o| o.value).collect();
+    let mut weights = [1.0; 10];
+    weights[3] = weight;
+    problem.with_data(&values, &weights).unwrap()
+}
+
+#[test]
+fn a_jacobian_that_is_not_finite_is_refused() {
+    // The term of weight 0 has no curvature to show it, only its gradient.
+    for weight in [0.0, 1.0] {
+        let message = changed_failure(&line_of_weight(weight), &[1.1, 0.48, 0.4], |s| {
+            s.jacobian[(3, 1)] = f64::INFINITY;
+            s.parts.jacobian[(3, 1)] = f64::INFINITY;
+        });
+
+        assert_eq!(
+            message,
+            "The derivatives of the runs at the fit are not finite: observation 'x' at 3 has \
+             the derivative inf with respect to 'b'"
+        );
+    }
+}
+
+#[test]
+fn a_prediction_that_is_not_finite_is_refused() {
+    // The curvature of a loss does not read the predictions, its gradient
+    // does.
+    for weight in [0.0, 1.0] {
+        let values = [1.0, 1.5, 2.2, 2.4];
+        let problem = CalibrationProblem::new(
+            Curve::new(Shape::Line),
+            observed("x", &values),
+            vec![
+                CalibrationParameter::new("a".to_string(), -10.0, 10.0),
+                CalibrationParameter::new("b".to_string(), -5.0, 5.0),
+            ],
+            None,
+            vec![],
+            LossConfig::SumSquaredError,
+        )
+        .unwrap()
+        .with_data(&values, &[1.0, 1.0, 1.0, weight])
+        .unwrap();
+
+        let message = changed_failure(&problem, &[1.0, 0.5], |s| {
+            s.predictions[3] = f64::INFINITY;
+        });
+
+        assert_eq!(
+            message,
+            "The predictions of the runs at the fit are not finite: observation 'x' at 3 has \
+             the prediction inf"
+        );
+    }
+
+    // The increment of x = a t + b t² over 10, a sum of two Poisson parts.
+    let sum = ObservedDataPoint {
+        parts: 2,
+        ..ObservedDataPoint::with_window(10.0, "x".to_string(), 40.0, 10.0)
+    };
+    let problem = CalibrationProblem::new(
+        Curve::new(Shape::Quadratic),
+        vec![sum],
+        vec![CalibrationParameter::new("a".to_string(), 0.1, 9.0)],
+        None,
+        vec![],
+        DiscrepancyConfig::Likelihood(vec![("x".to_string(), ObservationModel::Poisson)]),
+    )
+    .unwrap();
+    let message = changed_failure(&problem, &[4.0], |s| s.predictions[0] = f64::NAN);
+    assert!(
+        message.ends_with("observation 'x' at 10 has the prediction NaN"),
+        "{message}"
+    );
+    // An infinite mean of a Poisson part has the information 0.
+    let message = changed_failure(&problem, &[4.0], |s| s.parts.means[1] = f64::INFINITY);
+    assert!(
+        message.ends_with("observation 'x' at 10 has the prediction inf in its part 2"),
+        "{message}"
+    );
+}
+
+/// A line of `x` at 0, 1, 2 with a normal model of sd 0.5, and at 3 the
+/// series `far`, `scale` times the line, of weight `weight` and sd `sd`.
+fn line_and_far(scale: f64, weight: f64, sd: f64) -> CalibrationProblem<Curve> {
+    let values = [0.1, 0.2, 0.1, 1.0];
+    let mut data = observed("x", &values);
+    data[3].label = "far".to_string();
+    data[3].scale = scale;
+    CalibrationProblem::new(
+        Curve::new(Shape::Line),
+        data,
+        vec![
+            CalibrationParameter::new("a".to_string(), -1.0, 1.0),
+            CalibrationParameter::new("b".to_string(), -1.0, 1.0),
+        ],
+        None,
+        vec![],
+        DiscrepancyConfig::Likelihood(vec![
+            normal("x", Argument::Value(0.5)),
+            normal("far", Argument::Value(sd)),
+        ]),
+    )
+    .unwrap()
+    .with_data(&values, &[1.0, 1.0, 1.0, weight])
+    .unwrap()
+}
+
+#[test]
+fn a_difference_of_finite_runs_that_overflows_is_refused() {
+    // 10³⁰⁸ (a + b t) at t = 3 and (a, b) near (0, 0.01): the runs of a
+    // difference of b are finite, and their slope 3·10³⁰⁸ is above the
+    // largest number. A weight of 0, or a noise whose information 1/sd²
+    // underflows, gives a term of no curvature.
+    let fit = [0.0, 0.01];
+    for (weight, sd) in [(0.0, 0.5), (1.0, 0.5), (1.0, 1e308)] {
+        let problem = line_and_far(1e308, weight, sd);
+        let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+        let sensitivities = source.jacobian(&fit).unwrap();
+        assert!(sensitivities.predictions.iter().all(|p| p.is_finite()));
+        assert_eq!(sensitivities.jacobian[(3, 1)], f64::INFINITY);
+
+        for error in [
+            Curvature::gauss_newton(&problem, &source, &fit).unwrap_err(),
+            Curvature::hessian(&problem, &source, &fit).unwrap_err(),
+            sandwich_approximation(&problem, &fit, CurvatureKind::GaussNewton, Some(1))
+                .unwrap_err(),
+        ] {
+            assert_eq!(
+                error,
+                MethodError::Failed(
+                    "The derivatives of the runs at the fit are not finite: observation 'far' \
+                     at 3 has the derivative inf with respect to 'b'"
+                        .to_string()
+                )
+            );
+        }
+    }
+}
+
+#[test]
+fn a_loss_with_no_curvature_is_refused_before_a_derivative_that_is_not_finite() {
+    // The same derivative of 3·10³⁰⁸, under the mean absolute error, which no
+    // change of units gives a curvature.
+    let mut data = observed("x", &[0.1, 0.2, 0.1, 1.0]);
+    data[3].scale = 1e308;
+    let problem = CalibrationProblem::new(
+        Curve::new(Shape::Line),
+        data,
+        vec![
+            CalibrationParameter::new("a".to_string(), -1.0, 1.0),
+            CalibrationParameter::new("b".to_string(), -1.0, 1.0),
+        ],
+        None,
+        vec![],
+        LossConfig::MeanAbsoluteError,
+    )
+    .unwrap();
+
+    let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+    let error = Curvature::gauss_newton(&problem, &source, &[0.0, 0.01]).unwrap_err();
+
+    assert!(matches!(error, MethodError::Invalid(_)), "{error:?}");
+    assert!(
+        error
+            .to_string()
+            .starts_with("loss_function=\"mae\" has no curvature"),
+        "{error}"
+    );
+}
+
+#[test]
+fn a_derivative_too_large_for_its_square_has_no_finite_curvature() {
+    // The derivative 3 scale of scale (a + b t) at t = 3 is finite and its
+    // square is not.
+    for scale in [1e154, 1e157] {
+        let problem = line_and_far(scale, 1.0, 1.0);
+        let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+
+        let error = Curvature::gauss_newton(&problem, &source, &[0.0, 0.0]).unwrap_err();
+
+        assert!(matches!(error, MethodError::Failed(_)), "{error:?}");
+        assert!(
+            error
+                .to_string()
+                .ends_with("or a derivative is too large for its square"),
+            "{error}"
+        );
+    }
 }
 
 #[test]

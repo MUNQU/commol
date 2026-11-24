@@ -21,6 +21,7 @@ from commol import (
     CalibrationProblem,
     Calibrator,
     NelderMeadConfig,
+    ObservedDataPoint,
     Simulation,
 )
 from commol._calibration.method import UncertaintyMethod
@@ -358,6 +359,34 @@ class TestSandwich:
         calibrator = Calibrator(Simulation(model), problem)
 
         with pytest.raises(ValueError, match=r"density of the residuals.*bootstrap"):
+            calibrator.uncertainty(Sandwich(block_length=1, draws=10))
+
+    def test_sandwich_refuses_derivatives_that_are_not_finite(self) -> None:
+        # The prediction 2·10³⁰⁷ of "far" at c = 0.01 is finite and its slope
+        # 2·10³⁰⁹ is not; its information 1/sd² is 0.
+        model = build(
+            a_to_b_builder(
+                parameters={"c": None}, rate="c * A / A", amounts={"A": 1e6, "B": 0}
+            )
+        )
+        far = ObservedDataPoint(at=20, output="B", label="far", value=1.0, scale=1e308)
+        values = [0.01 * t + 0.01 * (-1) ** t for t in range(1, 9)]
+        problem = CalibrationProblem(
+            observed_data=[*flow_observations(values, windowed=False), far],
+            parameters=[bounded("c", 0.0, 1.0, initial_guess=0.01)],
+            observation_models={
+                "B": NormalObservations(sd=0.1),
+                "far": NormalObservations(sd=1e308),
+            },
+            optimization_config=NelderMeadConfig(max_iterations=500),
+            seed=2,
+        )
+        calibrator = Calibrator(Simulation(model), problem)
+
+        with pytest.raises(
+            RuntimeError,
+            match=r"not finite: observation 'far' at 20 .* with respect to 'c'",
+        ):
             calibrator.uncertainty(Sandwich(block_length=1, draws=10))
 
 

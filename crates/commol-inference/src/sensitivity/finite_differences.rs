@@ -9,6 +9,8 @@
 //! inside the bounds, and one-sided of second order towards the inside
 //! otherwise, so no run leaves the bounds. Each derivative is computed with
 //! the steps `h` and `2h`; their difference estimates the truncation error.
+//! Every run is finite, but its observation, a scale times its outputs, or
+//! the quotient of a difference can overflow.
 
 use std::collections::BTreeSet;
 

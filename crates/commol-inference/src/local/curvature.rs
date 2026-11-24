@@ -22,7 +22,7 @@ use commol_core::SimulationEngine;
 use finitediff::vec::hessian::central_hessian_nograd_error_vec;
 
 use crate::error::MethodError;
-use crate::sensitivity::{Matrix, SensitivitySource};
+use crate::sensitivity::{Matrix, Sensitivities, SensitivitySource};
 use crate::transform::{Scale, Transform};
 
 /// An entry of the curvature is reported when its estimated error is above
@@ -56,8 +56,9 @@ impl Curvature {
     /// parameter, the engine is stochastic, the discrepancy has no
     /// curvature (the mean absolute error), or an observation has no finite
     /// derivatives of its term ([`CalibrationProblem::term_derivatives`]);
-    /// [`MethodError::Failed`] when the derivatives fail or the curvature is
-    /// not finite.
+    /// [`MethodError::Failed`] when the derivatives fail, a prediction or a
+    /// derivative of `source` is not finite, also one that the curvature does
+    /// not read, or the curvature is not finite.
     pub fn gauss_newton<E, S>(
         problem: &CalibrationProblem<E>,
         source: &S,
@@ -69,7 +70,12 @@ impl Curvature {
     {
         let transform = Transform::new(&problem.parameter_bounds());
         check_inside(problem, &transform, fit)?;
+        problem
+            .discrepancy()
+            .check_curvature()
+            .map_err(MethodError::Invalid)?;
         let sensitivities = source.jacobian(fit).map_err(MethodError::Sensitivity)?;
+        check_finite(problem, &sensitivities)?;
         let parts = &sensitivities.parts;
         let terms = problem
             .term_derivatives(fit, &sensitivities.predictions, &parts.means)
@@ -96,7 +102,7 @@ impl Curvature {
         if matrix.iter().any(|entry| !entry.is_finite()) {
             return Err(MethodError::Failed(
                 "The curvature at the fit is not finite: a mean sits on the edge of the means \
-                 its observation model allows"
+                 its observation model allows, or a derivative is too large for its square"
                     .to_string(),
             ));
         }
@@ -131,8 +137,9 @@ impl Curvature {
     ///
     /// # Errors
     ///
-    /// As [`Self::gauss_newton`], and [`MethodError::Failed`] when a point of
-    /// the differences is infeasible or the engine fails.
+    /// As [`Self::gauss_newton`], also for an entry of `source` that the
+    /// differences of the objective do not read, and [`MethodError::Failed`]
+    /// when a point of the differences is infeasible or the engine fails.
     pub fn hessian<E, S>(
         problem: &CalibrationProblem<E>,
         source: &S,
@@ -314,6 +321,40 @@ fn check_inside<E: SimulationEngine>(
         ))),
         None => Ok(()),
     }
+}
+
+/// Refuse a prediction or a derivative of `sensitivities` that is not
+/// finite, whatever the weight of its observation. The check of the curvature
+/// does not see one that the curvature does not read (in a term of no
+/// curvature, or the prediction of a loss), and the gradient of its term can
+/// be not finite.
+fn check_finite<E: SimulationEngine>(
+    problem: &CalibrationProblem<E>,
+    sensitivities: &Sensitivities,
+) -> Result<(), MethodError> {
+    let Some(entry) = sensitivities.first_not_finite() else {
+        return Ok(());
+    };
+    let obs = &problem.observed_data()[entry.observation];
+    let value = entry.value;
+    let (what, named) = match entry.column {
+        None => ("predictions", format!("prediction {value}")),
+        Some(j) => (
+            "derivatives",
+            format!(
+                "derivative {value} with respect to '{}'",
+                problem.parameters()[j].id
+            ),
+        ),
+    };
+    let place = entry
+        .part
+        .map_or_else(String::new, |part| format!(" in its part {}", part + 1));
+    Err(MethodError::Failed(format!(
+        "The {what} of the runs at the fit are not finite: observation '{}' at {} has the \
+         {named}{place}",
+        obs.label, obs.at
+    )))
 }
 
 /// Rows `first` to `first + count` of `matrix`.

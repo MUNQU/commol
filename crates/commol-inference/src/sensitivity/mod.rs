@@ -104,7 +104,57 @@ impl PartSensitivities {
     }
 }
 
+/// A prediction or a derivative that is not finite.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct NotFinite {
+    /// Its observation.
+    pub observation: usize,
+    /// Its part, from 0, of an observation of several parts; `None` for the
+    /// whole observation.
+    pub part: Option<usize>,
+    /// The parameter of a derivative; `None` for a prediction.
+    pub column: Option<usize>,
+    /// The value.
+    pub value: f64,
+}
+
 impl Sensitivities {
+    /// The first prediction or derivative that is not finite, observation by
+    /// observation: in each, its parts before the whole, so that it names the
+    /// part, and in each of these the prediction before the derivatives.
+    pub(crate) fn first_not_finite(&self) -> Option<NotFinite> {
+        let parts = &self.parts;
+        let in_row = |prediction: f64, jacobian: &Matrix, row: usize| {
+            std::iter::once((None, prediction))
+                .chain((0..jacobian.ncols()).map(|j| (Some(j), jacobian[(row, j)])))
+                .find(|(_, value)| !value.is_finite())
+        };
+        let mut first = 0;
+        for (observation, &count) in parts.counts.iter().enumerate() {
+            let found = (0..count)
+                .find_map(|t| {
+                    let (column, value) =
+                        in_row(parts.means[first + t], &parts.jacobian, first + t)?;
+                    Some(((count > 1).then_some(t), column, value))
+                })
+                .or_else(|| {
+                    let prediction = self.predictions[observation];
+                    let (column, value) = in_row(prediction, &self.jacobian, observation)?;
+                    Some((None, column, value))
+                });
+            if let Some((part, column, value)) = found {
+                return Some(NotFinite {
+                    observation,
+                    part,
+                    column,
+                    value,
+                });
+            }
+            first += count;
+        }
+        None
+    }
+
     /// The same sensitivities restricted to the parameters `columns`, by
     /// index, in that order.
     ///
@@ -223,7 +273,8 @@ pub trait SensitivitySource: Sync {
     /// The parameters, in problem order: one column each.
     fn parameters(&self) -> &[CalibrationParameter];
 
-    /// The Jacobian of the predicted observations at `values`.
+    /// The Jacobian of the predicted observations at `values`. Its entries
+    /// and the predictions may be not finite.
     ///
     /// # Errors
     ///
@@ -339,5 +390,85 @@ mod tests {
         assert_eq!(scaled.jacobian, expected);
         assert_eq!(scaled.errors, expected.clone() * 0.5);
         assert_eq!(scaled.parts.jacobian, expected);
+    }
+
+    /// Observations of 1, 3 and 2 parts and two parameters, every entry 1.
+    fn of_parts() -> Sensitivities {
+        let ones = |rows: usize| Matrix::from_element(rows, 2, 1.0);
+        Sensitivities {
+            predictions: vec![1.0; 3],
+            jacobian: ones(3),
+            errors: ones(3),
+            labels: vec!["A".to_string(), "B".to_string(), "B".to_string()],
+            parts: PartSensitivities {
+                counts: vec![1, 3, 2],
+                means: vec![1.0; 6],
+                jacobian: ones(6),
+                errors: ones(6),
+            },
+        }
+    }
+
+    #[test]
+    fn the_first_entry_that_is_not_finite_names_its_place() {
+        assert_eq!(of_parts().first_not_finite(), None);
+        // Each row: its index, its observation and its part.
+        let rows_of_parts = [
+            (0, 0, None),
+            (1, 1, Some(0)),
+            (2, 1, Some(1)),
+            (3, 1, Some(2)),
+            (4, 2, Some(0)),
+            (5, 2, Some(1)),
+        ];
+        let rows_of_wholes = [(0, 0, None), (1, 1, None), (2, 2, None)];
+        for value in [f64::INFINITY, f64::NEG_INFINITY, f64::NAN] {
+            for column in [None, Some(0), Some(1)] {
+                let place = |changed: &Sensitivities| {
+                    let found = changed.first_not_finite().unwrap();
+                    assert_eq!(found.value.to_bits(), value.to_bits());
+                    assert_eq!(found.column, column);
+                    (found.observation, found.part)
+                };
+                for (row, observation, part) in rows_of_parts {
+                    let mut changed = of_parts();
+                    match column {
+                        None => changed.parts.means[row] = value,
+                        Some(j) => changed.parts.jacobian[(row, j)] = value,
+                    }
+                    assert_eq!(place(&changed), (observation, part));
+                }
+                for (row, observation, part) in rows_of_wholes {
+                    let mut changed = of_parts();
+                    match column {
+                        None => changed.predictions[row] = value,
+                        Some(j) => changed.jacobian[(row, j)] = value,
+                    }
+                    assert_eq!(place(&changed), (observation, part));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn a_part_that_is_not_finite_comes_before_its_whole() {
+        let mut changed = of_parts();
+        changed.predictions[2] = f64::INFINITY;
+        changed.parts.jacobian[(5, 1)] = f64::NEG_INFINITY;
+
+        assert_eq!(
+            changed.first_not_finite(),
+            Some(NotFinite {
+                observation: 2,
+                part: Some(1),
+                column: Some(1),
+                value: f64::NEG_INFINITY,
+            })
+        );
+        // An earlier observation, and its prediction before its derivatives.
+        changed.jacobian[(0, 0)] = f64::INFINITY;
+        changed.predictions[0] = f64::NAN;
+        let found = changed.first_not_finite().unwrap();
+        assert_eq!((found.observation, found.column), (0, None));
     }
 }

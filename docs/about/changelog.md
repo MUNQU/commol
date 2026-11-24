@@ -856,6 +856,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is singular to working precision as singular. Before, it reported that
   the scores were all 0.
 
+- A prediction or a derivative that is not finite at the fit, such as a
+  difference of finite runs that overflows, raises a `RuntimeError` from
+  `Laplace`, `Sandwich` and `InformationMatchingEta`, and a derivative also
+  from `LaplaceMixture`, at an end inside the support. The error names the
+  observation and, for a derivative, the parameter. Before, the error gave
+  another cause. It was a `RuntimeError` of a mean on the edge of its
+  observation model, or a `ValueError`: with observation models, of a value
+  with no probability at the fit or a score that is not finite; with
+  `loss_function="rmse"`, of a curvature that is not positive definite; from
+  `InformationMatchingEta`, of scores that are all 0. Or there was no error: a
+  term with no curvature (an `sd` whose square overflows, a weight of 0 in
+  Rust) gave `Sandwich` an infinite covariance and, in Rust, a source of
+  derivatives whose prediction is not finite gave a loss a finite curvature,
+  with any weight, and gradients that are not finite. `loss_function="mae"`
+  keeps its `ValueError`, that it has no curvature. A `Laplace` or a
+  `LaplaceMixture` whose matrix was right is refused too: one with
+  `curvature="hessian"` or, in Rust, one with the entry in a term of weight 0.
+  The error of a curvature that is not finite with finite derivatives says
+  that a derivative may be too large for its square. In Rust,
+  `Curvature::gauss_newton` and `Curvature::hessian` return
+  `MethodError::Failed`, also where they returned `MethodError::Invalid` at a
+  prediction or a derivative that is not finite, and
+  `Discrepancy::check_curvature` is new.
+
 - The curvature of a `NegativeBinomialObservations` of `overdispersion` 0,
   which the Laplace approximation, the sandwich and the noise floor of a
   profile read, is the limit of the Poisson, `μ²/2` for `φ`. Before, it ran

@@ -69,6 +69,42 @@ and column; a note changes no result.
 `crates/commol-inference/tests/test_local.rs::the_hessian_of_a_linear_model_equals_the_information`,
 `crates/commol-calibration/tests/test_likelihood.rs::fisher_information_of_each_model_has_its_closed_form`.
 
+## The curvature refuses a prediction or a derivative that is not finite
+
+A `SensitivitySource` ([one port](identifiability.md#sensitivities-come-from-one-port))
+may give entries that are not finite, as a difference of finite runs that
+overflows, so `Curvature::gauss_newton` finds the first
+(`Sensitivities::first_not_finite`) before it reads any term, and refuses it
+with a `MethodError::Failed` that names the observation, its part and, for a
+derivative, the parameter (`check_finite`). The curvature does not show an
+entry that it does not read: a derivative in a term of no curvature (a weight
+of 0, a noise whose information underflows) and the prediction of a loss,
+whose curvature is finite with any weight. The gradient of the term is then
+not finite, in the meat of the sandwich and in information matching. The rule
+does not read the weights, as a run that is not finite is refused whatever
+the weights (`ForwardModel::run_into`), and the predictions and derivatives
+come from the same runs. It therefore also refuses a Laplace approximation
+whose matrix is right without the entry: one of the Hessian, or one with the
+entry in a term of weight 0. A loss with no curvature is refused before the
+derivatives (`Discrepancy::check_curvature`), since no other units give it
+one. A curvature that overflows with finite derivatives, or that has an
+infinite information, is refused after it is summed.
+
+| Alternative | Why not |
+|---|---|
+| Check in `FiniteDifferences` | Another source of `SensitivitySource`, a public trait, could bring them back to the curvature. |
+| Check that the gradients are finite | They do not say which part is not finite, and a Laplace approximation reads none of them. With a weight of 0, the gradient of an observation model is 0 at any prediction, so it does not show one that is not finite. |
+| Skip the terms of weight 0 | An observation would be refused or not by its weight, when a run that is not finite never is. |
+| Skip what the method at hand does not read | The curvature is one object that each method reads in part, so each would need its own rule. |
+
+**Guards:** `crates/commol-inference/tests/test_local.rs::a_jacobian_that_is_not_finite_is_refused`,
+`crates/commol-inference/tests/test_local.rs::a_prediction_that_is_not_finite_is_refused`,
+`crates/commol-inference/tests/test_local.rs::a_difference_of_finite_runs_that_overflows_is_refused`,
+`crates/commol-inference/tests/test_local.rs::a_derivative_too_large_for_its_square_has_no_finite_curvature`,
+`crates/commol-inference/tests/test_local.rs::a_loss_with_no_curvature_is_refused_before_a_derivative_that_is_not_finite`,
+`crates/commol-inference/src/sensitivity/mod.rs::the_first_entry_that_is_not_finite_names_its_place`,
+`tests/uncertainty/test_local.py::TestSandwich::test_sandwich_refuses_derivatives_that_are_not_finite`.
+
 ## The sandwich sums scores over blocks
 
 `sandwich` (`local/sandwich.rs`) gives `H⁻¹ B H⁻¹` with

@@ -122,6 +122,12 @@ parameter has one finite bound) raises a `ValueError`: its
 variance on the unbounded scale is infinite there, and a
 [profile likelihood](profiles.md) describes it.
 
+A curvature needs finite predictions and derivatives. One that is not finite
+at the fit raises a `RuntimeError` that names the observation and, for a
+derivative, the parameter, whatever the weight and the noise of the
+observation. The runs can be finite and their difference overflow: change the
+units or the `scale` of that observation.
+
 ## Laplace approximation and the delta method
 
 `Laplace(draws, curvature="gauss_newton", starts=1)` fits the problem (`Calibrator.run(starts)`) and
