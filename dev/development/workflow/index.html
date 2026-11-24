@@ -3707,6 +3707,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#audits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Audits
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#parallel-work" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4247,6 +4258,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#audits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Audits
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#parallel-work" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4597,6 +4619,11 @@ merges into it, through the merge queue, and a release is a tag on it.</p>
 <td><code>release</code></td>
 <td>The checklist of one release, blocked by the issues it ships</td>
 </tr>
+<tr>
+<td>Audit (<code>audit.md</code>)</td>
+<td><code>proposal</code>, <code>audit</code></td>
+<td>The check of what one milestone implements against its articles (<a href="#audits">Audits</a>)</td>
+</tr>
 </tbody>
 </table>
 <table>
@@ -4712,9 +4739,15 @@ merges. <code>In Progress</code> is set when the work starts, by <code>.github/s
    with <code>WHEN … THEN …</code> scenarios), each scenario with the test that checks
    it. Add <code>breaking</code> when it breaks the public API, the milestone of its
    release, its blockers and, when it is not <code>Next</code>, its <code>Priority</code> in the
-   project. A large proposal
+   project. A proposal that adds a scientific method lists its articles in the
+   <a href="#audits">audit</a> of its milestone. A large proposal
    splits into sub-issues.</li>
-<li>Settle its decisions when its implementation starts, not before. A
+<li>Settle its decisions when its implementation starts, not before. A proposal
+   that adds a scientific method starts with the verdict of use of each one,
+   the task T0 of the template: keep, merge, drop or defer, with the evidence,
+   in a comment <code>L&lt;n&gt;</code> that the user approves before the decisions. A method
+   that is dropped leaves the issue and the list of articles of the audit; one
+   that is deferred goes, with them, to the issue that will do it. A
    decision that changes what an earlier proposal built, or what a later one
    relies on, updates those issues too, with a comment in each.</li>
 <li>Start it with one command, which takes it, sets it to <code>In Progress</code> and
@@ -4768,13 +4801,17 @@ release checklist asks for it:</p>
   field <code>Level</code> and the view "By precedence" count all of them. An issue moved
   to another milestone leaves the release it no longer ships, and blocks the
   release of its new milestone.</li>
+<li><strong>An audit waits for the same issues.</strong> Each open audit is "blocked by" the
+  same proposals and changes as its release, other audits left out
+  (<a href="#audits">Audits</a>).</li>
 </ul>
 <p><code>next.sh</code> and <code>start.sh</code> write these links before they read the blockers, and
 so does, at any time:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>python<span class="w"> </span>.github/scripts/parallel.py<span class="w"> </span>--releases
 </span></code></pre></div>
-<p>The script owns the links between a release and an issue whose milestone
-names a version: it adds the one that is missing and removes the others. A
+<p>The script owns the links between a release, or an <a href="#audits">audit</a>, and an
+issue whose milestone names a version: it adds the one that is missing and
+removes the others. A
 link from a release to an issue with no version in its milestone, or of
 another repository, stays, and so do the links between releases other than
 the release before. The script refuses a link that closes a cycle, and names
@@ -4789,6 +4826,34 @@ and the script names it to move to that milestone. A failure to write the
 links stops <code>next.sh</code> and <code>start.sh</code>, since the blockers they read would be
 wrong.</p>
 <p>An experiment, such as a benchmark, is not a bug and may have no milestone.</p>
+<h3 id="audits">Audits<a class="headerlink" href="#audits" title="Permanent link">&para;</a></h3>
+<p>No release ships before what it implements is checked against the articles it
+is based on. Each milestone has one audit, an issue from the template
+<code>audit.md</code> (labels <code>proposal</code> and <code>audit</code>), a patch release too: the record of
+one that implements no method is one line that says so. Obtaining the articles
+needs no branch, so it is done before the blockers of the audit close.</p>
+<ul>
+<li><strong>It closes last.</strong> It is blocked by every other open proposal and change of
+  its milestone, so it checks what the milestone ships, and every change since
+  the last release that touches a method, also one with no issue (an update of
+  a solver). A finding of the audit about a method of the milestone joins the
+  milestone, with the label <code>change</code> or <code>proposal</code> and not <code>audit</code>, and blocks
+  the audit and the release.</li>
+<li><strong>It never moves to another milestone</strong>, unlike any other issue: the
+  checklist of the release asks for it closed.</li>
+<li><strong>A method whose article could not be obtained is "not verified"</strong>, and the
+  release waits, unless a decision <code>L&lt;n&gt;</code> of the audit names the method and
+  accepts to go on without the article.</li>
+<li><strong>The articles are local copies</strong> in the folder <code>papers/</code> at the root, which
+  git ignores and nothing publishes. The audit cites them by DOI.</li>
+</ul>
+<p><code>parallel.py --releases</code> writes the links of the audits. It also names, on
+stderr, each version with an open issue and no audit, and each one whose audit
+is closed while an issue of the milestone is open or closed after it: reopen
+that audit. It only warns, so that one milestone does not stop the work on the
+others; the checklist of the release asks for no such line about its version.
+An audit closed as not planned or as a duplicate counts as none, and so does a
+pull request.</p>
 <h3 id="parallel-work">Parallel work<a class="headerlink" href="#parallel-work" title="Permanent link">&para;</a></h3>
 <p>Two proposals can run at the same time when no chain of "blocked by" links
 joins them and neither changes what the other changes or adds. Each proposal

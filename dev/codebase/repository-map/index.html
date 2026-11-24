@@ -4856,19 +4856,19 @@ results.</p>
 </tr>
 <tr>
 <td><code>.github/ISSUE_TEMPLATE/</code></td>
-<td>The templates of a proposal, a bug or small change, and a release (<a href="../../development/workflow/#planning">Planning</a>).</td>
+<td>The templates of a proposal, a bug or small change, a release, and the audit of a milestone (<a href="../../development/workflow/#planning">Planning</a>).</td>
 </tr>
 <tr>
 <td><code>.github/scripts/start.sh</code></td>
-<td>Start an issue: write the links of the releases (<code>parallel.py --releases</code>), check the issue, take it, set it to <code>In Progress</code>, and create its branch and worktree, linked to the issue; then refresh the precedence levels (<code>parallel.py --levels</code>).</td>
+<td>Start an issue: write the links of the releases and the audits (<code>parallel.py --releases</code>), check the issue, take it, set it to <code>In Progress</code>, and create its branch and worktree, linked to the issue; then refresh the precedence levels (<code>parallel.py --levels</code>).</td>
 </tr>
 <tr>
 <td><code>.github/scripts/next.sh</code></td>
-<td>The next proposals and changes to implement: open, not blocked, not taken, not touching an issue in progress, by priority, the version of the milestone and number, after it writes the links of the releases and refreshes the precedence levels (<code>parallel.py --releases --levels --next</code>).</td>
+<td>The next proposals and changes to implement: open, not blocked, not taken, not touching an issue in progress, by priority, the version of the milestone and number, after it writes the links of the releases and the audits and refreshes the precedence levels (<code>parallel.py --releases --levels --next</code>).</td>
 </tr>
 <tr>
 <td><code>.github/scripts/parallel.py</code></td>
-<td>The proposals and changes that can run in parallel, from their Touches or Where and the links of the open issues, printed and never written into an issue body; <code>--next</code> gives the next ones, <code>--releases</code> writes the links of the releases (<a href="../../development/workflow/#milestones">Milestones</a>), and <code>--levels</code> writes the precedence level of each open issue into the field <code>Level</code> of the project.</td>
+<td>The proposals and changes that can run in parallel, from their Touches or Where and the links of the open issues, printed and never written into an issue body; <code>--next</code> gives the next ones, <code>--releases</code> writes the links of the releases and the audits (<a href="../../development/workflow/#milestones">Milestones</a>) and names the versions that no audit covers (<a href="../../development/workflow/#audits">Audits</a>), and <code>--levels</code> writes the precedence level of each open issue into the field <code>Level</code> of the project.</td>
 </tr>
 <tr>
 <td><code>.github/scripts/github.py</code></td>
