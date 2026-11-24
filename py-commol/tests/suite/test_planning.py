@@ -219,11 +219,12 @@ def test_the_priorities_of_a_repository_are_read_from_the_items() -> None:
     assert parallel.priorities_of(items, "o/a") == {1: "Now"}
 
 
-def run_main(*arguments: str) -> dict[str, list[tuple]]:
+def run_main(*arguments: str, audits=None) -> dict[str, list[tuple]]:
     """Run ``parallel.main`` with ``arguments``; the writes of the levels fail.
 
-    Returns the calls of ``write_release_links``, ``show_next`` and
-    ``show_parallel``; the first is left out when it has none.
+    Returns the calls of ``write_release_links``, ``warn_of_audits``,
+    ``show_next`` and ``show_parallel``; the first two are left out when they
+    have none. ``audits`` runs in place of the second one.
     """
     calls: dict[str, list[tuple]] = {"next": [], "parallel": []}
     failure = SystemExit("GitHub: PATCH orgs/o/projectsV2/1/items/10: HTTP 403")
@@ -231,10 +232,15 @@ def run_main(*arguments: str) -> dict[str, list[tuple]]:
     def links(*a) -> None:
         calls.setdefault("releases", []).append(a)
 
+    def warnings(*a) -> None:
+        assert "releases" in calls
+        calls.setdefault("audits", []).append(a)
+
     with (
         patch.object(sys, "argv", ["parallel.py", *arguments]),
         patch.object(parallel, "load", return_value={}),
         patch.object(parallel, "write_release_links", links),
+        patch.object(parallel, "warn_of_audits", audits or warnings),
         patch.object(parallel, "write_levels", side_effect=failure),
         patch.object(parallel, "show_next", lambda *a: calls["next"].append(a)),
         patch.object(parallel, "show_parallel", lambda *a: calls["parallel"].append(a)),
@@ -258,13 +264,29 @@ def test_levels_alone_print_nothing_else() -> None:
     assert run_main("--levels") == {"next": [], "parallel": []}
 
 
+def test_a_failed_read_of_the_audits_still_lists_the_next_issues(capsys) -> None:
+    failure = SystemExit("GitHub: GET repos/o/a/issues: HTTP 502")
+
+    with patch.object(parallel, "closed_audits", side_effect=failure):
+        calls = run_main("--releases", "--next", "2", audits=parallel.warn_of_audits)
+
+    assert calls["next"] == [({}, 2)]
+    assert "Audits: not read: GitHub: GET" in capsys.readouterr().err
+
+
 def test_releases_alone_write_only_the_links() -> None:
-    assert run_main("--releases") == {"releases": [({},)], "next": [], "parallel": []}
+    assert run_main("--releases") == {
+        "releases": [({},)],
+        "audits": [({},)],
+        "next": [],
+        "parallel": [],
+    }
 
 
 def test_the_links_come_before_the_next_issues() -> None:
     assert run_main("--releases", "--next", "1") == {
         "releases": [({},)],
+        "audits": [({},)],
         "next": [({}, 1)],
         "parallel": [],
     }
@@ -338,6 +360,30 @@ def test_an_open_blocker_without_a_kind_label_blocks_an_issue() -> None:
 
     assert numbers(chosen) == []
     assert parallel.levels(issues) == {1: 1}
+
+
+def test_a_proposal_with_the_label_audit_is_an_audit() -> None:
+    # Only a proposal is an audit: a finding or a release with the label is not.
+    items = [
+        an_item(1, "proposal"),
+        an_item(2, "proposal", "audit"),
+        an_item(3, "change", "audit"),
+        an_item(4, "release", "audit"),
+    ]
+    rest, _ = github_of(items, {})
+
+    with (
+        patch.object(parallel, "repository", return_value="o/a"),
+        patch.object(parallel, "rest", side_effect=rest),
+    ):
+        issues = parallel.load()
+
+    assert {number: issue.audit for number, issue in issues.items()} == {
+        1: False,
+        2: True,
+        3: False,
+        4: False,
+    }
 
 
 def options_of_parallel(capsys) -> list[list[str]]:

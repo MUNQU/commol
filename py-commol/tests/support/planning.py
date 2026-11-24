@@ -33,6 +33,7 @@ def an_issue(
     milestone: tuple[str, int] | None = None,
     kind: str = "change",
     version: str = "",
+    audit: bool = False,
 ):
     """An open issue of the planning script, with what it touches.
 
@@ -46,4 +47,5 @@ def an_issue(
     issue.milestone = milestone
     issue.issue_id = 10 * number
     issue.version = parallel.version_of(version)
+    issue.audit = audit
     return issue

@@ -69,8 +69,10 @@ approved with a link to the comment that approves it. -->
 
 ## Tasks
 
-<!-- In order. The tests of a requirement come before its code. -->
+<!-- In order. The tests of a requirement come before its code. T0 is for a
+proposal that adds a scientific method; delete it otherwise. -->
 
+- [ ] T0: the verdict of use (keep, merge, drop or defer) of each method, with its evidence, before the decisions are settled: the question it answers, its overlap with the released and the planned methods, whether it is current practice, and its cost to maintain; recorded in a comment `L<n>` and approved. Its articles are listed in the audit of the milestone
 - [ ] T1 (R1): write the tests of R1; they fail
 - [ ] T2 (R1): implement R1; its tests pass
 - [ ] T3: documentation (definition of done: guide, design decisions, changelog)
