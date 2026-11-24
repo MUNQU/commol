@@ -49,6 +49,7 @@ Planned work lives in GitHub issues, written from the templates of
 | Proposal (`proposal.md`) | `proposal` | A feature, a refactor or a breaking change: goal, current state, requirements with the tests that check them, decisions, tasks |
 | Bug or small change (`change.md`) | `change` | A defect or a change that needs no proposal: the behavior, a reproduction and the test that will show it |
 | Release (`release.md`) | `release` | The checklist of one release, blocked by the issues it ships |
+| Audit (`audit.md`) | `proposal`, `audit` | The check of what one milestone implements against its articles ([Audits](#audits)) |
 
 | What | Where |
 |---|---|
@@ -146,9 +147,15 @@ gh project item-edit --project-id PVT_kwDODcfAw84BnXyo --id "$item" \
    with `WHEN … THEN …` scenarios), each scenario with the test that checks
    it. Add `breaking` when it breaks the public API, the milestone of its
    release, its blockers and, when it is not `Next`, its `Priority` in the
-   project. A large proposal
+   project. A proposal that adds a scientific method lists its articles in the
+   [audit](#audits) of its milestone. A large proposal
    splits into sub-issues.
-2. Settle its decisions when its implementation starts, not before. A
+2. Settle its decisions when its implementation starts, not before. A proposal
+   that adds a scientific method starts with the verdict of use of each one,
+   the task T0 of the template: keep, merge, drop or defer, with the evidence,
+   in a comment `L<n>` that the user approves before the decisions. A method
+   that is dropped leaves the issue and the list of articles of the audit; one
+   that is deferred goes, with them, to the issue that will do it. A
    decision that changes what an earlier proposal built, or what a later one
    relies on, updates those issues too, with a comment in each.
 3. Start it with one command, which takes it, sets it to `In Progress` and
@@ -210,6 +217,9 @@ release checklist asks for it:
   field `Level` and the view "By precedence" count all of them. An issue moved
   to another milestone leaves the release it no longer ships, and blocks the
   release of its new milestone.
+- **An audit waits for the same issues.** Each open audit is "blocked by" the
+  same proposals and changes as its release, other audits left out
+  ([Audits](#audits)).
 
 `next.sh` and `start.sh` write these links before they read the blockers, and
 so does, at any time:
@@ -218,8 +228,9 @@ so does, at any time:
 python .github/scripts/parallel.py --releases
 ```
 
-The script owns the links between a release and an issue whose milestone
-names a version: it adds the one that is missing and removes the others. A
+The script owns the links between a release, or an [audit](#audits), and an
+issue whose milestone names a version: it adds the one that is missing and
+removes the others. A
 link from a release to an issue with no version in its milestone, or of
 another repository, stays, and so do the links between releases other than
 the release before. The script refuses a link that closes a cycle, and names
@@ -235,6 +246,36 @@ links stops `next.sh` and `start.sh`, since the blockers they read would be
 wrong.
 
 An experiment, such as a benchmark, is not a bug and may have no milestone.
+
+### Audits
+
+No release ships before what it implements is checked against the articles it
+is based on. Each milestone has one audit, an issue from the template
+`audit.md` (labels `proposal` and `audit`), a patch release too: the record of
+one that implements no method is one line that says so. Obtaining the articles
+needs no branch, so it is done before the blockers of the audit close.
+
+- **It closes last.** It is blocked by every other open proposal and change of
+  its milestone, so it checks what the milestone ships, and every change since
+  the last release that touches a method, also one with no issue (an update of
+  a solver). A finding of the audit about a method of the milestone joins the
+  milestone, with the label `change` or `proposal` and not `audit`, and blocks
+  the audit and the release.
+- **It never moves to another milestone**, unlike any other issue: the
+  checklist of the release asks for it closed.
+- **A method whose article could not be obtained is "not verified"**, and the
+  release waits, unless a decision `L<n>` of the audit names the method and
+  accepts to go on without the article.
+- **The articles are local copies** in the folder `papers/` at the root, which
+  git ignores and nothing publishes. The audit cites them by DOI.
+
+`parallel.py --releases` writes the links of the audits. It also names, on
+stderr, each version with an open issue and no audit, and each one whose audit
+is closed while an issue of the milestone is open or closed after it: reopen
+that audit. It only warns, so that one milestone does not stop the work on the
+others; the checklist of the release asks for no such line about its version.
+An audit closed as not planned or as a duplicate counts as none, and so does a
+pull request.
 
 ### Parallel work
 

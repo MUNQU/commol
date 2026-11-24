@@ -1,13 +1,18 @@
 """Check the links of the releases of ``.github/scripts/parallel.py``
 (``--releases``): each issue waits for the release before its milestone, and
-each release for the issues of its milestone. The rules are in
+each release and each audit for the issues of its milestone; and the templates
+of a release and of an audit. The rules are in
 ``docs/development/workflow.md``, "Milestones"."""
 
+import re
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 from tests.support.planning import an_issue, parallel
+
+ROOT = Path(__file__).resolve().parents[3]
 
 
 def test_the_versions_of_milestones_compare_as_numbers() -> None:
@@ -229,3 +234,317 @@ def test_a_release_link_that_closes_a_cycle_names_the_issue_to_move(capsys) -> N
         "#150 waits for #187 through its blockers: move #150 to a later milestone"
         in capsys.readouterr().out
     )
+
+
+# The audit of a milestone
+
+
+def test_an_audit_is_blocked_by_the_issues_of_its_milestone() -> None:
+    issues = {
+        264: an_issue(264, kind="release", version="0.11.0"),
+        516: an_issue(516, version="0.11.0"),
+        548: an_issue(548, kind="proposal", version="0.11.0"),
+        549: an_issue(549, kind="proposal", version="0.11.0", audit=True),
+        134: an_issue(134, kind="proposal", version="0.13.0"),
+        141: an_issue(141, kind="proposal"),
+    }
+
+    added, removed, refused = parallel.release_links(issues)
+
+    assert added == [
+        (134, 264),
+        (264, 516),
+        (264, 548),
+        (264, 549),
+        (549, 516),
+        (549, 548),
+    ]
+    assert (removed, refused) == ([], [])
+    assert issues[549].blocked_by == {516, 548}
+
+
+def test_an_audit_loses_the_link_to_an_issue_moved_to_another_milestone() -> None:
+    issues = {
+        5: an_issue(5),
+        516: an_issue(516, version="0.11.1"),
+        549: an_issue(549, kind="proposal", version="0.11.0", audit=True),
+    }
+    # 5 has no version in its milestone and 999 is not loaded: their links stay.
+    issues[549].blocked_by = {5, 516, 999}
+
+    added, removed, refused = parallel.release_links(issues)
+
+    assert (added, removed, refused) == ([], [(549, 516)], [])
+    assert issues[549].blocked_by == {5, 999}
+
+
+def test_an_audit_is_not_blocked_by_another_audit() -> None:
+    issues = {
+        328: an_issue(328, kind="proposal", version="0.12.0", audit=True),
+        549: an_issue(549, kind="proposal", version="0.12.0", audit=True),
+        550: an_issue(550, kind="proposal", version="0.13.0", audit=True),
+    }
+    # Links written by hand, to an audit of the milestone and to one of another.
+    issues[328].blocked_by = {549, 550}
+
+    assert parallel.release_links(issues) == ([], [(328, 549), (328, 550)], [])
+    assert issues[328].blocked_by == set()
+
+
+def test_an_audit_without_a_milestone_waits_for_nothing() -> None:
+    issues = {
+        5: an_issue(5),
+        549: an_issue(549, kind="proposal", audit=True),
+    }
+
+    assert parallel.release_links(issues) == ([], [], [])
+
+
+def test_an_audit_link_that_closes_a_cycle_is_refused(capsys) -> None:
+    # 134 is in the milestone of the audit 328 and waits for it.
+    issues = {
+        134: an_issue(134, version="0.12.0", blocked_by=frozenset({328})),
+        328: an_issue(328, kind="proposal", version="0.12.0", audit=True),
+    }
+
+    with (
+        patch.object(parallel, "repository", return_value="o/a"),
+        patch.object(parallel, "rest") as rest,
+    ):
+        parallel.write_release_links(issues)
+
+    assert rest.call_args_list == []
+    assert issues[328].blocked_by == set()
+    assert (
+        "#134 waits for the audit #328 of its milestone: remove the link that"
+        " makes it wait" in capsys.readouterr().out
+    )
+
+
+def test_a_release_keeps_its_audit_over_the_issues_of_the_audit() -> None:
+    # 600 waits for 141, which has no milestone and waits for the release: the
+    # release still waits for its audit, and the audit does not wait for 600.
+    issues = {
+        141: an_issue(141, blocked_by=frozenset({264})),
+        264: an_issue(264, kind="release", version="0.11.0"),
+        549: an_issue(549, kind="proposal", version="0.11.0", audit=True),
+        600: an_issue(600, version="0.11.0", blocked_by=frozenset({141})),
+    }
+
+    added, _, refused = parallel.release_links(issues)
+
+    assert added == [(264, 549)]
+    assert refused == [(264, 600), (549, 600)]
+
+
+def a_closed_issue(
+    number: int,
+    version: str,
+    *labels: str,
+    closed_at: str = "2026-12-01T00:00:00Z",
+    reason: str = "completed",
+) -> dict:
+    """A closed issue, as the REST API gives it."""
+    return {
+        "number": number,
+        "state": "closed",
+        "state_reason": reason,
+        "closed_at": closed_at,
+        "labels": [{"name": label} for label in labels],
+        "milestone": {"number": 1, "title": version},
+    }
+
+
+def an_audit(number: int, version: str, **fields: str) -> dict:
+    """A closed audit, as the REST API gives it."""
+    return a_closed_issue(number, version, "proposal", "audit", **fields)
+
+
+def warnings_of(
+    issues: dict,
+    audits: list[dict],
+    closed: list[dict],
+    capsys,
+    since: str = "2026-12-01T00:00:00Z",
+) -> list[str]:
+    """The lines that ``warn_of_audits`` prints when GitHub has the closed audits
+    ``audits``, and the issues ``closed``, some of them after ``since``."""
+    paths: list[str] = []
+
+    def rest(path: str, **options: object) -> list[dict]:
+        paths.append(path)
+        assert options == {"every_page": True}
+        return audits if "labels=" in path else closed
+
+    with (
+        patch.object(parallel, "repository", return_value="o/a"),
+        patch.object(parallel, "rest", side_effect=rest),
+    ):
+        parallel.warn_of_audits(issues)
+
+    path = "repos/o/a/issues?state=closed"
+    assert paths[0] == f"{path}&labels=proposal,audit&per_page=100"
+    assert paths[1:] in ([], [f"{path}&since={since}&per_page=100"])
+    written = capsys.readouterr()
+    assert written.out == ""
+    return written.err.splitlines()
+
+
+OPEN_ONE = "open one from the template audit.md"
+
+
+def test_a_release_with_no_audit_is_named(capsys) -> None:
+    issues = {
+        264: an_issue(264, kind="release", version="0.11.0"),
+        265: an_issue(265, kind="release", version="0.12.0"),
+        328: an_issue(328, kind="proposal", version="0.12.0", audit=True),
+        300: an_issue(300, kind="release", version="Backlog"),
+    }
+    # The closed audits are of another milestone and of none.
+    audits = [an_audit(9, "0.10.0"), an_audit(8, "Backlog")]
+
+    assert warnings_of(issues, audits, [], capsys) == [
+        f"Audits: 0.11.0 has no audit: {OPEN_ONE}"
+    ]
+
+
+def test_a_milestone_with_no_release_and_no_audit_is_named(capsys) -> None:
+    issues = {516: an_issue(516, version="0.11.1"), 141: an_issue(141)}
+
+    assert warnings_of(issues, [], [], capsys) == [
+        f"Audits: 0.11.1 has no audit: {OPEN_ONE}"
+    ]
+
+
+def test_a_closed_audit_with_an_open_issue_is_named(capsys) -> None:
+    issues = {
+        264: an_issue(264, kind="release", version="0.11.0"),
+        516: an_issue(516, version="0.11.0"),
+        518: an_issue(518, version="0.11.0"),
+        600: an_issue(600, version="0.12.0"),
+        601: an_issue(601, kind="proposal", version="0.12.0", audit=True),
+    }
+
+    assert warnings_of(issues, [an_audit(549, "0.11.0")], [], capsys) == [
+        "Audits: 0.11.0 has issues that its closed audit #549 did not read"
+        " (#516, #518): reopen it"
+    ]
+
+
+def test_a_closed_audit_with_an_issue_closed_after_it_is_named(capsys) -> None:
+    issues = {264: an_issue(264, kind="release", version="0.11.0")}
+    later, earlier = "2026-12-02T00:00:00Z", "2026-11-30T00:00:00Z"
+    closed = [
+        a_closed_issue(600, "0.11.0", "change", closed_at=later),
+        # Not work of the milestone that the audit missed: closed before it, of
+        # another milestone, not done, not planned work, a pull request.
+        a_closed_issue(601, "0.11.0", "change", closed_at=earlier),
+        a_closed_issue(602, "0.12.0", "change", closed_at=later),
+        a_closed_issue(603, "0.11.0", "change", closed_at=later, reason="duplicate"),
+        a_closed_issue(604, "0.11.0", "question", closed_at=later),
+        a_closed_issue(605, "0.11.0", "change", closed_at=later) | {"pull_request": {}},
+    ]
+
+    assert warnings_of(issues, [an_audit(549, "0.11.0")], closed, capsys) == [
+        "Audits: 0.11.0 has issues that its closed audit #549 did not read"
+        " (#600): reopen it"
+    ]
+
+
+def test_an_audit_closed_again_reads_what_closed_before(capsys) -> None:
+    issues = {264: an_issue(264, kind="release", version="0.11.0")}
+    again = "2026-12-03T00:00:00Z"
+    audits = [an_audit(560, "0.11.0", closed_at=again), an_audit(570, "0.11.0")]
+    closed = [a_closed_issue(600, "0.11.0", "change", closed_at="2026-12-02T00:00:00Z")]
+
+    assert warnings_of(issues, audits, closed, capsys, since=again) == []
+
+
+def test_a_closed_audit_of_a_finished_milestone_is_silent(capsys) -> None:
+    issues = {264: an_issue(264, kind="release", version="0.11.0")}
+
+    assert warnings_of(issues, [an_audit(549, "0.11.0")], [], capsys) == []
+
+
+@pytest.mark.parametrize("reason", ["not_planned", "duplicate"])
+def test_an_audit_that_was_not_done_covers_nothing(reason: str, capsys) -> None:
+    issues = {264: an_issue(264, kind="release", version="0.11.0")}
+
+    audits = [an_audit(549, "0.11.0", reason=reason)]
+
+    assert warnings_of(issues, audits, [], capsys) == [
+        f"Audits: 0.11.0 has no audit: {OPEN_ONE}"
+    ]
+
+
+def test_a_pull_request_with_the_label_covers_nothing(capsys) -> None:
+    issues = {264: an_issue(264, kind="release", version="0.11.0")}
+
+    audits = [an_audit(400, "0.11.0") | {"pull_request": {}}]
+
+    assert warnings_of(issues, audits, [], capsys) == [
+        f"Audits: 0.11.0 has no audit: {OPEN_ONE}"
+    ]
+
+
+def test_an_open_audit_covers_a_milestone_with_a_closed_one(capsys) -> None:
+    issues = {
+        264: an_issue(264, kind="release", version="0.11.0"),
+        516: an_issue(516, version="0.11.0"),
+        560: an_issue(560, kind="proposal", version="0.11.0", audit=True),
+    }
+
+    assert warnings_of(issues, [an_audit(549, "0.11.0")], [], capsys) == []
+
+
+# The templates
+
+
+def checklist(path: str) -> list[str]:
+    """The items of the checklist of the release in ``path``, in order; the
+    version of the template and of the page is the same placeholder."""
+    text = (ROOT / path).read_text(encoding="utf-8")
+    return [line for line in text.splitlines() if line.startswith("- [ ] ")]
+
+
+def test_the_checklist_of_the_template_is_the_one_of_the_release_page() -> None:
+    template = checklist(".github/ISSUE_TEMPLATE/release.md")
+
+    assert template == checklist("docs/development/release.md")
+    assert [item for item in template if "audit" in item] == [
+        "- [ ] The audit of X.Y.Z closed (its number), and `python"
+        " .github/scripts/parallel.py --releases` prints no line `Audits:` about"
+        " X.Y.Z: the audit never moves to another milestone"
+    ]
+
+
+def test_the_template_of_an_audit_has_the_labels_that_the_script_reads() -> None:
+    template = ROOT / ".github" / "ISSUE_TEMPLATE" / "audit.md"
+    found = [
+        line.removeprefix("labels: ").split(", ")
+        for line in template.read_text(encoding="utf-8").splitlines()
+        if line.startswith("labels: ")
+    ]
+
+    assert found == [["proposal", parallel.AUDIT]]
+
+
+def test_the_template_of_an_audit_asks_for_what_the_rules_say() -> None:
+    text = (ROOT / ".github" / "ISSUE_TEMPLATE" / "audit.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert re.findall(r"^### (R\d) - (.*)$", text, re.MULTILINE) == [
+        ("R1", "Each method agrees with its articles"),
+        ("R2", "Compositions, and degenerate and extreme inputs"),
+        ("R3", "The audit closes last and blocks the release"),
+    ]
+    assert 'its verdict is "not verified"' in text
+    assert "the audit does not close (D4)" in text
+    assert "git log --first-parent" in text
+
+
+def test_a_proposal_of_a_method_starts_with_its_verdict_of_use() -> None:
+    tasks = checklist(".github/ISSUE_TEMPLATE/proposal.md")
+
+    assert tasks[0].startswith("- [ ] T0: the verdict of use")

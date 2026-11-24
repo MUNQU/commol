@@ -54,13 +54,18 @@ an issue it ships and a link to the release before close a cycle together, the
 first one stays, whatever the numbers of the issues: a release needs its
 issues, and the release before only orders the work.
 
+An open audit (a proposal with the label ``audit``) waits, as its release does,
+for the open proposals and changes of its own milestone, other audits left out.
+``--releases`` then names, on stderr, each version with an open issue that no
+audit covers (``docs/development/workflow.md``, "Audits").
+
 The script reads the repository from the git remote, and the project is the
 one of the organization with the name of the repository. Usage, from the root
 of the repository:
 ``python .github/scripts/parallel.py`` prints what can run in parallel (no
 script writes it into an issue body, where it would go out of date),
 ``--next N`` prints the next N issues (``.github/scripts/next.sh`` runs it),
-``--releases`` writes the links to the release before each milestone, and
+``--releases`` writes the links of the releases and of the audits, and
 ``--levels`` writes the precedence levels. Given together, the links come
 first, then the levels, then the next issues (``next.sh`` and ``start.sh``
 run them).
@@ -79,6 +84,8 @@ from github import JsonValue, repository, rest
 ITEM = re.compile(r"`([^`]+)`")
 PRIORITIES = ("Now", "Next", "Later")
 DEFAULT_PRIORITY = "Next"
+AUDIT = "audit"
+NOT_DONE = ("not_planned", "duplicate")
 VERSION = re.compile(r"v?(\d+(?:\.\d+)*)")
 
 
@@ -99,7 +106,8 @@ class Proposal:
 
     ``blocked_by`` holds its open blockers that are loaded issues;
     ``blocked_elsewhere`` counts the others: of another repository, or of this
-    one with no label ``proposal``, ``change`` or ``release``.
+    one with no label ``proposal``, ``change`` or ``release``. ``audit`` says
+    that it is a proposal with the label ``audit``.
     """
 
     number: int
@@ -114,6 +122,7 @@ class Proposal:
     milestone: tuple[str, int] | None = None
     issue_id: int = 0
     version: tuple[int, ...] | None = None
+    audit: bool = False
 
 
 def text_field(item: dict[str, JsonValue], name: str) -> str:
@@ -244,17 +253,24 @@ def conflict(a: Proposal, b: Proposal) -> list[tuple[str, str]]:
     return found
 
 
+def labels_of(item: JsonValue) -> set[str]:
+    """Return the names of the labels of an issue of gh."""
+    labels = item.get("labels") if isinstance(item, dict) else None
+    if not isinstance(labels, list):
+        return set()
+    return {
+        name
+        for label in labels
+        if isinstance(label, dict) and isinstance(name := label.get("name"), str)
+    }
+
+
 def kind_and_holder(item: JsonValue) -> tuple[str, bool]:
     """Return the kind of an issue of gh (its label) and whether someone holds it."""
     if not isinstance(item, dict):
         raise SystemExit(f"gh returned an issue that is not an object: {item!r}")
-    labels = item.get("labels")
     assignees = item.get("assignees")
-    names = (
-        {label.get("name") for label in labels or [] if isinstance(label, dict)}
-        if isinstance(labels, list)
-        else set()
-    )
+    names = labels_of(item)
     kind = next((k for k in ("proposal", "change", "release") if k in names), "")
     return kind, isinstance(assignees, list) and bool(assignees)
 
@@ -310,6 +326,7 @@ def load() -> dict[int, Proposal]:
             milestone=milestone_of(item),
             issue_id=issue_id if isinstance(issue_id, int) else 0,
             version=milestone_version(item),
+            audit=kind == "proposal" and AUDIT in labels_of(item),
         )
     for proposal in found.values():
         url = f"repos/{repository()}/issues/{proposal.number}/dependencies/blocked_by"
@@ -395,32 +412,37 @@ def links_to_release_before(
     return wanted, removed
 
 
-def links_to_shipped_issues(
+def links_to_issues_of_milestone(
     issues: dict[int, Proposal], releases: list[Proposal]
 ) -> tuple[list[Link], list[Link]]:
-    """Return the links of each release to the issues it ships; remove the others.
+    """Return the links of each release and audit to the issues of its milestone.
 
-    Each release with a version waits for the open proposals and changes of
-    its own milestone. Its links to proposals and changes whose milestone names
-    another version leave its ``blocked_by`` and come back as the links
-    removed; its links to releases, and to issues with no version in their
-    milestone, stay.
+    Each release, and then each audit, with a version waits for the open
+    proposals and changes of its own milestone; an audit does not wait for an
+    audit. Its other links to issues whose milestone names a version, except
+    releases, leave its ``blocked_by`` and come back as the links removed; its
+    links to releases, and to issues with no version in their milestone, stay.
     """
     numbers = {release.number for release in releases}
+    audits = [issue for _, issue in sorted(issues.items()) if issue.audit]
     wanted: list[Link] = []
     removed: list[Link] = []
-    for release in sorted(releases, key=lambda r: r.number):
-        if release.version is None:
+    for waiting in [*sorted(releases, key=lambda r: r.number), *audits]:
+        if waiting.version is None:
             continue
-        for number in sorted(release.blocked_by - numbers):
+        for number in sorted(waiting.blocked_by - numbers):
             issue = issues.get(number)
-            if issue is not None and issue.version not in (None, release.version):
-                release.blocked_by.discard(number)
-                removed.append((release.number, number))
+            if issue is None or issue.version is None:
+                continue
+            if issue.version != waiting.version or (waiting.audit and issue.audit):
+                waiting.blocked_by.discard(number)
+                removed.append((waiting.number, number))
         wanted.extend(
-            (release.number, number)
+            (waiting.number, number)
             for number, issue in sorted(issues.items())
-            if issue.kind != "release" and issue.version == release.version
+            if issue.kind != "release"
+            and issue.version == waiting.version
+            and not (waiting.audit and issue.audit)
         )
     return wanted, removed
 
@@ -431,17 +453,17 @@ def release_links(
     """Return the links to add and to remove, and the ones refused.
 
     A link ``(issue, blocker)`` says that the blocker blocks the issue: the
-    links of ``links_to_shipped_issues`` and ``links_to_release_before``. A
-    link that would close a chain of links back to its issue is refused. The
-    links of a release to the issues it ships come first: a release needs its
-    issues, while the release before only orders the work. So when the two
-    kinds of link close a cycle together, the link to the release before is
-    the one refused, whatever the numbers of the issues, and the issue it
-    names moves to the milestone of the release that needs it. The
-    ``blocked_by`` of the issues change to what the links give.
+    links of ``links_to_issues_of_milestone`` and ``links_to_release_before``.
+    A link that would close a chain of links back to its issue is refused. The
+    links of a release to the issues it ships come first, then the ones of an
+    audit: they need their issues, while the release before only orders the
+    work. So when the two kinds of link close a cycle together, the link to
+    the release before is the one refused, whatever the numbers of the issues,
+    and the issue it names moves to the milestone of the release that needs
+    it. The ``blocked_by`` of the issues change to what the links give.
     """
     releases = [issue for issue in issues.values() if issue.kind == "release"]
-    shipped, removed_shipped = links_to_shipped_issues(issues, releases)
+    shipped, removed_shipped = links_to_issues_of_milestone(issues, releases)
     before, removed_before = links_to_release_before(issues, releases)
     added: list[Link] = []
     refused: list[Link] = []
@@ -457,7 +479,7 @@ def release_links(
 
 
 def write_release_links(issues: dict[int, Proposal]) -> None:
-    """Write the links of each release to the issues it precedes and ships."""
+    """Write the links of the releases and of the audits (``release_links``)."""
     added, removed, refused = release_links(issues)
     path = f"repos/{repository()}/issues"
     for number, blocker in removed:
@@ -476,6 +498,11 @@ def write_release_links(issues: dict[int, Proposal]) -> None:
                 f" which waits for it: move #{number} to that milestone, or"
                 " remove the link"
             )
+        elif issues[number].audit:
+            print(
+                f"Releases: #{blocker} waits for the audit #{number} of its"
+                " milestone: remove the link that makes it wait"
+            )
         else:
             print(
                 f"Releases: #{blocker} waits for #{number} through its blockers:"
@@ -483,6 +510,74 @@ def write_release_links(issues: dict[int, Proposal]) -> None:
                 " makes it wait"
             )
     print(f"Releases: {len(added)} links added, {len(removed)} removed")
+
+
+def closed_issues(query: str) -> list[dict[str, JsonValue]]:
+    """Return the closed issues of a query that were done, pull requests left out."""
+    answer = rest(
+        f"repos/{repository()}/issues?state=closed&{query}&per_page=100",
+        every_page=True,
+    )
+    return [
+        item
+        for item in (answer if isinstance(answer, list) else [])
+        if isinstance(item, dict)
+        and "pull_request" not in item
+        and item.get("state_reason") not in NOT_DONE
+    ]
+
+
+def closed_audits() -> dict[tuple[int, ...], tuple[str, int]]:
+    """Return when the last audit of each version closed, and its number."""
+    found: dict[tuple[int, ...], tuple[str, int]] = {}
+    for item in closed_issues(f"labels=proposal,{AUDIT}"):
+        version = milestone_version(item)
+        if version is not None:
+            audit = (text_field(item, "closed_at"), issue_of(item).number)
+            found[version] = max(audit, found.get(version, audit))
+    return found
+
+
+def closed_since(time: str) -> list[dict[str, JsonValue]]:
+    """Return the issues closed after a time (an update after it comes with them)."""
+    return [
+        item
+        for item in closed_issues(f"since={time}")
+        if text_field(item, "closed_at") > time
+    ]
+
+
+def warn_of_audits(issues: dict[int, Proposal]) -> None:
+    """Name, on stderr, each version with an open issue that no audit covers.
+
+    An open audit covers its version, and a closed one does when no proposal or
+    change of the version is open or closed after it.
+    """
+    closed = closed_audits()
+    for version in sorted({i.version for i in issues.values() if i.version}):
+        own = {n: i for n, i in issues.items() if i.version == version}
+        if any(issue.audit for issue in own.values()):
+            continue
+        name = ".".join(map(str, (*version, 0, 0)[: max(3, len(version))]))
+        if version not in closed:
+            print(
+                f"Audits: {name} has no audit: open one from the template audit.md",
+                file=sys.stderr,
+            )
+            continue
+        time, audit = closed[version]
+        missed = {n for n, issue in own.items() if issue.kind != "release"} | {
+            issue_of(item).number
+            for item in closed_since(time)
+            if milestone_version(item) == version
+            and kind_and_holder(item)[0] in ("proposal", "change")
+        }
+        if missed:
+            print(
+                f"Audits: {name} has issues that its closed audit #{audit} did not"
+                f" read ({', '.join(f'#{n}' for n in sorted(missed))}): reopen it",
+                file=sys.stderr,
+            )
 
 
 def project_number(owner: str, name: str) -> int | None:
@@ -856,19 +951,20 @@ def show_parallel(proposals: dict[int, Proposal]) -> None:
 def main() -> None:
     """Print what can run in parallel, or with --next the next issues to take.
 
-    With --releases it first writes the links to the release before each
-    milestone; a failure there stops it, because the blockers it reads after
-    would be wrong. With --levels it then writes the precedence levels into
-    the project. Alone, each does only that. A failure to write the levels
-    prints one line and the next issues follow. No option edits the body of
-    an issue.
+    With --releases it first writes the links of the releases and of the
+    audits; a failure there stops it, because the blockers it reads after
+    would be wrong. Then it names the versions that no audit covers. With
+    --levels it then writes the precedence levels into the project. Alone, each
+    does only that. A failure to read the audits or to write the levels prints
+    one line and the next issues follow. No option edits the body of an issue.
     """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--next", type=int, metavar="N", help="the next N issues")
     parser.add_argument(
         "--releases",
         action="store_true",
-        help="link each issue to the release before its milestone",
+        help="link each issue to the release before its milestone, and each"
+        " release and audit to the issues of its milestone",
     )
     parser.add_argument(
         "--levels", action="store_true", help="write the field Level of the project"
@@ -877,6 +973,10 @@ def main() -> None:
     issues = load()
     if arguments.releases:
         write_release_links(issues)
+        try:
+            warn_of_audits(issues)
+        except SystemExit as error:
+            print(f"Audits: not read: {error}", file=sys.stderr)
     if arguments.levels:
         try:
             write_levels(issues)

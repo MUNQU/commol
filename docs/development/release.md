@@ -75,7 +75,8 @@ publishes to PyPI immediately: the `pypi` environment has no approval step.
 The release issue (label `release`) holds the checklist of this page, and the
 milestone of the release lists the issues it ships. The release issue waits
 for each open proposal and change of its milestone, through "blocked by" links
-that `next.sh` and `start.sh` write.
+that `next.sh` and `start.sh` write. One of them is the audit of the
+milestone, which closes last ([Audits](workflow.md#audits)).
 The milestone has the version as its title (`0.9.1`): every issue of a later
 milestone waits for this release issue, through a "blocked by" link that
 `next.sh` and `start.sh` write ([Milestones](workflow.md#milestones)).
@@ -89,7 +90,10 @@ milestone waits for this release issue, through a "blocked by" link that
 An issue of the milestone that will not ship in this release moves to another
 milestone, with a comment that says why
 ([Milestones](workflow.md#milestones)). When every issue left in the milestone
-is closed, list the changes since the last release:
+is closed, and `parallel.py --releases` prints no line `Audits:` about its
+version ([Audits](workflow.md#audits)), list the changes since the last
+release. The audit has read each one that touches a method, also one with no
+issue, such as an update of a solver:
 
 ```bash
 git fetch --tags origin
@@ -249,10 +253,11 @@ publisher on PyPI first, or the upload fails.
 The release issue repeats this list.
 
 - [ ] Every issue of the milestone closed, or moved to another milestone with a comment that says why
+- [ ] The audit of X.Y.Z closed (its number), and `python .github/scripts/parallel.py --releases` prints no line `Audits:` about X.Y.Z: the audit never moves to another milestone
 - [ ] Version chosen
 - [ ] Changelog dated on `main`, with its opening paragraph
 - [ ] Annotated tag `vX.Y.Z` created on `main` and pushed
-- [ ] GitHub release published with the notes of `release_notes.py`
+- [ ] GitHub release published with the notes of `python .github/scripts/release_notes.py X.Y.Z`
 - [ ] **Release to PyPI** workflow passed
 - [ ] Version visible on PyPI and tested in a clean environment
 - [ ] Release issue and milestone closed

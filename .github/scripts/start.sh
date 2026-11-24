@@ -3,9 +3,9 @@
 # marks it:
 #
 #   1. links each open issue to the release before its milestone, and each
-#      open release to the issues of its milestone (parallel.py --releases),
-#      so that the check below sees those links; a failure there stops the
-#      start;
+#      open release and audit to the issues of its milestone
+#      (parallel.py --releases), so that the check below sees those links; a
+#      failure there stops the start;
 #      then checks that the issue is open, blocked by no open issue and taken
 #      by nobody else;
 #   2. assigns it to you, which takes it;
@@ -60,8 +60,8 @@ me=$(gh api user --jq .login)
 root=$(git rev-parse --show-toplevel)
 
 # 1. The links of the releases (to the release before each milestone, and to
-# the issues of their own), then the issue: its state, blockers, assignees and
-# project items.
+# the issues of their own, as the audits), then the issue: its state, blockers,
+# assignees and project items.
 run uv run --project "$root/py-commol" --locked python \
     "$root/.github/scripts/parallel.py" --releases
 read -r state blocked assignees item <<<"$(gh api graphql \

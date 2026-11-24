@@ -8,6 +8,7 @@ labels: release
 Follow [the release process](https://github.com/MUNQU/commol/blob/main/docs/development/release.md) once every issue that blocks this one is closed. Put this issue in the milestone of the release, and name the milestone by its version (`X.Y.Z`): this issue waits for the proposals and changes of the milestone, and the issues of the later milestones wait for this one (`python .github/scripts/parallel.py --releases` writes both links).
 
 - [ ] Every issue of the milestone closed, or moved to another milestone with a comment that says why
+- [ ] The audit of X.Y.Z closed (its number), and `python .github/scripts/parallel.py --releases` prints no line `Audits:` about X.Y.Z: the audit never moves to another milestone
 - [ ] Version chosen
 - [ ] Changelog dated on `main`, with its opening paragraph
 - [ ] Annotated tag `vX.Y.Z` created on `main` and pushed
