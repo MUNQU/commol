@@ -121,6 +121,7 @@ reads `step` or a `"pulse"` series (and so `AxisPattern.pulse`, `pulses`,
 side reads one of them (`CompiledModel::depends_on_step`), the engine ends a
 piece of integration at every integer, so each jump of the rate is the start of
 a piece (`breakpoints` in `crates/commol-differential/src/solve.rs`).
+A series compares its positions as numbers, so a pulse at `-0.0` is at step 0.
 
 A `"step_function"` or `"linear"` series reads `t`
 (`SeriesParameter::evaluate`), so it holds or interpolates from any position.
@@ -137,19 +138,16 @@ current parameters and ends a piece there. Without that, an adaptive solver
 whose rate is 0 before a short window grows its step and steps over the window.
 A comparison with the state is a state event, which the engine does not detect.
 
-On a piece `[start, end)` the right-hand side sees `t` no larger than the
-float just below `end` (`RightHandSide::last_t`). A Runge–Kutta step evaluates
-the right-hand side at the end of its interval; without the limit, a value that
-jumps at `end` would already act on the last step of the piece.
+On a piece `[start, end)` the right-hand side sees `t` no larger than the float
+just below `end` (`RightHandSide::last_t`). A Runge–Kutta step evaluates it at
+the end of its interval, where a value that jumps at `end` would already act.
 
-Whether an expression reads `step` comes from `reads_variable`, not from
-`get_variables`: `get_variables` leaves out the special variables, because it
-lists the variables a model must define.
+Whether an expression reads `step` comes from `reads_variable`: `get_variables`
+lists the variables a model must define, so it leaves out the special ones.
 
 **Consequence:** a proportional pulse `p` moves `p` of its source in a difference
 model and `1 − e^(−p)` in a differential model. An impulse moves `p` in both.
-The alternative, `step = t`, makes a pulse `step == n` true on a set of zero
-length, so it would never act.
+The alternative, `step = t`, makes a pulse act on a set of zero length: never.
 
 **Guards:** `tests/simulation/test_differential.py::TestTimeInsideAStep`,
 `crates/commol-differential/src/tests.rs::a_pulse_rate_is_a_constant_rate_on_its_unit_interval`,
@@ -157,6 +155,8 @@ length, so it would never act.
 `a_rate_that_switches_on_t_acts_only_on_its_window`,
 `a_linear_series_matches_the_integral_of_its_interpolant`,
 `a_step_function_series_holds_from_a_position_between_steps`,
+`crates/commol-model/src/types.rs::a_pulse_at_minus_zero_is_read_at_step_zero`,
+`crates/commol-stochastic/tests/test_state.rs::a_seed_set_at_minus_zero_acts_the_pulse_of_step_zero`,
 `crates/commol-model/src/builder.rs::a_comparison_of_t_with_a_fixed_value_is_a_threshold`,
 `tests/axis_patterns/test_pattern_runs.py::TestDifferentialIntegration`.
 

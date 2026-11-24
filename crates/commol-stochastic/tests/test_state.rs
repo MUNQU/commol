@@ -1,13 +1,14 @@
 //! A parameter or a seed changed between two runs of `StochasticEvents` acts
-//! from the position where the first run stopped.
+//! from the position where the first run stopped, also a stop at `-0.0`,
+//! which is step 0.
 
-use commol_core::{Model, SimulationEngine};
+use commol_core::{Model, ParameterValue, SeriesMode, SimulationEngine};
 use commol_random::replicate_seed;
 use commol_stochastic::StochasticEvents;
 
-/// `A → D` at the rate `k·A`, from `units` units of `A`, run by
+/// `A → D` at the rate `k·A`, from `units` units of `A`, for
 /// `StochasticEvents` with `settings` (a JSON object or `null`).
-fn death(settings: &str, units: f64, k: f64) -> StochasticEvents {
+fn death_model(settings: &str, units: f64, k: f64) -> Model {
     let json = format!(
         r#"{{"name":"m","parameters":[{{"id":"k","value":{k:?}}}],
         "engine":{{"type":"StochasticEvents","settings":{settings}}},
@@ -16,8 +17,12 @@ fn death(settings: &str, units: f64, k: f64) -> StochasticEvents {
         "transitions":[{{"id":"death","source":["A"],"target":["D"],"rate":"k"}}]}},
         "structure":{{"kind":"aggregate","bin_amounts":{{"A":{units:?},"D":0.0}}}}}}"#
     );
-    let model: Model = serde_json::from_str(&json).expect("valid model JSON");
-    StochasticEvents::try_from_model(&model).expect("the model compiles")
+    serde_json::from_str(&json).expect("valid model JSON")
+}
+
+/// The engine of [`death_model`].
+fn death(settings: &str, units: f64, k: f64) -> StochasticEvents {
+    StochasticEvents::try_from_model(&death_model(settings, units, k)).expect("the model compiles")
 }
 
 /// The seed of replicate `index`.
@@ -127,6 +132,27 @@ fn a_new_seed_acts_from_the_position() {
         })
         .collect();
     assert!(after.iter().any(|&amount| amount != after[0]), "{after:?}");
+}
+
+#[test]
+fn a_seed_set_at_minus_zero_acts_the_pulse_of_step_zero() {
+    let mut model = death_model("null", 1000.0, 0.0);
+    model.parameters[0].value = Some(ParameterValue::Series {
+        data: vec![(0.0, 1.0)],
+        mode: SeriesMode::Pulse,
+    });
+    let engine = StochasticEvents::try_from_model(&model).expect("the model compiles");
+    let left = |start: f64| {
+        let mut engine = engine.clone();
+        engine.run_at(&[start]).unwrap();
+        // A seed or a parameter set at a stop settles the clock onto it, so
+        // the rates of the next run read the step of `start`.
+        engine.set_seed(seed(0));
+        engine.run_at(&[1.0]).unwrap()[0][0]
+    };
+
+    assert!(left(0.0) < 1000.0);
+    assert_eq!(left(-0.0), left(0.0));
 }
 
 #[test]

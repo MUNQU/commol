@@ -228,6 +228,11 @@ fn every_value_outside_its_rule_is_rejected() {
             rules::check_series(&[(2.0, 0.0), (1.0, 0.0), (2.0, 1.0)]),
             "a series has one point per position, got two at 2",
         ),
+        (
+            series(vec![(0.0, 0.0), (1.0, 0.0), (-0.0, 1.0)]),
+            rules::check_series(&[(0.0, 0.0), (1.0, 0.0), (-0.0, 1.0)]),
+            "a series has one point per position, got two at -0",
+        ),
     ];
     for (model, check, message) in cases {
         assert_eq!(check, Err(message.to_string()));
