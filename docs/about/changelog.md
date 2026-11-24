@@ -834,6 +834,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dense design of `StructuralRank` read an observation at `-0.0` as a
   second position 0, which changed its singular values.
 
+- The PIT and the quantile residuals of a total far above its mean under
+  `NegativeBinomialObservations(sum="exact")` put it in its upper tail.
+  Before, at about 15 times the mean for a mean of 100 and
+  `overdispersion` 0, and closer for a larger mean, `P(Y < y)` read about
+  0 and `P(Y > y)` about 1: an extreme upper outlier had a PIT of about 0
+  and a quantile residual at the lower end. Just before that point the tails
+  lost a part of the mass. `P(Y < y)`, `p(y)` and `P(Y > y)` now sum to 1.
+
+- `NegativeBinomialObservations(sum="exact")` reads an `overdispersion`
+  between 0 and about `1e-60` as the limit it is near. Before, the log
+  density of a total above 1 was `−∞` there, its scores were NaN, and its
+  tails and its information were wrong.
+
 - An observation of value 0 at a predicted mean of exactly 0 of a
   `PoissonObservations`, `NegativeBinomialObservations` or
   `BinomialObservations` (and a binomial count of all its trials at a mean

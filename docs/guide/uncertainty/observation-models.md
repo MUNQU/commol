@@ -284,7 +284,9 @@ models over the draws, also for a sample of one point
 ([Quantile residuals](index.md#quantile-residuals)). The distribution function
 of an observation of several parts is that of the reading of its model
 ([Sums of parts](#sums-of-parts)): the recursion of `"exact"`, the matched
-negative binomial of `"moments"`, `Poisson(M)` and `N(M, K · sd²)`.
+negative binomial of `"moments"`, `Poisson(M)` and `N(M, K · sd²)`. Within
+the counts of `"exact"`, a total however far above or below its mean is at its
+own end of that function.
 
 ## Checklist
 
