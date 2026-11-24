@@ -13,6 +13,11 @@ use crate::types::{
     CalibrationParameter, CalibrationParameterType, LossConfig, ObservedDataPoint, ReplicateSummary,
 };
 
+/// Why the mean absolute error has no curvature, and what to use instead.
+const NO_CURVATURE_OF_MAE: &str = "loss_function=\"mae\" has no curvature: the sandwich of the \
+    absolute error needs a density of the residuals at 0 and a bandwidth. Use a bootstrap \
+    (BayesianBootstrap, ResidualBootstrap or WildBootstrap)";
+
 /// What a problem compares predictions with data by: a loss, or one
 /// observation model per series label.
 #[derive(Debug, Clone, PartialEq)]
@@ -306,6 +311,19 @@ impl Discrepancy {
         }
     }
 
+    /// Refuse a discrepancy with no curvature at any predictions: the mean
+    /// absolute error.
+    ///
+    /// # Errors
+    ///
+    /// The message that says what to use instead.
+    pub fn check_curvature(&self) -> Result<(), String> {
+        match self.loss() {
+            Some(LossConfig::MeanAbsoluteError) => Err(NO_CURVATURE_OF_MAE.to_string()),
+            _ => Ok(()),
+        }
+    }
+
     /// The derivatives of each observation's term of the discrepancy of one
     /// run, at the parameter `values`, the means `predictions` and the means
     /// of their `parts`, with respect to its arguments ([`TermDerivatives`]):
@@ -353,12 +371,7 @@ impl Discrepancy {
                 0.5 / (weight_sum * sum).sqrt()
             }
             LossConfig::MeanAbsoluteError => {
-                return Err(TermError::NoCurvature(
-                    "loss_function=\"mae\" has no curvature: the sandwich of the absolute \
-                     error needs a density of the residuals at 0 and a bandwidth. Use a \
-                     bootstrap (BayesianBootstrap, ResidualBootstrap or WildBootstrap)"
-                        .to_string(),
-                ));
+                return Err(TermError::NoCurvature(NO_CURVATURE_OF_MAE.to_string()));
             }
         };
         Ok(self
