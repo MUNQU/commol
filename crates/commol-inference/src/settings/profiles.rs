@@ -1,7 +1,7 @@
 //! The settings of the profile likelihood: the threshold, the predictions
 //! and the two methods.
 
-use commol_calibration::ranges::{AT, SCALE, STARTS, WINDOW};
+use commol_calibration::ranges::{AT, BACKGROUND, SCALE, STARTS, WINDOW};
 use commol_calibration::{Observation, ObservedDataPoint};
 use commol_core::{CONFIDENCE_LEVEL, Rule, checked};
 use serde::{Deserialize, Serialize};
@@ -76,12 +76,20 @@ pub struct PredictionSpec {
     /// The known number that multiplies the prediction, with the factor, as
     /// the scale of an observation does.
     pub scale: f64,
+    /// The known number added to the prediction after the scale and the
+    /// factor, as the background of an observation is.
+    pub background: f64,
 }
 
 checked!(
     PredictionSpec,
     "PredictionSpec",
-    [Rule::Real(AT), Rule::Real(SCALE), Rule::Real(WINDOW)],
+    [
+        Rule::Real(AT),
+        Rule::Real(SCALE),
+        Rule::Real(BACKGROUND),
+        Rule::Real(WINDOW),
+    ],
     check = |spec: &PredictionSpec| spec.observation().check()
 );
 
@@ -104,6 +112,7 @@ impl PredictionSpec {
             weight: 1.0,
             factor_id: self.factor_id.clone(),
             scale: self.scale,
+            background: self.background,
             window: self.window,
             parts: 1,
             trials: None,

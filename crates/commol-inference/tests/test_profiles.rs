@@ -980,7 +980,7 @@ fn each_parameter_and_each_prediction_is_profiled_once() {
     let spec = |label: &str| {
         format!(
             r#"{{"at": 1.0, "output": "B", "outputs": null, "label": "{label}",
-            "window": null, "factor_id": null, "scale": 1.0}}"#
+            "window": null, "factor_id": null, "scale": 1.0, "background": 0.0}}"#
         )
     };
     let predictions = |specs: &str| {

@@ -2,10 +2,10 @@
 observation models of a calibration problem.
 
 A problem with ``observation_models`` fits by maximum likelihood instead of a
-loss. Each model takes the prediction of an observation (its sums, window and
-factor) as its mean and adds how the observed value scatters around it. A
-noise argument is a number, or the id of a calibration parameter of type
-``"noise"``, which is calibrated with the others and never reaches the
+loss. Each model takes the prediction of an observation (its sums, window,
+factor and background) as its mean and adds how the observed value scatters
+around it. A noise argument is a number, or the id of a calibration parameter
+of type ``"noise"``, which is calibrated with the others and never reaches the
 engine.
 """
 

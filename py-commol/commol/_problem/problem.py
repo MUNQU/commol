@@ -45,9 +45,9 @@ class ObservedDataPoint(EngineChecked, RangeChecked):
     coefficients : list[float] | None
         The known coefficient of each output of `outputs`, in its order: the
         prediction is ``Σ coefficient · output``, then times `scale` and the
-        factor (default: None, 1 for each output). Each coefficient is a
-        finite number, 0 or more, and at least one is above 0. Only with
-        `outputs`; the share of one output is `scale`.
+        factor, plus `background` (default: None, 1 for each output). Each
+        coefficient is a finite number, 0 or more, and at least one is above
+        0. Only with `outputs`; the share of one output is `scale`.
     label : str
         Name of the observed series, used by reports, plots and the
         per-series normalization. Defaults to `output`.
@@ -69,6 +69,13 @@ class ObservedDataPoint(EngineChecked, RangeChecked):
         share of the model output that the observation sees, such as the
         share of the units that report. A count model then reads the
         observed count with the mean ``scale · model``.
+    background : float
+        A known number, 0 or more, added to the model output after the scale
+        and the factor, in the units of `value` (default: 0.0): the amount
+        that the observation reads and the model does not give, such as what
+        an instrument counts where the process is absent. The prediction has
+        it once, whatever the `window` and the `parts`: each part has an
+        equal share of it.
     window : float | None
         Optional window length for a cumulative output: the prediction is the
         output at `at` minus the output at ``at - window``.
@@ -115,6 +122,12 @@ class ObservedDataPoint(EngineChecked, RangeChecked):
     scale: float = Field(
         default=1.0,
         description="Known positive number that multiplies the model output",
+    )
+    background: float = Field(
+        default=0.0,
+        description=(
+            "Known number added to the model output, after the scale and the factor"
+        ),
     )
     window: float | None = Field(
         default=None,

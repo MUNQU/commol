@@ -108,6 +108,10 @@ fn every_setting_outside_its_range_is_rejected() {
         ),
         (observation(|p| p.scale = 0.0), real_message(ranges::SCALE)),
         (
+            observation(|p| p.background = -1.0),
+            real_message(ranges::BACKGROUND),
+        ),
+        (
             observation(|p| p.window = Some(0.0)),
             real_message(ranges::WINDOW),
         ),

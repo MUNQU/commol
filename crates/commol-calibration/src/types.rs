@@ -61,6 +61,11 @@ pub struct ObservedDataPoint {
     /// observation sees (default 1.0).
     pub scale: f64,
 
+    /// Known number added to the prediction after the scale and the factor,
+    /// in the units of `value`: the amount that the observation reads and the
+    /// model does not give (default 0.0).
+    pub background: f64,
+
     /// Optional window length for cumulative-output observations.
     /// When set, the predicted value is `output(at) - output(at - window)`.
     pub window: Option<f64>,
@@ -89,6 +94,7 @@ impl ObservedDataPoint {
             weight: 1.0,
             factor_id: None,
             scale: 1.0,
+            background: 0.0,
             window: None,
             parts: 1,
             trials: None,
@@ -144,6 +150,14 @@ impl ObservedDataPoint {
                 k => start + k as f64 * length / parts as f64,
             })
             .collect()
+    }
+
+    /// The background of the mean of each part: an equal share of
+    /// [`Self::background`], so the prediction of the observation, the sum of
+    /// the means of its parts, has it once.
+    pub fn part_background(&self) -> f64 {
+        // A count of parts is far below 2^53.
+        self.background / self.parts.max(1) as f64
     }
 
     /// The coefficient of each output in the sum: `coefficients`, or 1 for
@@ -209,20 +223,21 @@ impl ObservedDataPoint {
         Ok(())
     }
 
-    /// Check the position, the value, the weight, the scale, the window, the
-    /// parts and the trials of the observation with their rules
-    /// ([`crate::ranges`]), as the observation of the Python API is checked
-    /// when it is built.
+    /// Check the position, the value, the weight, the scale, the background,
+    /// the window, the parts and the trials of the observation with their
+    /// rules ([`crate::ranges`]), as the observation of the Python API is
+    /// checked when it is built.
     ///
     /// # Errors
     ///
     /// Returns the message of the first rule that a setting breaks.
     pub fn check_ranges(&self) -> Result<(), String> {
-        use crate::ranges::{AT, PARTS, SCALE, TRIALS, VALUE, WEIGHT, WINDOW};
+        use crate::ranges::{AT, BACKGROUND, PARTS, SCALE, TRIALS, VALUE, WEIGHT, WINDOW};
         AT.check(self.at)?;
         VALUE.check(self.value)?;
         WEIGHT.check(self.weight)?;
         SCALE.check(self.scale)?;
+        BACKGROUND.check(self.background)?;
         self.window.map_or(Ok(()), |window| WINDOW.check(window))?;
         PARTS.check(self.parts)?;
         self.trials.map_or(Ok(()), |trials| TRIALS.check(trials))

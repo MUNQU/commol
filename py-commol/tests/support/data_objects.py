@@ -124,7 +124,9 @@ SAMPLE = ParameterSample.equally_weighted(
 
 
 EXAMPLES: dict[str, Callable[[], BaseModel]] = {
-    "ObservedDataPoint": lambda: POINT,
+    "ObservedDataPoint": lambda: ObservedDataPoint(
+        at=1.0, output="B", value=1.0, scale=0.5, background=2.0
+    ),
     "CalibrationParameter": lambda: PARAMETER,
     "CalibrationConstraint": lambda: CalibrationConstraint(
         id="c", expression="c - 1", at=[1.0]
@@ -260,7 +262,9 @@ EXAMPLES: dict[str, Callable[[], BaseModel]] = {
         ),
         0.95,
     ),
-    "PredictionSpec": lambda: PredictionSpec(at=1.0, output="B"),
+    "PredictionSpec": lambda: PredictionSpec(
+        at=1.0, output="B", scale=0.5, background=2.0
+    ),
     "ProfileLikelihood": lambda: ProfileLikelihood(
         parameters=["c"], threshold=THRESHOLD
     ),

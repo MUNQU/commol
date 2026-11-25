@@ -92,6 +92,23 @@ fn weighted_sum_over_a_window() {
 }
 
 #[test]
+fn a_background_is_added_once_to_the_gain_of_a_window() {
+    let names = ["A".to_string(), "B".to_string()];
+    let mut observation = ObservedDataPoint::of_sum(2.0, "seen".to_string(), names.to_vec(), 0.0);
+    observation.coefficients = Some(vec![1.0, 0.5]);
+    observation.window = Some(1.0);
+    observation.background = 6.0;
+    let operator = ObservationOperator::new(&[observation], &[], &names, &[1.0, 2.0]).unwrap();
+    let rows = [vec![10.0, 20.0], vec![30.0, 70.0]];
+    let mut out = [0.0];
+
+    operator.apply(&rows, &[], &mut out);
+
+    // A + 0.5 B grows from 20 to 65; the gain 45 plus the background 6.
+    assert_eq!(out, [51.0]);
+}
+
+#[test]
 fn an_operator_refuses_invalid_coefficients() {
     let names = ["A".to_string(), "B".to_string()];
     let cases: [(Vec<f64>, &str); 4] = [

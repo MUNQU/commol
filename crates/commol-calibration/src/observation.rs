@@ -221,15 +221,17 @@ pub fn window_increments(
 
 /// How each observation and each part of its window read a run: the outputs
 /// it sums with their coefficients, the rows of the boundaries of its parts,
-/// and its scale and the factor that multiply it.
+/// its scale and the factor that multiply it, and the background added to it.
 ///
 /// The mean of a part is the increment of the sum over the part, times the
-/// scale and the factor; the prediction of an observation is the sum of the
-/// means of its parts. An observation without a window has one part, its
-/// level at its position; one with a window and [`ObservedDataPoint::parts`]
-/// `K` has `K` parts ([`ObservedDataPoint::part_boundaries`]), and part `k`
-/// starts at the row where part `k − 1` ends. The parts of a set of
-/// observations are laid out observation after observation.
+/// scale and the factor, plus the share of the background of the part
+/// ([`ObservedDataPoint::part_background`]); the prediction of an observation
+/// is the sum of the means of its parts. An observation without a window has
+/// one part, its level at its position; one with a window and
+/// [`ObservedDataPoint::parts`] `K` has `K` parts
+/// ([`ObservedDataPoint::part_boundaries`]), and part `k` starts at the row
+/// where part `k − 1` ends. The parts of a set of observations are laid out
+/// observation after observation.
 ///
 /// The rows are those of a run at the positions of the schedule the operator
 /// was built with ([`ObservationOperator::new`]).
@@ -248,6 +250,8 @@ pub struct ObservationOperator {
     factors: Vec<Option<usize>>,
     /// The known scale of each observation.
     scales: Vec<f64>,
+    /// The known background of each part of each observation, if it has one.
+    backgrounds: Vec<Option<f64>>,
 }
 
 impl ObservationOperator {
@@ -390,6 +394,10 @@ impl ObservationOperator {
             bounds,
             factors,
             scales: observed_data.iter().map(|obs| obs.scale).collect(),
+            backgrounds: observed_data
+                .iter()
+                .map(|obs| (obs.background != 0.0).then(|| obs.part_background()))
+                .collect(),
         })
     }
 
@@ -406,7 +414,8 @@ impl ObservationOperator {
     /// Write the prediction of each observation into `out`: the sum of the
     /// means of its parts ([`Self::apply_parts`]). With one part it is the
     /// sum of its outputs, each times its coefficient, or the increment of
-    /// that sum over its window, times its scale and times its factor.
+    /// that sum over its window, times its scale and times its factor, plus
+    /// its background.
     ///
     /// `rows` are the rows of a run at the schedule; `parameters` are the
     /// values of the calibration parameters, which hold the factors.
@@ -456,18 +465,22 @@ impl ObservationOperator {
                 })
                 .unwrap_or(0.0)
         };
-        let multiply = move |predicted: f64| {
-            let scaled = predicted * self.scales[index];
-            match self.factors[index] {
+        let mean = move |modelled: f64| {
+            let scaled = modelled * self.scales[index];
+            let seen = match self.factors[index] {
                 Some(factor) => scaled * parameters[factor],
                 None => scaled,
+            };
+            match self.backgrounds[index] {
+                Some(background) => seen + background,
+                None => seen,
             }
         };
         let bounds = &self.bounds[index];
-        let level = (bounds.len() == 1).then(|| multiply(sum_at(bounds[0])));
+        let level = (bounds.len() == 1).then(|| mean(sum_at(bounds[0])));
         let increments = bounds
             .windows(2)
-            .map(move |pair| multiply(sum_at(pair[1]) - sum_at(pair[0])));
+            .map(move |pair| mean(sum_at(pair[1]) - sum_at(pair[0])));
         level.into_iter().chain(increments)
     }
 }
@@ -530,6 +543,40 @@ mod tests {
 
         // 400 times the scale 0.25 times the factor 3.
         assert_eq!(out, [300.0]);
+    }
+
+    #[test]
+    fn a_background_is_added_after_the_scale_and_the_factor() {
+        let mut observation = ObservedDataPoint::new(1.0, "A".to_string(), 0.0);
+        observation.scale = 0.25;
+        observation.factor_id = Some("f".to_string());
+        observation.background = 2.0;
+        let parameters = [CalibrationParameter::with_type(
+            "f".to_string(),
+            CalibrationParameterType::Factor,
+            0.1,
+            10.0,
+        )];
+        let operator =
+            ObservationOperator::new(&[observation], &parameters, &names(), &[1.0]).unwrap();
+        let mut out = [0.0];
+
+        operator.apply(&[vec![400.0, 0.0, 0.0]], &[3.0], &mut out);
+
+        // 400 times the scale 0.25 times the factor 3, plus the background 2.
+        assert_eq!(out, [302.0]);
+    }
+
+    #[test]
+    fn a_background_of_zero_keeps_the_sign_of_zero() {
+        let observation = ObservedDataPoint::new(1.0, "A".to_string(), 0.0);
+        let operator = ObservationOperator::new(&[observation], &[], &names(), &[1.0]).unwrap();
+        let mut out = [1.0];
+
+        operator.apply(&[vec![-0.0, 0.0, 0.0]], &[], &mut out);
+
+        // `-0.0 + 0.0` is `0.0`, another bit pattern than the model's.
+        assert_eq!(out[0].to_bits(), (-0.0f64).to_bits());
     }
 
     #[test]
