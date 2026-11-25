@@ -165,9 +165,9 @@ class ObservationDraws:
     Every draw's value of a set of observations.
 
     The values are read through the observation operator of the calibration
-    problem (sums of outputs, windows, scales, factors), the one the loss
-    uses. Without observation noise their interval is a band of the model,
-    not a prediction interval.
+    problem (sums of outputs, windows, scales, factors, backgrounds), the one
+    the loss uses. Without observation noise their interval is a band of the
+    model, not a prediction interval.
     """
 
     def __init__(

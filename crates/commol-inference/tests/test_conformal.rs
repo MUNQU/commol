@@ -273,6 +273,34 @@ fn split_conformal_needs_held_out_observations() {
 }
 
 #[test]
+fn a_target_keeps_the_background_of_its_series() {
+    // Series x read with a background, and a series y without one.
+    let mut observed = observations(&VALUES[..4], &[]);
+    for point in &mut observed {
+        point.background = 4.0;
+    }
+    let mut other = ObservedDataPoint::new(1.0, "x".to_string(), 10.0);
+    other.label = "y".to_string();
+    observed.push(other);
+    let problem = problem(observed.clone());
+
+    let intervals = split_conformal(
+        &problem,
+        Predictor::Fit(&[10.0]),
+        &observed,
+        &[11.0, 12.0],
+        settings(NonconformityScore::Absolute),
+    )
+    .unwrap()
+    .intervals;
+
+    let backgrounds: Vec<f64> = intervals.targets.iter().map(|t| t.background).collect();
+    assert_eq!(backgrounds, [4.0, 4.0, 0.0, 0.0]);
+    // x = 10 at every position, plus the background of its series.
+    assert_eq!(intervals.prediction, [14.0, 14.0, 10.0, 10.0]);
+}
+
+#[test]
 fn rolling_conformal_rejects_what_it_cannot_score() {
     let problem = problem(observations(&VALUES, &[]));
     let config = config();
@@ -544,7 +572,8 @@ fn a_conformal_method_needs_its_lists_and_a_score_it_can_scale() {
         r#"{"score": "spread", "by": "all", "confidence_level": 0.9,
         "calibration_data": [{"at": 1.0, "output": "B", "outputs": null, "coefficients": null,
         "label": "B", "value": 2.0, "weight": 1.0, "factor_id": null, "scale": 1.0,
-        "window": null, "parts": 1, "trials": null}], "positions": [1.0], "starts": 1}"#,
+        "background": 0.0, "window": null, "parts": 1, "trials": null}], "positions": [1.0],
+        "starts": 1}"#,
     )
     .unwrap();
     assert!(with_spread.check_predictor(true).is_ok());

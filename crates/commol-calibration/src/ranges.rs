@@ -25,6 +25,9 @@ pub const GRID_END: Real = Real::finite("end");
 /// The known scale of an observation: the number its prediction is
 /// multiplied by.
 pub const SCALE: Real = Real::positive("scale");
+/// The known background of an observation: the number added to its
+/// prediction.
+pub const BACKGROUND: Real = Real::non_negative("background");
 /// The trials of a binomial observation.
 pub const TRIALS: Count = Count::at_least("trials", 0);
 /// The count of equal parts of the window of an observation.

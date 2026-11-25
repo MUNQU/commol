@@ -68,9 +68,10 @@ class PredictivePlot:
         one panel per series.
 
         Each draw is read through the observation operator of the problem
-        (the sums, windows, scales and factors of the observations of the
-        series, each at its own position when they do not share one operator
-        with no window), then the draws are reduced with their weights.
+        (the sums, windows, scales, factors and backgrounds of the
+        observations of the series, each at its own position when they do not
+        share one operator with no window), then the draws are reduced with
+        their weights.
 
         Parameters
         ----------
@@ -155,8 +156,8 @@ class PredictivePlot:
             Path to save the figure to. If None, the figure is only returned.
         observed_data : list[ObservedDataPoint] | None
             Observations, drawn as their running total on the panel of their
-            label. Each observation is divided by its scale and by the
-            weighted median of its factor in the sample.
+            label. Each observation, less its background, is divided by its
+            scale and by the weighted median of its factor in the sample.
         config : PlotConfig | None
             Layout, size and style. If None, the defaults.
         series : list[str] | None
@@ -218,13 +219,13 @@ class PredictivePlot:
 
         The values are those of ``at_observations(observed_data, NoNoise())``:
         each draw's value of each observation through its own operator (the
-        sum of its outputs, its window, its scale and the draw's value of its
-        factor),
-        the values the loss compares. A value with a window is drawn as a
-        step over its window with a marker at ``at``, and its band as a
-        rectangle over the same window; a value with no window is a marker,
-        joined only as a guide. The band is a band of the model, with no
-        observation noise, not a prediction interval, and its legend says so.
+        sum of its outputs, its window, its scale, the draw's value of its
+        factor and its background), the values the loss compares. A value with
+        a window is drawn as a step over its window with a marker at ``at``,
+        and its band as a rectangle over the same window; a value with no
+        window is a marker, joined only as a guide. The band is a band of the
+        model, with no observation noise, not a prediction interval, and its
+        legend says so.
 
         Parameters
         ----------

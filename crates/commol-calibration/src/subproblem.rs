@@ -137,11 +137,11 @@ impl<'a, E: SimulationEngine> Subproblem<'a, E> {
     /// The problem with the prediction of `spec` held at `value`.
     ///
     /// `spec` is read as an observation is (its outputs summed, its window,
-    /// its factor), through the [`ObservationOperator`]; its value is not
-    /// read. With replicates of a stochastic engine, the prediction is the
-    /// mean of the replicates. The settings are
-    /// [`ConstraintSettings::for_value`]; [`Self::with_settings`] replaces
-    /// them.
+    /// its factor, its background), through the [`ObservationOperator`]; its
+    /// value is not read. With replicates of a stochastic engine, the
+    /// prediction is the mean of the replicates. The settings are
+    /// [`ConstraintSettings::for_value`] of what the model gives, `value`
+    /// less the background; [`Self::with_settings`] replaces them.
     ///
     /// # Errors
     ///
@@ -164,7 +164,7 @@ impl<'a, E: SimulationEngine> Subproblem<'a, E> {
                 observing,
                 operator,
                 value,
-                settings: ConstraintSettings::for_value(value),
+                settings: ConstraintSettings::for_value(value - spec.background),
             })),
         })
     }

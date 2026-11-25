@@ -9,8 +9,8 @@
 //! inside the bounds, and one-sided of second order towards the inside
 //! otherwise, so no run leaves the bounds. Each derivative is computed with
 //! the steps `h` and `2h`; their difference estimates the truncation error.
-//! Every run is finite, but its observation, a scale times its outputs, or
-//! the quotient of a difference can overflow.
+//! Every run is finite, but its observation, a scale times its outputs plus
+//! a background, or the quotient of a difference can overflow.
 
 use std::collections::BTreeSet;
 
@@ -152,12 +152,23 @@ impl<E: SimulationEngine + Send + Sync> FiniteDifferences<E> {
             .collect())
     }
 
+    /// The background of every observation, then of every part.
+    fn backgrounds(&self) -> Vec<f64> {
+        let observations = self.observed_data.iter().map(|obs| obs.background);
+        let parts = self
+            .observed_data
+            .iter()
+            .flat_map(|obs| std::iter::repeat_n(obs.part_background(), obs.parts.max(1)));
+        observations.chain(parts).collect()
+    }
+
     /// The derivative of every observation, then of every part, with
     /// respect to parameter `j`, and its estimated error.
     fn column(
         &self,
         values: &[f64],
         center: &[f64],
+        backgrounds: &[f64],
         j: usize,
         step: f64,
     ) -> Result<(Vec<f64>, Vec<f64>), SensitivityError> {
@@ -200,14 +211,18 @@ impl<E: SimulationEngine + Send + Sync> FiniteDifferences<E> {
         };
         let mut column = Vec::with_capacity(rows);
         let mut errors = Vec::with_capacity(rows);
-        for i in 0..rows {
+        for (i, &background) in backgrounds.iter().enumerate() {
             let with_h = derivative(stencil.with_h, i);
             let with_2h = derivative(stencil.with_2h, i);
-            let size = runs.iter().map(|run| run[i].abs()).fold(0.0, f64::max);
+            // The error of a run is a share of what it gives; the background
+            // is exact, and only its sum is rounded.
+            let size = runs
+                .iter()
+                .map(|run| (run[i] - background).abs())
+                .fold(0.0, f64::max);
+            let error = self.accuracy * size + f64::EPSILON * background;
             column.push(with_h);
-            errors.push(
-                (with_h - with_2h).abs() / 3.0 + self.accuracy * size * stencil.rounding / step,
-            );
+            errors.push((with_h - with_2h).abs() / 3.0 + error * stencil.rounding / step);
         }
         Ok((column, errors))
     }
@@ -239,9 +254,10 @@ impl<E: SimulationEngine + Send + Sync> SensitivitySource for FiniteDifferences<
                 EvaluationError::Failed(message) => SensitivityError::Failed(message),
             })?;
         let steps = self.steps(values);
+        let backgrounds = self.backgrounds();
         let columns: Vec<(Vec<f64>, Vec<f64>)> = columns
             .par_iter()
-            .map(|&j| self.column(values, &center, j, steps[j]))
+            .map(|&j| self.column(values, &center, &backgrounds, j, steps[j]))
             .collect::<Result<_, _>>()?;
         let rows = self.observed_data.len();
         let parts = center.len() - rows;
@@ -319,9 +335,9 @@ fn reason(violation: &Violation) -> String {
 }
 
 /// Every series of `observed_data` (its label, outputs, coefficients, factor
-/// and window, with the scale of its first observation) at every unit
-/// position from 0 up to the last observation, and at the positions of the
-/// observations, each of one part; a series with a window starts once a
+/// and window, with the scale and the background of its first observation) at
+/// every unit position from 0 up to the last observation, and at the positions
+/// of the observations, each of one part; a series with a window starts once a
 /// whole window fits.
 fn dense_observations(observed_data: &[ObservedDataPoint]) -> Vec<ObservedDataPoint> {
     let last = observed_data.iter().map(|obs| obs.at).fold(0.0, f64::max);
@@ -390,6 +406,26 @@ mod tests {
         let dense = dense_observations(&[plain, weighted]);
         assert_eq!(dense.len(), 4);
         assert_eq!(dense[3].coefficients, Some(vec![1.0, 0.6]));
+    }
+
+    #[test]
+    fn the_dense_design_keeps_the_background_of_its_series() {
+        let first = ObservedDataPoint {
+            background: 2.0,
+            ..ObservedDataPoint::new(1.0, "A".to_string(), 0.0)
+        };
+        let other = ObservedDataPoint {
+            background: 5.0,
+            ..ObservedDataPoint::new(2.0, "A".to_string(), 0.0)
+        };
+
+        // One series, at 0, 1 and 2, with the background of its first
+        // observation.
+        let backgrounds: Vec<f64> = dense_observations(&[first, other])
+            .iter()
+            .map(|obs| obs.background)
+            .collect();
+        assert_eq!(backgrounds, [2.0, 2.0, 2.0]);
     }
 
     #[test]

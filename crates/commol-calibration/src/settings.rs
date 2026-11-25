@@ -32,7 +32,7 @@ use crate::optimization::{
     ParticleSwarmConfig,
 };
 use crate::ranges::{
-    ALPHA, AT, COGNITIVE, COGNITIVE_FINAL, COGNITIVE_INITIAL, GAMMA, HEADER_INTERVAL,
+    ALPHA, AT, BACKGROUND, COGNITIVE, COGNITIVE_FINAL, COGNITIVE_INITIAL, GAMMA, HEADER_INTERVAL,
     IMPROVEMENT_TOL_ABS, IMPROVEMENT_TOL_REL, IMPROVEMENT_WINDOW, INERTIA_FACTOR, INERTIA_MAX,
     INERTIA_MIN, INITIAL_SIMPLEX_SIZE, ITERATIONS, MAX_ITERATIONS, MUTATION_PROBABILITY,
     MUTATION_SCALE, PARTICLES, PARTS, RADIUS_TOL, REPLICATES, RHO, SCALE, SD_TOLERANCE, SIGMA,
@@ -67,6 +67,9 @@ pub struct Observation {
     pub factor_id: Option<String>,
     /// The known number that multiplies the prediction.
     pub scale: f64,
+    /// The known number added to the prediction, after the scale and the
+    /// factor.
+    pub background: f64,
     /// The length of the window of a cumulative output, if any.
     pub window: Option<f64>,
     /// The count of equal parts of the window
@@ -84,6 +87,7 @@ checked!(
         Rule::Real(VALUE),
         Rule::Real(WEIGHT),
         Rule::Real(SCALE),
+        Rule::Real(BACKGROUND),
         Rule::Real(WINDOW),
         Rule::Count(PARTS),
         Rule::Count(TRIALS),
@@ -148,6 +152,7 @@ impl From<&Observation> for ObservedDataPoint {
             weight: observation.weight,
             factor_id: observation.factor_id.clone(),
             scale: observation.scale,
+            background: observation.background,
             window: observation.window,
             parts: observation.parts,
             trials: observation.trials,

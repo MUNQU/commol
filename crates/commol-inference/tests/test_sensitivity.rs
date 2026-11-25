@@ -310,6 +310,89 @@ fn the_ode_step_follows_the_solver_tolerance() {
     }
 }
 
+/// The sensitivities to `k` of the amount of A at 2 and of its gain over
+/// the window that ends at 4, in two parts, each with `background`.
+fn with_background<E: SimulationEngine + Send + Sync>(
+    engine: E,
+    background: f64,
+) -> commol_inference::sensitivity::Sensitivities {
+    let level = ObservedDataPoint {
+        background,
+        ..ObservedDataPoint::new(2.0, "A".to_string(), 0.0)
+    };
+    let gain = ObservedDataPoint {
+        background,
+        parts: 2,
+        ..ObservedDataPoint::with_window(4.0, "B".to_string(), 0.0, 2.0)
+    };
+    let problem = problem(
+        engine,
+        vec![ObservedDataPoint::new(1.0, "A".to_string(), 800.0)],
+        vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)],
+    );
+    FiniteDifferences::of_observations(&problem, vec![level, gain])
+        .unwrap()
+        .jacobian(&[0.2])
+        .unwrap()
+}
+
+#[test]
+fn a_background_has_no_error_of_the_solver() {
+    let engine = || {
+        DifferentialEquations::try_from_model(&decay(
+            "DifferentialEquations",
+            &ode_settings(1e-6),
+            &[],
+        ))
+        .unwrap()
+    };
+    let plain = with_background(engine(), 0.0);
+    // A thousand times the outputs: an error of `1e-6 · background` would
+    // hide every derivative.
+    let background = with_background(engine(), 1e6);
+
+    let pairs = [
+        (&background.jacobian, &plain.jacobian),
+        (&background.errors, &plain.errors),
+        (&background.parts.jacobian, &plain.parts.jacobian),
+        (&background.parts.errors, &plain.parts.errors),
+    ];
+    for (actual, expected) in pairs {
+        for (actual, expected) in actual.iter().zip(expected) {
+            assert!(
+                (actual - expected).abs() <= 1e-3 * expected.abs(),
+                "{actual} {expected}"
+            );
+        }
+    }
+}
+
+#[test]
+fn the_error_of_a_derivative_holds_the_rounding_of_its_background() {
+    // Runs exact up to rounding, read on a background that keeps only a few
+    // of their digits.
+    let plain = with_background(difference(&[]), 0.0);
+    let background = with_background(difference(&[]), 1e9);
+
+    for (block, expected, errors) in [
+        (&background.jacobian, &plain.jacobian, &background.errors),
+        (
+            &background.parts.jacobian,
+            &plain.parts.jacobian,
+            &background.parts.errors,
+        ),
+    ] {
+        for i in 0..block.nrows() {
+            assert_within(
+                block[(i, 0)],
+                expected[(i, 0)],
+                errors[(i, 0)],
+                &format!("row {i}"),
+            );
+        }
+    }
+}
+
 #[test]
 fn a_source_at_a_tighter_accuracy_steps_by_it() {
     let engine = DifferentialEquations::try_from_model(&decay(

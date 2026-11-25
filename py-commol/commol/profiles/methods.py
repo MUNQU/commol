@@ -51,6 +51,10 @@ class PredictionSpec(RangeChecked):
     scale : float
         A known positive number that multiplies the prediction, with the
         factor, as the scale of an observation does (default: 1.0).
+    background : float
+        A known number, 0 or more, added to the prediction after the scale
+        and the factor, as the background of an observation is (default:
+        0.0).
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -64,6 +68,7 @@ class PredictionSpec(RangeChecked):
     )
     factor_id: str | None = None
     scale: float = 1.0
+    background: float = 0.0
 
     def as_observation(self) -> ObservedDataPoint:
         """
@@ -88,6 +93,7 @@ class PredictionSpec(RangeChecked):
             window=self.window,
             factor_id=self.factor_id,
             scale=self.scale,
+            background=self.background,
         )
 
 

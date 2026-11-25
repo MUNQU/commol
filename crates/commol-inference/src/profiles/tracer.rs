@@ -50,7 +50,8 @@ pub enum ProfiledQuantity {
     /// The parameter at this index of the problem.
     Parameter(usize),
     /// The prediction of this observation, read as an observation is (its
-    /// outputs summed, its window, its factor); its value is not read.
+    /// outputs summed, its window, its factor, its background); its value is
+    /// not read.
     Prediction(ObservedDataPoint),
 }
 
@@ -263,12 +264,13 @@ where
     /// `Σᵢ |∂ℓᵢ/∂mᵢ| · eᵢ`, with `ℓᵢ` the term of observation `i`
     /// ([`CalibrationProblem::term_derivatives`]), `mᵢ` its prediction (the
     /// mean of each part, for an observation of several parts, summed over
-    /// them) and `eᵢ = rtol · |mᵢ| + k · atol` the error of a run on it, for
-    /// an observation that sums `k` outputs; `rtol` is the relative and `atol`
-    /// the absolute [`SimulationEngine::accuracy`] of the engine. They are the
-    /// tolerances of each step of a solver, so `ν₁` is an estimate,
-    /// not a bound. 0 when it cannot be computed: a loss with no term
-    /// derivatives, or a problem of replicates.
+    /// them) and `eᵢ = rtol · |mᵢ − bᵢ| + k · atol` the error of a run on it,
+    /// for an observation that sums `k` outputs, `bᵢ` its background (the
+    /// share of the part); `rtol` is the relative and `atol` the absolute
+    /// [`SimulationEngine::accuracy`] of the engine. They are the tolerances
+    /// of each step of a solver, so `ν₁` is an estimate, not a bound. 0 when
+    /// it cannot be computed: a loss with no term derivatives, or a problem
+    /// of replicates.
     pub fn noise_floor(&self) -> f64 {
         self.noise_floor
     }
@@ -534,8 +536,11 @@ where
                 let width = hi - lo;
                 (width, if side == 0 { lo } else { hi }, LARGEST_STEP * width)
             }
-            ProfiledQuantity::Prediction(_) => {
-                let scale = if center == 0.0 { 1.0 } else { center.abs() };
+            ProfiledQuantity::Prediction(spec) => {
+                // The background is known, so a step is a share of what the
+                // model gives.
+                let given = (center - spec.background).abs();
+                let scale = if given == 0.0 { 1.0 } else { given };
                 (scale, direction * f64::INFINITY, f64::INFINITY)
             }
         };
@@ -713,11 +718,13 @@ where
     }
 }
 
-/// The error of the prediction `mean` of `obs` from a run whose outputs
-/// have the accuracy `relative` and `absolute`: the relative error of the
-/// mean, and the absolute error of each output times its coefficient.
+/// The error of the mean `mean` of a part of `obs` from a run whose outputs
+/// have the accuracy `relative` and `absolute`: the relative error of what
+/// the run gives, the mean less its background, which is exact, and the
+/// absolute error of each output times its coefficient.
 fn prediction_error(obs: &ObservedDataPoint, mean: f64, relative: f64, absolute: f64) -> f64 {
-    relative * mean.abs() + obs.output_coefficients().iter().sum::<f64>() * absolute
+    relative * (mean - obs.part_background()).abs()
+        + obs.output_coefficients().iter().sum::<f64>() * absolute
 }
 
 /// The noise floor `ν₁` and the evaluation floor of the objective at `fit`
@@ -900,6 +907,23 @@ mod tests {
 
         // 0.1 · 10 + (1 + 0.6) · 0.5.
         assert!((prediction_error(&obs, -10.0, 0.1, 0.5) - 1.8).abs() < 1e-12);
+    }
+
+    #[test]
+    fn a_background_has_no_error() {
+        let plain = ObservedDataPoint::with_window(6.0, "A".to_string(), 0.0, 6.0);
+        let with = ObservedDataPoint {
+            background: 6.0,
+            parts: 3,
+            ..plain.clone()
+        };
+
+        // Each part has 2 of the background, so a part of mean 12 reads 10 of
+        // the run: 0.1 · 10 + 0.5.
+        assert_eq!(prediction_error(&plain, 10.0, 0.1, 0.5), 1.5);
+        assert_eq!(prediction_error(&with, 12.0, 0.1, 0.5), 1.5);
+        // Where an exact run gives 0, the mean is the background, exact.
+        assert_eq!(prediction_error(&with, 2.0, 0.1, 0.0), 0.0);
     }
 
     #[test]

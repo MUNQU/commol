@@ -2,9 +2,9 @@
 //! which says how an observed value scatters around its predicted mean.
 //!
 //! The observation operator gives the mean of each part of each observation
-//! (its sums, windows, scales and factors); a model only adds the scatter.
-//! An observation of one part reads the model at its mean; one of several
-//! parts is the sum of one observation per part ([`sums`]). The
+//! (its sums, windows, scales, factors and backgrounds); a model only adds the
+//! scatter. An observation of one part reads the model at its mean; one of
+//! several parts is the sum of one observation per part ([`sums`]). The
 //! log-likelihood is `Σ wᵢ · log p(yᵢ | μᵢ)`: a weight is a power of its term,
 //! so a weight of 2 counts the observation twice, as it does in every loss.
 //!

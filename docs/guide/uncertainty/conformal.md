@@ -186,7 +186,8 @@ print(widths)  # [6.3, 5.2]
 starts=1)` fits the problem's observations (`Calibrator.run(starts)`), or
 reads a `sample`, scores `calibration_data` and gives intervals at `positions`
 for each series of `calibration_data`. A series of `calibration_data` is read
-as its observations define it: its outputs, factor, scale and window.
+as its observations define it: its outputs, factor, scale, background and
+window.
 
 ## Rolling origins
 

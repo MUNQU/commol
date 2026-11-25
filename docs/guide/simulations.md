@@ -515,8 +515,8 @@ results.plot.series(
 |---|---|---|
 | `output_file` | `None` | Where to save the figure. `None` only returns it. |
 | `series` | `None` (every output) | What to draw, one panel each: an output name (`B_g1`) or a bin or accumulator id (`B`), which draws the sum of its outputs (`ModelStructure.outputs_by_source`). An exact output name wins. An unknown entry raises `ValueError`. |
-| `observed_data` | `None` | [`ObservedDataPoint`](calibration-observations.md)s to draw on the panel of their `label`, at their positions (a differential model may observe between integers). When the observations of a series share one sum of outputs, one factor and one `scale` and have no window, the model line covers every position of the results. Otherwise the line joins the model value of each observation at its position, read through its own outputs, `window`, `scale` and factor as the loss reads it (`ValueError` when the results have no value at a position or a window start). A predictive reads each draw through the same operator. |
-| `calibration_result` | `None` | Runs and replicates only. A [`CalibrationResult`](calibration.md#results) gives the values of the [factors](calibration-observations.md#partial-observations-factors) that multiply the model; without it, each factor counts as 1, with one warning for each factor. The `scale` of each observation applies in both cases. A predictive reads the factors of each draw. |
+| `observed_data` | `None` | [`ObservedDataPoint`](calibration-observations.md)s to draw on the panel of their `label`, at their positions (a differential model may observe between integers). When the observations of a series share one sum of outputs, one factor, one `scale` and one `background` and have no window, the model line covers every position of the results. Otherwise the line joins the model value of each observation at its position, read through its own outputs, `window`, `scale`, factor and `background` as the loss reads it (`ValueError` when the results have no value at a position or a window start). A predictive reads each draw through the same operator. |
+| `calibration_result` | `None` | Runs and replicates only. A [`CalibrationResult`](calibration.md#results) gives the values of the [factors](calibration-observations.md#partial-observations-factors) that multiply the model; without it, each factor counts as 1, with one warning for each factor. The `scale` and the `background` of each observation apply in both cases. A predictive reads the factors of each draw. |
 | `confidence_level` | `0.95` | Replicates and predictives only. The level of the band. |
 | `prediction_intervals` | `None` | `plot.series` only. The `PredictionIntervals` of a [conformal method](uncertainty/conformal.md): the panel of each of their series, by label, shows the band from `lower` to `upper` and the point prediction, dashed. An unbounded interval is left out of the band. |
 | `axes` | `None` | A `Figure` of commol to draw on ([several results on one figure](#several-results-on-one-figure)). |
@@ -557,9 +557,10 @@ results.plot.series(output_file="with_data.png", observed_data=observed)
 `plot.observations(observed_data, …)` checks a model against its data: one
 panel per `label` of the observations, in the order of its first observation.
 The model is read only at the observations, through the observation operator
-of each one (the sum of its `outputs`, its `window`, its `scale` and its factor): the
-values the loss compares. An observed series that sums some outputs, such as
-`B + C`, has its own panel, which no series of `plot.series` gives.
+of each one (the sum of its `outputs`, its `window`, its `scale`, its factor and
+its `background`): the values the loss compares. An observed series that sums
+some outputs, such as `B + C`, has its own panel, which no series of
+`plot.series` gives.
 
 ```python
 observed = [
@@ -658,10 +659,10 @@ print([float(at) for at in weekly.axes[0].lines[0].get_xdata()][:3])  # [7.0, 14
 `panels="observations"` draws one panel per `label` of `observed_data`, as
 [`plot.observations`](#a-panel-per-observed-series) draws one result: each
 result is read only at the observations, through the observation operator of
-each one (the sum of its `outputs`, its `window`, its `scale` and its factor). Each result
-has the steps, markers and band of `plot.observations` in the color of its
-key, and the observations are drawn once. The default, `panels="series"`,
-draws one panel per entry of `series`.
+each one (the sum of its `outputs`, its `window`, its `scale`, its factor and its
+`background`). Each result has the steps, markers and band of
+`plot.observations` in the color of its key, and the observations are drawn
+once. The default, `panels="series"`, draws one panel per entry of `series`.
 
 ```python
 checked = plot_compared(

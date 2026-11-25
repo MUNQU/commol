@@ -192,7 +192,7 @@ models, raises one too.
 | Step | Rule |
 |---|---|
 | Start | The fit of `Calibrator.run(starts)` |
-| Step | The adaptive step of Raue et al. (2009): it starts at 1 % of the width of the bounds (of the value at the fit, for a prediction), doubles while a step rises by less than half of 10 % of the threshold, and halves when a step rises by more than twice it |
+| Step | The adaptive step of Raue et al. (2009): it starts at 1 % of the width of the bounds (of the value at the fit less its `background`, for a prediction), doubles while a step rises by less than half of 10 % of the threshold, and halves when a step rises by more than twice it |
 | Start of each refit | Every parameter extrapolated along the line through the two points before, as in Data2Dynamics |
 | End of a side | Past the threshold (`"crossed"`), at a bound (`"bound"`), after `max_steps` points (`"max_steps"`), or at a prediction no values within the bounds give (`"unreachable"`) |
 
@@ -218,13 +218,14 @@ empty list, or a parameter listed twice, raises a `ValueError`.
 
 `PredictionProfile(specs, threshold)` profiles the value of each prediction: a
 `PredictionSpec` reads an output, or a sum of outputs, at a position, with a
-`window`, a `factor_id` and a known `scale`, as an observation does. Its
-interval is the set of values the data do not reject (Kreutz et al. 2012);
-specs at several positions give a band. A prediction past the data has a wider
-interval, as `B at 50` shows in the [quick path](#quick-path). The intervals
-are pointwise: a band of them is not a joint region. `specs` holds at least
-one prediction, each with a label of its own (an empty label is the name of
-its output).
+`window`, a `factor_id`, a known `scale` and a known `background`, as an
+observation does. Its interval is the set of values the data do not reject
+(Kreutz et al. 2012); specs at several positions give a band. A prediction
+past the data has a wider interval, as `B at 50` shows in the
+[quick path](#quick-path). The intervals are pointwise: a band of them is not
+a joint region. A `background` moves the profile and changes nothing else.
+`specs` holds at least one prediction, each with a label of its own (an empty
+label is the name of its output).
 
 ## Verdicts and the identifiability report
 
@@ -244,12 +245,13 @@ has no tolerance on the objective, and `τ` is
 [polish](../calibration-optimizers.md#polish-with-nelder-mead) ends with
 Nelder-Mead, so `τ` is the `sd_tolerance` of the polish. `ν`, the noise floor, is the error of one
 evaluation of the objective at the fit, from the accuracy of a run:
-`Σ |∂ℓᵢ/∂mᵢ| · eᵢ`, with `eᵢ = rtol · |mᵢ| + k · atol` the error of a run on
-an observation that sums `k` outputs, its prediction `mᵢ`, and the accuracy
-of the engine (machine epsilon for a difference model, the `rtol` and `atol`
-of the ODE solver). A solver holds its tolerances at each step, so `ν` is an
-estimate, not a bound. A threshold at or below `ε` gives no verdict: the
-profile cannot tell a rise from numerical error, and `notes` says so.
+`Σ |∂ℓᵢ/∂mᵢ| · eᵢ`, with `eᵢ = rtol · |mᵢ − bᵢ| + k · atol` the error of a
+run on an observation that sums `k` outputs, its prediction `mᵢ`, its
+background `bᵢ`, which is exact, and the accuracy of the engine (machine
+epsilon for a difference model, the `rtol` and `atol` of the ODE solver). A
+solver holds its tolerances at each step, so `ν` is an estimate, not a bound.
+A threshold at or below `ε` gives no verdict: the profile cannot tell a rise
+from numerical error, and `notes` says so.
 
 The box of the parameters is the space inside their bounds. A free parameter
 of a refit is on a bound when it is within `1e-8` of the width of its bounds,

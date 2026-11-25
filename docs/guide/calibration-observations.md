@@ -5,8 +5,8 @@
 An `ObservedDataPoint` says what the model must reproduce: an output at a
 position on the axis. This page shows how to observe several outputs, sums
 and weighted sums of outputs, partial observations (factors and known
-scales), counts per period (windows) and positions between integers, and how
-to weigh them.
+scales), known backgrounds, counts per period (windows) and positions between
+integers, and how to weigh them.
 
 ## Quick path
 
@@ -83,6 +83,7 @@ plots and the per-series normalization; it defaults to `output`.
 | `weight` | `float` | `1.0` | Above zero. How much the observation counts in every loss, and the power of its term of a likelihood; see [Losses](calibration.md#losses). |
 | `factor_id` | `str \| None` | `None` | A `factor` unknown that multiplies the prediction. |
 | `scale` | `float` | `1.0` | Above zero and finite. A known number that multiplies the prediction, with the factor; see [Known shares: scales](#known-shares-scales). |
+| `background` | `float` | `0.0` | Zero or more and finite. A known number added to the prediction after the scale and the factor; see [Known backgrounds](#known-backgrounds). |
 | `window` | `float \| None` | `None` | Compares with the gain over `(at − window, at]` instead of the value. |
 | `trials` | `int \| None` | `None` | The trials of the observation, for a `BinomialObservations()` model that reads them from each observation. See [Observation Models](uncertainty/observation-models.md). |
 | `parts` | `int` | `1` | At least 1. The count of equal parts of the window that the value sums, each an independent observation; more than 1 needs a `window`. See [Parts of a window](#parts-of-a-window). |
@@ -116,7 +117,7 @@ and `window`. It must not be empty.
 When a measurement sees the whole of one output and a known share of
 another, give one coefficient per output in `coefficients`, in the order of
 `outputs`. The prediction is `Σ coefficient · output`, then times `scale` and
-the factor:
+the factor, plus `background`:
 
 ```python
 b_and_half_c = [
@@ -217,6 +218,40 @@ print(calibrate_k1(known))  # 0.4
 | Reports | The `observed` block of a report gives `scales` when a scale is not 1.0 ([Reports](reports.md)). |
 | Range | A scale of 0, below 0, infinite or NaN raises `ValidationError` that names `scale`. |
 
+## Known backgrounds
+
+A measurement often reads something where the model gives 0: an instrument
+counts where the process is absent, a blank has a signal. When that amount is
+known, give it as `background`. The prediction is then
+
+```text
+predicted = scale · factor · (sum of the outputs, or its gain over the window) + background
+```
+
+so neither the scale nor a calibrated factor changes it:
+
+```python
+blank = 20.0
+read = [
+    ObservedDataPoint(
+        at=step, output="B", value=0.3 * truth["B"][step] + blank, scale=0.3, background=blank
+    )
+    for step in range(5, 51, 5)
+]
+print(calibrate_k1(read))  # 0.4
+```
+
+| Fact | Detail |
+|---|---|
+| Units | Those of `value`, whatever the scale, the factor and the coefficients are. |
+| A known number | No method fits it. It can change from one observation to the next, so a background that changes along the axis is one number per observation. |
+| Counts | A count model reads the mean `scale · model + background`, so it accepts a count where the model gives 0. Do not subtract the background from the count: the rest may be negative or not whole, and a model of the rest reads too small a variance. |
+| Windows and parts | The prediction has it once: give the background of the whole window. With `parts=K`, the mean of each part has `background / K`. |
+| Every reader | The readers of a scale, above, read the background too: the prediction profiles take `PredictionSpec(background=...)`. |
+| Figures | `plot.series` and `plot.observations` draw the model with the background. `plot.cumulative` takes the background from each observed value, then divides by its scale and its factor: a value below its background lowers the running total. |
+| Reports | The `observed` block of a report gives `backgrounds` when a background is not 0.0 ([Reports](reports.md)). |
+| Range | A background below 0, infinite or NaN raises `ValidationError` that names `background`. |
+
 ## Counts per period: windows
 
 Data often counts what happened **in** each period, such as the amount that
@@ -243,7 +278,7 @@ print(calibrate_k1(windowed))  # 0.4
 | The window starts at 0 or later | `at − window`, read as 0 within the rounding of the window; otherwise the observation is rejected when it is created, with the rule of the engine (`check_window_end` in `crates/commol-calibration/src/observation.rs`, which `Observation::check` calls). |
 | Any output | Usually an accumulator, but any compartment works. |
 | Mixed windows | Observations may use different windows, and positions need not be multiples of the window. |
-| Combinations | Works with `factor_id` and `outputs`. |
+| Combinations | Works with `factor_id`, `background` and `outputs`. |
 
 `SimulationResults.windowed_totals` applies the same reduction outside
 calibration, so a report shows exactly what the loss compared. See
@@ -361,6 +396,7 @@ Observe expanded outputs by name, such as `B_g1`, or sum them with
 - [ ] Weights say how much each observation counts, in every loss.
 - [ ] Every `factor_id` has a `CalibrationParameter` with `parameter_type="factor"`.
 - [ ] A known share is a `scale`, not a `factor` with narrow bounds.
+- [ ] A known amount that the model does not give is a `background`, not an accumulator of a constant flow.
 - [ ] Windowed observations use a cumulative output and a window that starts at 0 or later.
 - [ ] A total of independent counts has `parts`, and no observation of its parts beside it.
 

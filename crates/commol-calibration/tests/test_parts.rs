@@ -158,6 +158,25 @@ fn the_parts_sum_to_the_window() {
 }
 
 #[test]
+fn each_part_has_its_share_of_the_background() {
+    let without = split("B", 12.0, 12.0, 3, 0.0);
+    let with = ObservedDataPoint {
+        background: 6.0,
+        ..without.clone()
+    };
+    let (gain, increments) = means(&problem(difference(), vec![without]).unwrap(), 0.1);
+    let (total, parts) = means(&problem(difference(), vec![with.clone()]).unwrap(), 0.1);
+
+    // A third of the background in each part, and the whole of it once.
+    assert_eq!(with.part_background(), 2.0);
+    assert_eq!(parts.len(), 3);
+    for (part, increment) in parts.iter().zip(&increments) {
+        assert_eq!(*part, increment + 2.0);
+    }
+    assert!(relative(total[0], gain[0] + 6.0) < 1e-12, "{total:?}");
+}
+
+#[test]
 fn a_negative_part_is_outside_the_support() {
     // B rises and then falls: the last part of its window has a negative
     // increment, though the total is positive.

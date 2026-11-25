@@ -217,6 +217,37 @@ fn fixing_a_prediction_at_the_fit_keeps_the_parameters() {
 }
 
 #[test]
+fn a_background_does_not_loosen_a_held_prediction() {
+    let problem = line_problem(&VALUES);
+    let plain = ObservedDataPoint::new(15.0, "x".to_string(), 0.0);
+    let with = ObservedDataPoint {
+        background: 1e6,
+        ..plain.clone()
+    };
+    let start = [1.0, 0.5];
+
+    let refit = |spec: &ObservedDataPoint, value: f64| {
+        let subproblem = Subproblem::fix_prediction(&problem, spec, value).unwrap();
+        optimize_subproblem(&subproblem, &config(), &start, 0).unwrap()
+    };
+    let held = refit(&plain, 9.0);
+    let moved = refit(&with, 1e6 + 9.0);
+
+    // The tolerance is 1e-8 of the 9 that the model gives, not of the value.
+    assert!(moved.fit.converged, "{}", moved.fit.termination_reason);
+    let prediction = moved.prediction.expect("a prediction subproblem");
+    assert!((prediction - (1e6 + 9.0)).abs() < 1e-7, "{prediction}");
+    for (moved, held) in moved
+        .fit
+        .best_parameters
+        .iter()
+        .zip(&held.fit.best_parameters)
+    {
+        assert!((moved - held).abs() < 1e-5, "{moved} {held}");
+    }
+}
+
+#[test]
 fn a_problem_observing_more_positions_scores_as_the_problem() {
     let base = line_problem(&VALUES);
     // x(2) = a + 2b must stay at least 2: a constraint at a position.
@@ -980,7 +1011,7 @@ fn each_parameter_and_each_prediction_is_profiled_once() {
     let spec = |label: &str| {
         format!(
             r#"{{"at": 1.0, "output": "B", "outputs": null, "label": "{label}",
-            "window": null, "factor_id": null, "scale": 1.0}}"#
+            "window": null, "factor_id": null, "scale": 1.0, "background": 0.0}}"#
         )
     };
     let predictions = |specs: &str| {
