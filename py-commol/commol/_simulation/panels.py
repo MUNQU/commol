@@ -20,10 +20,10 @@ from commol.plotting.panels import (
     PanelOutputs,
     Trace,
     cumulative_observed,
-    model_multiplier,
     group_observed,
     observation_panel,
     observation_positions,
+    observed_mean,
     observed_series,
     observed_trace,
     reads_each_observation,
@@ -129,8 +129,8 @@ def cumulative_panels(
 ) -> list[Panel]:
     """
     The panels of the running total of each series of a run, and of its
-    observations, each divided by its scale and by the fitted value of its
-    factor.
+    observations, each, less its background, divided by its scale and by the
+    fitted value of its factor.
     """
     outputs = PanelOutputs(results, results.model)
     selected = outputs.select(series)
@@ -166,7 +166,7 @@ def run_observation_panels(
     The model value of each observation is read through its own operator, as
     the loss reads it: the sum of its outputs times their coefficients at its
     position, or its increment over its window, times its scale and the value
-    of its factor in `calibration_result`.
+    of its factor in `calibration_result`, plus its background.
 
     Raises
     ------
@@ -263,10 +263,10 @@ def _at_observations(
     """
     The model value of each observation in one run, through its own
     operator: the sum of its outputs times their coefficients, its window, its
-    scale and its factor.
+    scale, its factor and its background (`observed_mean`).
     """
     return [
-        _read(results, point.observed_outputs, point) * model_multiplier(point, factors)
+        observed_mean(point, _read(results, point.observed_outputs, point), factors)
         for point in observed
     ]
 
@@ -299,9 +299,10 @@ def _model_line(
     window, each observation is read through its own operator, as the loss
     reads it: the sum of its outputs times their coefficients at its position,
     or its increment over its window (`windowed_totals`), times its scale and
-    its factor. Otherwise the sum of the outputs of their operator, times
-    their coefficients, at every position of the results, times its scale and
-    its factor.
+    its factor, plus its background. Otherwise the sum of the outputs of their
+    operator, times their coefficients, at every position of the results,
+    times its scale and its factor, plus its background; without
+    observations, the sum of the outputs of the series.
 
     Raises
     ------
@@ -311,19 +312,21 @@ def _model_line(
     """
     if reads_each_observation(observed):
         return [point.at for point in observed], [
-            _read(results, point.outputs or outputs.components(series_id), point)
-            * model_multiplier(point, factors)
+            observed_mean(
+                point,
+                _read(results, point.outputs or outputs.components(series_id), point),
+                factors,
+            )
             for point in observed
         ]
-    components = (
-        observed[0].outputs
-        if observed and observed[0].outputs
-        else outputs.components(series_id)
-    )
-    coefficients = observed[0].coefficients if observed else None
-    multiplier = model_multiplier(observed[0] if observed else None, factors)
-    return list(results.positions), [
-        value * multiplier for value in total_series(results, components, coefficients)
+    positions = list(results.positions)
+    if not observed:
+        return positions, total_series(results, outputs.components(series_id))
+    point = observed[0]
+    components = point.outputs or outputs.components(series_id)
+    return positions, [
+        observed_mean(point, value, factors)
+        for value in total_series(results, components, point.coefficients)
     ]
 
 

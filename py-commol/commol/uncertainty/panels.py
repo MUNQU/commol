@@ -69,8 +69,8 @@ def predictive_cumulative_panels(
 ) -> list[Panel]:
     """
     The panels of the band of the running total of each series of a
-    predictive, and of its observations, each divided by its scale and by the
-    weighted median of its factor.
+    predictive, and of its observations, each, less its background, divided
+    by its scale and by the weighted median of its factor.
 
     Raises
     ------
@@ -191,8 +191,8 @@ def _predictive_band(
     When the observations of the series do not share one operator with no
     window, each draw is read through the operator of each observation at its
     position, as the loss reads it. With one operator and coefficients, a
-    factor or a scale, each draw is read through it at every position of the
-    predictive. Otherwise, the band of the sum of the outputs.
+    factor, a scale or a background, each draw is read through it at every
+    position of the predictive. Otherwise, the band of the sum of the outputs.
     """
     if reads_each_observation(observed):
         points = [
@@ -205,6 +205,7 @@ def _predictive_band(
                 window=point.window,
                 factor_id=point.factor_id,
                 scale=point.scale,
+                background=point.background,
             )
             for point in observed
         ]
@@ -216,8 +217,14 @@ def _predictive_band(
     )
     factor_id = observed[0].factor_id if observed else None
     scale = observed[0].scale if observed else 1.0
+    background = observed[0].background if observed else 0.0
     coefficients = observed[0].coefficients if observed else None
-    if factor_id is None and scale == 1.0 and coefficients is None:
+    if (
+        factor_id is None
+        and scale == 1.0
+        and background == 0.0
+        and coefficients is None
+    ):
         return predictive.series_band(components, confidence_level)
     points = [
         ObservedDataPoint(
@@ -228,6 +235,7 @@ def _predictive_band(
             value=0.0,
             factor_id=factor_id,
             scale=scale,
+            background=background,
         )
         for at in predictive.positions
     ]

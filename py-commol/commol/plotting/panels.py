@@ -619,35 +619,46 @@ def cumulative_observed(
     observed: list[ObservedDataPoint], factors: Mapping[str, float]
 ) -> Trace | None:
     """
-    The running total of the observations of a series, each divided by its
-    scale and by the value of its factor when `factors` has it
-    (`model_multiplier`).
+    The running total of the observations of a series, each in the units of
+    the model (`modelled_value`).
     """
     if not observed:
         return None
     return Trace(
         [point.at for point in observed],
         list(
-            itertools.accumulate(
-                point.value / model_multiplier(point, factors) for point in observed
-            )
+            itertools.accumulate(modelled_value(point, factors) for point in observed)
         ),
         "Observed (Cumulative)",
     )
 
 
-def model_multiplier(
-    point: ObservedDataPoint | None,
-    factors: Mapping[str, float],
+def observed_mean(
+    point: ObservedDataPoint, modelled: float, factors: Mapping[str, float]
 ) -> float:
+    """
+    What an observation reads where its outputs give `modelled`, as its
+    operator in the engine reads it: `modelled` times its `model_multiplier`,
+    plus its background.
+    """
+    return modelled * model_multiplier(point, factors) + point.background
+
+
+def modelled_value(point: ObservedDataPoint, factors: Mapping[str, float]) -> float:
+    """
+    The value of an observation in the units of the model, the inverse of
+    `observed_mean`: less its background, divided by its `model_multiplier`.
+    It is negative for a value below its background.
+    """
+    return (point.value - point.background) / model_multiplier(point, factors)
+
+
+def model_multiplier(point: ObservedDataPoint, factors: Mapping[str, float]) -> float:
     """
     The number an observation multiplies the model by, as its operator in the
     engine reads it: its scale times the value of its factor. A factor that
-    `factors` lacks counts as 1 (`warn_missing_factors` names it); no
-    observation is 1.
+    `factors` lacks counts as 1 (`warn_missing_factors` names it).
     """
-    if point is None:
-        return 1.0
     factor_id = point.factor_id
     if factor_id is None or factor_id not in factors:
         return point.scale
@@ -676,8 +687,8 @@ def warn_missing_factors(
 def reads_each_observation(observed: list[ObservedDataPoint]) -> bool:
     """
     Whether the model of a series is read at each observation: when one has
-    a window, or the observations differ in outputs, coefficients, factor or
-    scale.
+    a window, or the observations differ in outputs, coefficients, factor,
+    scale or background.
 
     Otherwise one operator reads every observation, and the model line covers
     every position of the results.
@@ -688,6 +699,7 @@ def reads_each_observation(observed: list[ObservedDataPoint]) -> bool:
             tuple(point.coefficients or ()),
             point.factor_id,
             point.scale,
+            point.background,
         )
         for point in observed
     }
