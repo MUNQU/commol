@@ -5005,12 +5005,12 @@ only their outputs, and a bin or accumulator id raises <code>ValueError</code>.<
 <tr>
 <td><code>observed_data</code></td>
 <td><code>None</code></td>
-<td><a href="../calibration-observations/"><code>ObservedDataPoint</code></a>s to draw on the panel of their <code>label</code>, at their positions (a differential model may observe between integers). When the observations of a series share one sum of outputs, one factor and one <code>scale</code> and have no window, the model line covers every position of the results. Otherwise the line joins the model value of each observation at its position, read through its own outputs, <code>window</code>, <code>scale</code> and factor as the loss reads it (<code>ValueError</code> when the results have no value at a position or a window start). A predictive reads each draw through the same operator.</td>
+<td><a href="../calibration-observations/"><code>ObservedDataPoint</code></a>s to draw on the panel of their <code>label</code>, at their positions (a differential model may observe between integers). When the observations of a series share one sum of outputs, one factor, one <code>scale</code> and one <code>background</code> and have no window, the model line covers every position of the results. Otherwise the line joins the model value of each observation at its position, read through its own outputs, <code>window</code>, <code>scale</code>, factor and <code>background</code> as the loss reads it (<code>ValueError</code> when the results have no value at a position or a window start). A predictive reads each draw through the same operator.</td>
 </tr>
 <tr>
 <td><code>calibration_result</code></td>
 <td><code>None</code></td>
-<td>Runs and replicates only. A <a href="../calibration/#results"><code>CalibrationResult</code></a> gives the values of the <a href="../calibration-observations/#partial-observations-factors">factors</a> that multiply the model; without it, each factor counts as 1, with one warning for each factor. The <code>scale</code> of each observation applies in both cases. A predictive reads the factors of each draw.</td>
+<td>Runs and replicates only. A <a href="../calibration/#results"><code>CalibrationResult</code></a> gives the values of the <a href="../calibration-observations/#partial-observations-factors">factors</a> that multiply the model; without it, each factor counts as 1, with one warning for each factor. The <code>scale</code> and the <code>background</code> of each observation apply in both cases. A predictive reads the factors of each draw.</td>
 </tr>
 <tr>
 <td><code>confidence_level</code></td>
@@ -5099,9 +5099,10 @@ matplotlib after a figure of commol keep your own style.</p>
 <p><code>plot.observations(observed_data, …)</code> checks a model against its data: one
 panel per <code>label</code> of the observations, in the order of its first observation.
 The model is read only at the observations, through the observation operator
-of each one (the sum of its <code>outputs</code>, its <code>window</code>, its <code>scale</code> and its factor): the
-values the loss compares. An observed series that sums some outputs, such as
-<code>B + C</code>, has its own panel, which no series of <code>plot.series</code> gives.</p>
+of each one (the sum of its <code>outputs</code>, its <code>window</code>, its <code>scale</code>, its factor and
+its <code>background</code>): the values the loss compares. An observed series that sums
+some outputs, such as <code>B + C</code>, has its own panel, which no series of
+<code>plot.series</code> gives.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="n">observed</span> <span class="o">=</span> <span class="p">[</span>
 </span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="n">at</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">&quot;cum_ab&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">value</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="mi">7</span><span class="p">)</span>
 </span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>    <span class="k">for</span> <span class="n">at</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="p">[(</span><span class="mi">7</span><span class="p">,</span> <span class="mf">120.0</span><span class="p">),</span> <span class="p">(</span><span class="mi">14</span><span class="p">,</span> <span class="mf">160.0</span><span class="p">),</span> <span class="p">(</span><span class="mi">21</span><span class="p">,</span> <span class="mf">190.0</span><span class="p">)]</span>
@@ -5246,10 +5247,10 @@ work as in <code>plot.series</code>.</p>
 <p><code>panels="observations"</code> draws one panel per <code>label</code> of <code>observed_data</code>, as
 <a href="#a-panel-per-observed-series"><code>plot.observations</code></a> draws one result: each
 result is read only at the observations, through the observation operator of
-each one (the sum of its <code>outputs</code>, its <code>window</code>, its <code>scale</code> and its factor). Each result
-has the steps, markers and band of <code>plot.observations</code> in the color of its
-key, and the observations are drawn once. The default, <code>panels="series"</code>,
-draws one panel per entry of <code>series</code>.</p>
+each one (the sum of its <code>outputs</code>, its <code>window</code>, its <code>scale</code>, its factor and its
+<code>background</code>). Each result has the steps, markers and band of
+<code>plot.observations</code> in the color of its key, and the observations are drawn
+once. The default, <code>panels="series"</code>, draws one panel per entry of <code>series</code>.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="n">checked</span> <span class="o">=</span> <span class="n">plot_compared</span><span class="p">(</span>
 </span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>    <span class="p">{</span><span class="s2">&quot;k1 = 0.3&quot;</span><span class="p">:</span> <span class="n">results</span><span class="p">,</span> <span class="s2">&quot;k1 = 0.5&quot;</span><span class="p">:</span> <span class="n">faster</span><span class="p">},</span> <span class="n">observed_data</span><span class="o">=</span><span class="n">observed</span><span class="p">,</span> <span class="n">panels</span><span class="o">=</span><span class="s2">&quot;observations&quot;</span>
 </span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="p">)</span>

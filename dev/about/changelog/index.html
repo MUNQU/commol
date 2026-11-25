@@ -5428,6 +5428,16 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li><code>ObservedDataPoint(background=...)</code>: a known number, 0 or more and 0 by
+  default, added to the prediction of the observation after its scale and its
+  factor, in the units of <code>value</code>: a calibrated factor does not multiply it,
+  and a count model reads a mean above 0 where the model gives 0. An
+  observation with <code>parts=K</code> has <code>background / K</code> in each part. The loss, the
+  likelihood, the predictive, the scores, the figures, the <code>observed</code> block of
+  a report (<code>backgrounds</code>) and a <code>PredictionSpec(background=...)</code> of a
+  prediction profile read it; a cumulative figure takes it from each observed
+  value. See
+  <a href="../../guide/calibration-observations/#known-backgrounds">Known backgrounds</a>.</li>
 <li>
 <p><code>commol.dependence</code>: whether the values of each series are independent,
   and how strongly they depend. <code>series_dependence(values, observations,

@@ -613,6 +613,7 @@ class ObservedSeries(TypedDict):
     values: list[float | None]
     weights: NotRequired[list[float | None]]
     scales: NotRequired[list[float | None]]
+    backgrounds: NotRequired[list[float | None]]
     outputs: NotRequired[list[str]]
     coefficients: NotRequired[list[float]]
     factor_id: NotRequired[str]

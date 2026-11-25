@@ -122,15 +122,16 @@ A prediction to profile: an output, or a sum of outputs, at a position, read as 
 
 Attributes:
 
-| Name        | Type        | Description                                                                                                                  |
-| ----------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `at`        | `float`     | The position.                                                                                                                |
-| `output`    | \`str       | None\`                                                                                                                       |
-| `outputs`   | \`list[str] | None\`                                                                                                                       |
-| `label`     | `str`       | The name of the prediction in the result; defaults to output.                                                                |
-| `window`    | \`float     | None\`                                                                                                                       |
-| `factor_id` | \`str       | None\`                                                                                                                       |
-| `scale`     | `float`     | A known positive number that multiplies the prediction, with the factor, as the scale of an observation does (default: 1.0). |
+| Name         | Type        | Description                                                                                                                               |
+| ------------ | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `at`         | `float`     | The position.                                                                                                                             |
+| `output`     | \`str       | None\`                                                                                                                                    |
+| `outputs`    | \`list[str] | None\`                                                                                                                                    |
+| `label`      | `str`       | The name of the prediction in the result; defaults to output.                                                                             |
+| `window`     | \`float     | None\`                                                                                                                                    |
+| `factor_id`  | \`str       | None\`                                                                                                                                    |
+| `scale`      | `float`     | A known positive number that multiplies the prediction, with the factor, as the scale of an observation does (default: 1.0).              |
+| `background` | `float`     | A known number, 0 or more, added to the prediction after the scale and the factor, as the background of an observation is (default: 0.0). |
 
 Source code in `commol/profiles/methods.py`
 
@@ -158,6 +159,10 @@ class PredictionSpec(RangeChecked):
     scale : float
         A known positive number that multiplies the prediction, with the
         factor, as the scale of an observation does (default: 1.0).
+    background : float
+        A known number, 0 or more, added to the prediction after the scale
+        and the factor, as the background of an observation is (default:
+        0.0).
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -171,6 +176,7 @@ class PredictionSpec(RangeChecked):
     )
     factor_id: str | None = None
     scale: float = 1.0
+    background: float = 0.0
 
     def as_observation(self) -> ObservedDataPoint:
         """
@@ -195,6 +201,7 @@ class PredictionSpec(RangeChecked):
             window=self.window,
             factor_id=self.factor_id,
             scale=self.scale,
+            background=self.background,
         )
 ```
 
@@ -246,6 +253,7 @@ def as_observation(self) -> ObservedDataPoint:
         window=self.window,
         factor_id=self.factor_id,
         scale=self.scale,
+        background=self.background,
     )
 ```
 

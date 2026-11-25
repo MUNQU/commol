@@ -1319,6 +1319,7 @@ Attributes:
 | `weight`       | `float`       | How much this observation counts in the loss (default: 1.0). Every loss multiplies the squared or absolute residual by it: sse is Σ w·r², rmse is √(Σ w·r² / Σ w), mae is Σ w·                                                                                                                                                                                                                                        |
 | `factor_id`    | \`str         | None\`                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `scale`        | `float`       | A known positive number that multiplies the model output, with the factor if there is one, before comparison (default: 1.0): the known share of the model output that the observation sees, such as the share of the units that report. A count model then reads the observed count with the mean scale · model.                                                                                                      |
+| `background`   | `float`       | A known number, 0 or more, added to the model output after the scale and the factor, in the units of value (default: 0.0): the amount that the observation reads and the model does not give, such as what an instrument counts where the process is absent. The prediction has it once, whatever the window and the parts: each part has an equal share of it.                                                       |
 | `window`       | \`float       | None\`                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `parts`        | `int`         | The count of equal parts of the window (default: 1). With more than one, value is the sum of one independent observation per part, each scattered by the observation model of the series around the mean of its part, and the window splits from its start to at into parts equal lengths. Needs a window and observation models: PoissonObservations, NormalObservations or NegativeBinomialObservations with a sum. |
 | `trials`       | \`int         | None\`                                                                                                                                                                                                                                                                                                                                                                                                                |
@@ -1349,9 +1350,9 @@ class ObservedDataPoint(EngineChecked, RangeChecked):
     coefficients : list[float] | None
         The known coefficient of each output of `outputs`, in its order: the
         prediction is ``Σ coefficient · output``, then times `scale` and the
-        factor (default: None, 1 for each output). Each coefficient is a
-        finite number, 0 or more, and at least one is above 0. Only with
-        `outputs`; the share of one output is `scale`.
+        factor, plus `background` (default: None, 1 for each output). Each
+        coefficient is a finite number, 0 or more, and at least one is above
+        0. Only with `outputs`; the share of one output is `scale`.
     label : str
         Name of the observed series, used by reports, plots and the
         per-series normalization. Defaults to `output`.
@@ -1373,6 +1374,13 @@ class ObservedDataPoint(EngineChecked, RangeChecked):
         share of the model output that the observation sees, such as the
         share of the units that report. A count model then reads the
         observed count with the mean ``scale · model``.
+    background : float
+        A known number, 0 or more, added to the model output after the scale
+        and the factor, in the units of `value` (default: 0.0): the amount
+        that the observation reads and the model does not give, such as what
+        an instrument counts where the process is absent. The prediction has
+        it once, whatever the `window` and the `parts`: each part has an
+        equal share of it.
     window : float | None
         Optional window length for a cumulative output: the prediction is the
         output at `at` minus the output at ``at - window``.
@@ -1419,6 +1427,12 @@ class ObservedDataPoint(EngineChecked, RangeChecked):
     scale: float = Field(
         default=1.0,
         description="Known positive number that multiplies the model output",
+    )
+    background: float = Field(
+        default=0.0,
+        description=(
+            "Known number added to the model output, after the scale and the factor"
+        ),
     )
     window: float | None = Field(
         default=None,

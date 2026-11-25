@@ -122,10 +122,10 @@ Every method runs through `Calibrator.identifiability(method)` and returns an `I
 
 `StructuralRank` evaluates the sensitivities of the predicted observations at `points` rows of a Latin hypercube over the bounds, drawn from the seed of the calibrator (`Calibrator.seed`), so `problem.seed` repeats them. The sensitivity of observation `i` to parameter `j` is scaled to a relative change of both, `S_ij = (∂y_i/∂θ_j) · θ_j / s_i`, where `s_i` is the root mean square of the series of observation `i`, so the answer does not depend on units.
 
-| `design`         | Positions and outputs                                                                                                    | Question                                           |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- |
-| `"observations"` | Those of the problem's observations; their values are ignored                                                            | Can this design determine the parameters?          |
-| `"dense"`        | Every observed series, with its outputs, factor, scale and window, at every unit position from 0 to the last observation | Can denser data of the same series determine them? |
+| `design`         | Positions and outputs                                                                                                                | Question                                           |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- |
+| `"observations"` | Those of the problem's observations; their values are ignored                                                                        | Can this design determine the parameters?          |
+| `"dense"`        | Every observed series, with its outputs, factor, scale, background and window, at every unit position from 0 to the last observation | Can denser data of the same series determine them? |
 
 At each point the rank counts the singular values of `S` above the norm of the estimated error of `S`. The **generic rank** is the rank at most points; each point's singular values are in `report.structural[0].points`. A parameter is:
 

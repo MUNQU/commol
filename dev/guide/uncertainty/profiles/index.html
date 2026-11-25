@@ -4344,7 +4344,7 @@ models, raises one too.</p>
 </tr>
 <tr>
 <td>Step</td>
-<td>The adaptive step of Raue et al. (2009): it starts at 1 % of the width of the bounds (of the value at the fit, for a prediction), doubles while a step rises by less than half of 10 % of the threshold, and halves when a step rises by more than twice it</td>
+<td>The adaptive step of Raue et al. (2009): it starts at 1 % of the width of the bounds (of the value at the fit less its <code>background</code>, for a prediction), doubles while a step rises by less than half of 10 % of the threshold, and halves when a step rises by more than twice it</td>
 </tr>
 <tr>
 <td>Start of each refit</td>
@@ -4375,13 +4375,14 @@ then comes from that second run.</p>
 empty list, or a parameter listed twice, raises a <code>ValueError</code>.</p>
 <p><code>PredictionProfile(specs, threshold)</code> profiles the value of each prediction: a
 <code>PredictionSpec</code> reads an output, or a sum of outputs, at a position, with a
-<code>window</code>, a <code>factor_id</code> and a known <code>scale</code>, as an observation does. Its
-interval is the set of values the data do not reject (Kreutz et al. 2012);
-specs at several positions give a band. A prediction past the data has a wider
-interval, as <code>B at 50</code> shows in the <a href="#quick-path">quick path</a>. The intervals
-are pointwise: a band of them is not a joint region. <code>specs</code> holds at least
-one prediction, each with a label of its own (an empty label is the name of
-its output).</p>
+<code>window</code>, a <code>factor_id</code>, a known <code>scale</code> and a known <code>background</code>, as an
+observation does. Its interval is the set of values the data do not reject
+(Kreutz et al. 2012); specs at several positions give a band. A prediction
+past the data has a wider interval, as <code>B at 50</code> shows in the
+<a href="#quick-path">quick path</a>. The intervals are pointwise: a band of them is not
+a joint region. A <code>background</code> moves the profile and changes nothing else.
+<code>specs</code> holds at least one prediction, each with a label of its own (an empty
+label is the name of its output).</p>
 <h2 id="verdicts-and-the-identifiability-report">Verdicts and the identifiability report<a class="headerlink" href="#verdicts-and-the-identifiability-report" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -4419,12 +4420,13 @@ has no tolerance on the objective, and <code>τ</code> is
 <a href="../../calibration-optimizers/#polish-with-nelder-mead">polish</a> ends with
 Nelder-Mead, so <code>τ</code> is the <code>sd_tolerance</code> of the polish. <code>ν</code>, the noise floor, is the error of one
 evaluation of the objective at the fit, from the accuracy of a run:
-<code>Σ |∂ℓᵢ/∂mᵢ| · eᵢ</code>, with <code>eᵢ = rtol · |mᵢ| + k · atol</code> the error of a run on
-an observation that sums <code>k</code> outputs, its prediction <code>mᵢ</code>, and the accuracy
-of the engine (machine epsilon for a difference model, the <code>rtol</code> and <code>atol</code>
-of the ODE solver). A solver holds its tolerances at each step, so <code>ν</code> is an
-estimate, not a bound. A threshold at or below <code>ε</code> gives no verdict: the
-profile cannot tell a rise from numerical error, and <code>notes</code> says so.</p>
+<code>Σ |∂ℓᵢ/∂mᵢ| · eᵢ</code>, with <code>eᵢ = rtol · |mᵢ − bᵢ| + k · atol</code> the error of a
+run on an observation that sums <code>k</code> outputs, its prediction <code>mᵢ</code>, its
+background <code>bᵢ</code>, which is exact, and the accuracy of the engine (machine
+epsilon for a difference model, the <code>rtol</code> and <code>atol</code> of the ODE solver). A
+solver holds its tolerances at each step, so <code>ν</code> is an estimate, not a bound.
+A threshold at or below <code>ε</code> gives no verdict: the profile cannot tell a rise
+from numerical error, and <code>notes</code> says so.</p>
 <p>The box of the parameters is the space inside their bounds. A free parameter
 of a refit is on a bound when it is within <code>1e-8</code> of the width of its bounds,
 or of the larger of 1 and the size of its one finite bound, the rule of the
