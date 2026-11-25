@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `ObservedDataPoint(background=...)`: a known number, 0 or more and 0 by
+  default, added to the prediction of the observation after its scale and its
+  factor, in the units of `value`: a calibrated factor does not multiply it,
+  and a count model reads a mean above 0 where the model gives 0. An
+  observation with `parts=K` has `background / K` in each part. The loss, the
+  likelihood, the predictive, the scores, the figures, the `observed` block of
+  a report (`backgrounds`) and a `PredictionSpec(background=...)` of a
+  prediction profile read it; a cumulative figure takes it from each observed
+  value. See
+  [Known backgrounds](../guide/calibration-observations.md#known-backgrounds).
 - `commol.dependence`: whether the values of each series are independent,
   and how strongly they depend. `series_dependence(values, observations,
   max_lag, replicates, confidence_level, seed)` reads any values, one per

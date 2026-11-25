@@ -106,8 +106,9 @@ print(round(scores.log_score(predictive, held_out, DistributionNoise()).mean, 2)
 ## Choosing a model
 
 The mean of every model is the prediction of the observation (its sums,
-window, scale and factor), except the median of a `LogNormalObservations` with
-`center="median"`. A model only adds the scatter around it.
+window, scale, factor and background), except the median of a
+`LogNormalObservations` with `center="median"`. A model only adds the scatter
+around it.
 
 | Your data | Model | Variance | Notes |
 |---|---|---|---|
@@ -129,7 +130,10 @@ a known size, keeps its own value: give the share as
 [`scale`](../calibration-observations.md#known-shares-scales), and the model
 reads the mean `scale · μ`. Dividing the count by the share instead gives a
 value that is not whole, and a count multiplied by `1/scale` has the wrong
-Poisson variance.
+Poisson variance. A count that also holds a known amount from outside the
+model keeps it too: give that amount as
+[`background`](../calibration-observations.md#known-backgrounds), and the mean
+is `scale · μ + background`.
 
 ## Noise parameters
 

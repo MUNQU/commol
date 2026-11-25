@@ -49,9 +49,9 @@ the improvement rule, it stops when the constraint holds.
 side of each quantity from the fit, all in parallel. It knows no optimizer and
 no threshold rule: a `Subproblem` holds the quantity, and the caller gives the
 threshold. The first step is 1 % of the width of the bounds (of `|value at the
-fit|` for a prediction); a step that rises by more than `2 q T` is rejected and
-halved, one that rises by less than `q T / 2` doubles the next (`q = 0.1`,
-`T` the threshold, at least the tolerance). Each refit starts from every
+fit − background|` for a prediction); a step that rises by more than `2 q T` is
+rejected and halved, one that rises by less than `q T / 2` doubles the next
+(`q = 0.1`, `T` the threshold, at least the tolerance). Each refit starts from every
 parameter, and the multiplier of a held prediction, extrapolated along the
 line through the two points before. A side ends past the threshold, at a
 bound, after `max_steps` points, or at the fifth miss of a held prediction
@@ -106,8 +106,9 @@ without it, `1e-6 · max(1, |f̂|)`, since the swarm has no tolerance on the
 cost (the radius rule reads positions); for a swarm with a polish, the
 `sd_tolerance` of the polish, since the run ends with Nelder-Mead. `ν` is the noise floor: the error
 of one evaluation of the objective at the fit, propagated from the accuracy
-of a run, `Σ |∂ℓᵢ/∂mᵢ| · eᵢ` with `eᵢ = rtol · |mᵢ| + k · atol` for an
-observation that sums `k` outputs, the term derivatives of
+of a run, `Σ |∂ℓᵢ/∂mᵢ| · eᵢ`, where `eᵢ` is `rtol · |mᵢ − bᵢ| + k · atol` for
+an observation that sums `k` outputs and has the background `bᵢ`, with the
+term derivatives of
 `CalibrationProblem::term_derivatives` and the relative and absolute
 `accuracy` of the engine (`ProfileTracer::noise_floor`);
 solvers hold their tolerances per step, so `ν` is an estimate, not a bound. A

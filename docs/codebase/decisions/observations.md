@@ -3,9 +3,9 @@
 [Back to Design decisions](../design-decisions.md)
 
 How an observation reads a run: the one operator of the engine, the known
-scale of an observation, the coefficients of a weighted sum of outputs, the
-parts of a window and the readers that refuse two observations of a series at
-one position.
+scale and the known background of an observation, the coefficients of a
+weighted sum of outputs, the parts of a window and the readers that refuse two
+observations of a series at one position.
 How a model reads the sum of the parts is on [Sums of parts](sums-of-parts.md).
 What a weight means and how a calibration runs are on
 [Calibration](calibration.md).
@@ -15,9 +15,10 @@ What a weight means and how a calibration runs are on
 `ObservationOperator` (`crates/commol-calibration/src/observation.rs`) is the
 only code of the engine that turns a run into observed quantities: the row of
 each observation, the sum of its outputs, its increment over its window, its
-scale and its factor. The loss, the predictions of `PyCalibrationProblem`, the
-predictive's `at_observations` and every score read it, and the figures of a
-predictive read a series with a window, a factor or a scale through it. The
+scale, its factor and its background. The loss, the predictions of
+`PyCalibrationProblem`, the predictive's `at_observations` and every score read
+it, and the figures of a predictive read a series with a window, a factor, a
+scale or a background through it. The
 figures of a run and of its replicates have no problem to read, and repeat
 its rules in Python ([A known scale is a number of the
 observation](#a-known-scale-is-a-number-of-the-observation)).
@@ -137,6 +138,40 @@ rules of one built in Python.
 `sensitivity::finite_differences::tests::observations_with_other_coefficients_are_another_series`,
 `tests/calibration/test_coefficients.py`.
 
+## A background is added after the scale and the factor
+
+A known amount that an observation reads and the model does not give is
+`ObservedDataPoint.background` (0 by default), or the `background` of a
+`PredictionSpec`. The operator adds an equal share of it to the mean of each
+part (`ObservedDataPoint::part_background`), so a prediction has it once for
+any `parts`. A background of 0 adds nothing, so a mean of `-0.0` keeps its
+sign. Outside the operator, the figures read it through `observed_mean` and
+`modelled_value` (`plotting/panels.py`) and `_predictive_band`, a report lists
+`backgrounds`, and a copy of the first observation of a series keeps it.
+
+**Rule:** finite and 0 or more (`BACKGROUND` of
+`crates/commol-calibration/src/ranges.rs`): a negative one can give a count
+model a negative mean. It is exact, so what measures the error or the size of
+a run leaves it out: the noise floor (`prediction_error`), the first step of a
+prediction profile (`ProfileTracer`), the tolerance of a held prediction
+(`Subproblem::fix_prediction`) and the error of a derivative, which only keeps
+the rounding of the sum (`FiniteDifferences`).
+
+| Alternative | Why not |
+|---|---|
+| Added before the scale and the factor | A calibrated factor multiplies it, so it is not known. |
+| An accumulator of a constant flow, a parameter nothing fits, or a field of the observation model | The dynamics show a flow the process lacks; every method reads the parameter vector; a loss has no observation model. |
+| Subtracted from the observed value | A count model refuses it, or reads the variance of a smaller count. |
+| One background per part | The prediction changes with `parts`. |
+| Added to the line of a cumulative figure, or a floor at 0 of its observations | It exists only at the observations; a floor keeps the positive noise and drops the negative one. |
+
+**Guards:** `observation::tests::a_background_is_added_after_the_scale_and_the_factor`,
+`crates/commol-calibration/tests/test_parts.rs::each_part_has_its_share_of_the_background`,
+`profiles::tracer::tests::a_background_has_no_error`,
+`crates/commol-inference/tests/test_profiles.rs::a_background_does_not_loosen_a_held_prediction`,
+`crates/commol-inference/tests/test_sensitivity.rs::a_background_has_no_error_of_the_solver`,
+`tests/calibration/test_background.py`.
+
 ## The parts of a window are observations of every reader
 
 An observation with `parts=K` (`ObservedDataPoint.parts`, 1 by default, the
@@ -145,8 +180,9 @@ equal parts of its window, with the boundaries
 `b_k = start + k · (at − start) / K` (`ObservedDataPoint::part_boundaries`),
 `b₀` the start of the window and `b_K` its end, so the parts share their
 boundary rows. The operator keeps the rows of every boundary
-(`ObservationOperator::apply_parts`) and gives the mean of each part, times
-the coefficients, the scale and the factor; its prediction is their sum, so an
+(`ObservationOperator::apply_parts`) and gives the mean of each part, with
+the coefficients, the scale, the factor and its share of the background; its
+prediction is their sum, so an
 observation of one part is its window read whole. The operator is built wherever an operator is
 (`ForwardModel::new`, `with_observations`, `on_schedule`,
 `CalibrationProblem::observing`), so the `Workspace` holds the part means of
