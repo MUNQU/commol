@@ -35,7 +35,6 @@ fn check<E: SimulationEngine + Send + Sync>(
     one_per_position(
         observed,
         "RollingConformal counts a horizon in observations of a series",
-        "",
     )
     .map_err(MethodError::Invalid)?;
     let last = observed

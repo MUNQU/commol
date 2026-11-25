@@ -65,26 +65,6 @@ def sample_method(
     return SampleMethod(name=name, settings=settings)
 
 
-def block_length_estimates(
-    estimates: list[tuple[str, float]] | None,
-) -> dict[str, float] | None:
-    """
-    The estimates of an automatic block length as a result gives them.
-
-    Parameters
-    ----------
-    estimates : list[tuple[str, float]] | None
-        The estimate of each series, as the Rust runners give it; None for a
-        length given.
-
-    Returns
-    -------
-    dict[str, float] | None
-        The estimate of each series, by label; None for a length given.
-    """
-    return dict(estimates) if estimates is not None else None
-
-
 def log_failed(failed: list[str], log: logging.Logger = logger) -> list[str]:
     """
     Log each fit that failed as a warning.
@@ -106,18 +86,6 @@ def log_failed(failed: list[str], log: logging.Logger = logger) -> list[str]:
     return failed
 
 
-def _diagnostics(
-    block_length: int | None,
-    estimates: list[tuple[str, float]] | None,
-    negative_values: int,
-) -> ResamplingDiagnostics:
-    return ResamplingDiagnostics(
-        block_length=block_length,
-        block_length_estimates=block_length_estimates(estimates),
-        negative_values=negative_values,
-    )
-
-
 def _bootstrap_result(
     calibrator: CalibrationPort,
     fit: CalibrationResult,
@@ -136,8 +104,8 @@ def _bootstrap_result(
         ),
         failed=log_failed(run.failed),
         not_converged=run.not_converged,
-        diagnostics=_diagnostics(
-            run.block_length, run.block_length_estimates, run.negative_values
+        diagnostics=ResamplingDiagnostics(
+            block_length=run.block_length, negative_values=run.negative_values
         ),
     )
 
@@ -210,5 +178,7 @@ def run_block_jackknife(
         influence=by_parameter(run.influence),
         failed=log_failed(run.failed),
         not_converged=run.not_converged,
-        diagnostics=_diagnostics(run.block_length, run.block_length_estimates, 0),
+        diagnostics=ResamplingDiagnostics(
+            block_length=run.block_length, negative_values=0
+        ),
     )

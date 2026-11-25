@@ -33,14 +33,17 @@ stays infinite for the mean. When the model holds the mean there (a series
 that stays 0 for a while), its Jacobian is 0, so the term adds nothing to the
 gradients, the curvature (`add_term`) or the floors of a profile (a part with
 no prediction error is skipped). The sandwich and information matching then
-give the same result with and without it for a given `block_length` at
-positions other series share; it still counts in the blocks and in the
-residuals of `"auto"` (#517). `Likelihood::term_derivatives` refuses a score
-that is not finite, as it refuses a mean outside its model, naming the
-observation (`MethodError::Invalid`): no probability at the fit, outside the
-support, or an overflow next to the edge. No reader of the terms sums a NaN.
-Information matching reads an inverse of the curvature that is not finite as
-singular.
+give the same result with and without it at positions other series share; at
+a position of its own it counts in the windows of the blocks
+([why](dependence.md#the-user-gives-the-length-of-a-block)). The same holds of
+a value of 0 at that mean under a normal or Student t model with numbers for
+its scale and degrees of freedom; with a fitted one its score in that
+parameter is not 0, and the results change with it.
+`Likelihood::term_derivatives` refuses a score that is not finite, as it
+refuses a mean outside its model, naming the observation
+(`MethodError::Invalid`): no probability at the fit, outside the support, or
+an overflow next to the edge. No reader of the terms sums a NaN. Information
+matching reads an inverse of the curvature that is not finite as singular.
 
 | Alternative | Why not |
 |---|---|
@@ -53,7 +56,8 @@ singular.
 **Guards:** `crates/commol-calibration/src/likelihood/density.rs::the_poisson_score_of_a_count_of_zero_at_a_mean_of_zero_is_its_limit`, `crates/commol-calibration/src/likelihood/density.rs::the_negative_binomial_scores_of_a_count_of_zero_at_a_mean_of_zero_are_their_limits`, `crates/commol-calibration/src/likelihood/density.rs::the_binomial_scores_at_the_ends_of_its_trials_are_their_limits`,
 `crates/commol-calibration/tests/test_likelihood.rs::sums_of_parts_of_mean_zero_have_the_limit_of_their_scores`, `crates/commol-calibration/tests/test_likelihood.rs::terms_name_a_score_that_is_not_finite`,
 `crates/commol-inference/tests/test_local.rs::a_count_of_zero_at_a_mean_of_zero_adds_no_score`, `crates/commol-inference/tests/test_local.rs::a_count_with_no_probability_at_its_mean_has_no_curvature`,
-`tests/uncertainty/test_smc.py::test_information_matching_ignores_observations_of_mean_and_value_zero`, `tests/uncertainty/test_smc.py::test_information_matching_refuses_a_curvature_singular_to_working_precision`, `tests/uncertainty/test_profiles.py::test_a_count_of_zero_at_a_mean_of_zero_keeps_the_floors`,
+`tests/uncertainty/test_information_matching.py::TestInformationMatching::test_a_fitted_scale_reads_the_observations_of_mean_and_value_zero`,
+`tests/uncertainty/test_smc.py::test_the_blocks_ignore_observations_that_carry_no_information_at_shared_positions`, `tests/uncertainty/test_smc.py::test_information_matching_refuses_a_curvature_singular_to_working_precision`, `tests/uncertainty/test_profiles.py::test_a_count_of_zero_at_a_mean_of_zero_keeps_the_floors`,
 `crates/commol-calibration/tests/test_likelihood.rs::scores_equal_the_differences_of_the_terms`,
 `crates/commol-inference/tests/test_local.rs::the_gradient_of_a_sum_is_that_of_its_density`,
 `crates/commol-inference/tests/test_local.rs::the_information_of_a_sum_is_that_of_its_density`,

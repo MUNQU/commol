@@ -51,7 +51,7 @@ class InformationMatchingEta(RangeChecked):
 
     Attributes
     ----------
-    block_length : int | "auto"
+    block_length : int
         Positions per block of the scores; they must make at least two
         blocks.
     starts : int
@@ -62,7 +62,7 @@ class InformationMatchingEta(RangeChecked):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     kind: Literal["information_matching"] = "information_matching"
-    block_length: int | Literal["auto"] = Field(description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     starts: int = Field(default=1, description="Starts of the fit.")
 
 
@@ -79,7 +79,7 @@ class BootstrapCoverageEta(RangeChecked):
     ----------
     replicates : int
         Number of Bayesian-bootstrap data sets, at least 1.
-    block_length : int | "auto"
+    block_length : int
         Positions per block of the bootstrap.
     confidence_level : float
         The level of the intervals, strictly between 0 and 1.
@@ -92,7 +92,7 @@ class BootstrapCoverageEta(RangeChecked):
 
     kind: Literal["bootstrap_coverage"] = "bootstrap_coverage"
     replicates: int = Field(description="Number of bootstrap data sets.")
-    block_length: int | Literal["auto"] = Field(description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     confidence_level: float = Field(description="The level of the intervals.")
     starts: int = Field(default=1, description="Starts of the fit.")
 

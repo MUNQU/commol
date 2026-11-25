@@ -4,14 +4,20 @@ curvature unevenly, and its degrees of freedom."""
 
 import logging
 import math
-from typing import Literal
 
 import numpy as np
 import pytest
 
-from commol import ObservedDataPoint
+from commol import Calibrator, ObservedDataPoint
 from commol.distributions import Priors
-from commol.observations import NegativeBinomialObservations, NormalObservations
+from commol.observations import (
+    BinomialObservations,
+    NegativeBinomialObservations,
+    NormalObservations,
+    PoissonObservations,
+    StudentTObservations,
+)
+from commol.observations.models import _ObservationModel
 from commol.smc import GibbsPosterior, GibbsResult, InformationMatchingEta
 from tests.support import (
     bounded,
@@ -21,10 +27,11 @@ from tests.support import (
     line_calibrator,
     sum_calibrator,
     normal_values,
+    structural_zero_calibrator,
 )
 
 
-def _matching(block_length: int | Literal["auto"]) -> GibbsPosterior:
+def _matching(block_length: int) -> GibbsPosterior:
     return GibbsPosterior(
         priors=Priors.uniform_on_bounds(),
         eta=InformationMatchingEta(block_length=block_length),
@@ -163,19 +170,49 @@ class TestInformationMatching:
         assert _warnings(caplog) == []
 
     def test_the_note_advises_only_what_the_blocks_allow(self) -> None:
-        # Blocks of one position cannot be shorter; "auto" says it chose the
-        # length.
+        # Blocks of one position cannot be shorter.
         one = flow_calibrator(normal_values(6, 10, sd=1.0), windowed=True)
         (note,) = one.uncertainty(_matching(block_length=1)).diagnostics.notes
         assert "ν = 5 (block_length 1)" in note
         assert "Shorter blocks" not in note
 
-        trend = (10 + np.repeat([-3.0, 3.0], 4)).tolist()
-        automatic = flow_calibrator(trend, windowed=True).uncertainty(
-            _matching(block_length="auto")
+    @pytest.mark.parametrize(
+        ("model", "reads_them"),
+        [
+            (PoissonObservations(), False),
+            (BinomialObservations(trials=1000), False),
+            (NormalObservations(sd=20.0), False),
+            (StudentTObservations(df=5.0, scale=20.0), False),
+            (NormalObservations(sd="sg"), True),
+            (StudentTObservations(df=5.0, scale="sg"), True),
+        ],
+        ids=["poisson", "binomial", "normal", "t", "fitted sd", "fitted scale"],
+    )
+    def test_a_fitted_scale_reads_the_observations_of_mean_and_value_zero(
+        self, model: _ObservationModel, reads_them: bool
+    ) -> None:
+        # C is 0, the mean the model holds, at the steps of B up to 10.
+        noise = [bounded("sg", 1.0, 200.0, kind="noise", initial_guess=50.0)]
+
+        def calibrator(first_c: int) -> Calibrator:
+            full = structural_zero_calibrator(first_c)
+            problem = full.problem.model_copy(
+                update={
+                    "parameters": full.problem.parameters[:1]
+                    + (noise if reads_them else []),
+                    "observation_models": {"B": PoissonObservations(), "C": model},
+                }
+            )
+            return Calibrator(full.simulation, problem)
+
+        without, with_zeros = (
+            calibrator(first).uncertainty(_matching(block_length=2)).eta
+            for first in (11, 1)
         )
-        (note,) = automatic.diagnostics.notes
-        assert f'(block_length {automatic.block_length}, from "auto")' in note
+
+        assert (with_zeros != pytest.approx(without, rel=1e-3)) == reads_them
+        if not reads_them:
+            assert with_zeros == pytest.approx(without, rel=1e-9)
 
 
 def _warnings(caplog: pytest.LogCaptureFixture) -> list[str]:

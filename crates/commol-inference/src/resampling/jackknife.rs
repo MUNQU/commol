@@ -12,6 +12,7 @@ use commol_core::SimulationEngine;
 use crate::error::MethodError;
 use crate::resampling::blocks::BlockScheme;
 use crate::resampling::resamplers::Perturbation;
+use crate::resampling::residuals::fitted_values;
 use crate::resampling::runner::{FitUnit, ReplicateRunner};
 
 /// The statistics of a jackknife, one value per parameter in each vector.
@@ -99,6 +100,7 @@ pub struct Jackknife {
 ///
 /// # Errors
 ///
+/// As [`MethodError::of_point`] when the fit of `runner` has no run;
 /// [`MethodError::Invalid`] when `scheme` has fewer than two blocks;
 /// [`MethodError::Failed`] when fewer than two fits succeed
 /// ([`FitUnit::require`]).
@@ -109,6 +111,8 @@ pub fn block_jackknife<E>(
 where
     E: SimulationEngine + Send + Sync,
 {
+    let problem = runner.problem();
+    fitted_values(problem, runner.fit())?;
     if scheme.count() < 2 {
         return Err(MethodError::Invalid(format!(
             "block_length {} makes {} block; a jackknife needs at least two",
@@ -116,7 +120,6 @@ where
             scheme.count()
         )));
     }
-    let problem = runner.problem();
     let weights: Vec<f64> = problem.observed_data().iter().map(|o| o.weight).collect();
     let perturbations: Vec<Perturbation> = scheme
         .blocks()

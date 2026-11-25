@@ -194,7 +194,7 @@ def _invalid_smc() -> object:
         GibbsPosterior(
             priors=Priors.uniform_on_bounds(),
             eta=BootstrapCoverageEta(
-                replicates=10, block_length="auto", confidence_level=0.8
+                replicates=10, block_length=1, confidence_level=0.8
             ),
             particles=50,
             target_cess=0.5,

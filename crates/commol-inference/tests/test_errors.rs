@@ -202,7 +202,7 @@ fn a_setting_out_of_range_is_invalid_in_every_method() {
     let runner = ReplicateRunner::new(&problem, &config, &FIT, 1, 4).unwrap();
     let one_block = BlockScheme::new(problem.observed_data(), VALUES.len()).unwrap();
     let blocks = BlockScheme::new(problem.observed_data(), 2).unwrap();
-    let resampler = BayesianBootstrap::new(problem.observed_data(), &blocks);
+    let resampler = BayesianBootstrap::new(&problem, &FIT, &blocks).unwrap();
     let priors =
         Priors::uniform_on_bounds(&problem.parameter_names(), &problem.parameter_bounds()).unwrap();
     let mut sampler = SmcSampler::new(20, RandomWalk::new(), 0.5, 0.5, 0.01).unwrap();
@@ -296,12 +296,47 @@ fn a_setting_out_of_range_is_invalid_in_every_method() {
 }
 
 #[test]
+fn a_method_that_refits_refuses_a_fit_with_no_run() {
+    let problem = problem(broken, &VALUES);
+    let config = config();
+    let runner = ReplicateRunner::new(&problem, &config, &FIT, 1, 4).unwrap();
+    let blocks = BlockScheme::new(problem.observed_data(), 2).unwrap();
+    let priors =
+        Priors::uniform_on_bounds(&problem.parameter_names(), &problem.parameter_bounds()).unwrap();
+    let mut sampler = SmcSampler::new(20, RandomWalk::new(), 0.5, 0.5, 0.01).unwrap();
+
+    let errors = [
+        kind_of(BayesianBootstrap::new(&problem, &FIT, &blocks)),
+        kind_of(Residuals::new(&problem, &FIT, ResidualScale::Additive)),
+        kind_of(block_jackknife(&runner, &blocks)),
+        kind_of(jackknife_plus(&runner, &blocks, &[8.0], settings())),
+        kind_of(enbpi(&runner, &blocks, 4, &[8.0], settings())),
+        kind_of(bootstrap_coverage_eta(
+            &problem,
+            &priors,
+            &FIT,
+            &mut sampler,
+            &blocks,
+            20,
+            0.5,
+            3,
+            &NoSteps,
+        )),
+    ];
+
+    for (kind, message) in errors {
+        assert_eq!(kind, ErrorKind::Failed, "{message}");
+        assert!(message.starts_with("The fit has no run: "), "{message}");
+    }
+}
+
+#[test]
 fn a_computation_that_fails_is_failed_in_every_method() {
     let problem = problem(line, &VALUES);
     let failing = failing_config();
     let runner = ReplicateRunner::new(&problem, &failing, &FIT, 1, 4).unwrap();
     let blocks = BlockScheme::new(problem.observed_data(), 2).unwrap();
-    let resampler = BayesianBootstrap::new(problem.observed_data(), &blocks);
+    let resampler = BayesianBootstrap::new(&problem, &FIT, &blocks).unwrap();
     let config = config();
     let fitting = ReplicateRunner::new(&problem, &config, &FIT, 1, 4).unwrap();
     let held = [ProfiledQuantity::Parameter(0)];
@@ -339,7 +374,6 @@ fn a_computation_that_fails_is_failed_in_every_method() {
             &NoSteps,
         )),
         kind_of(structural_rank(&source, 2, 7)),
-        kind_of(Residuals::new(&no_run, &FIT, ResidualScale::Additive)),
     ];
 
     let expected = [
@@ -351,7 +385,6 @@ fn a_computation_that_fails_is_failed_in_every_method() {
         "Every replicate failed",
         "The Gibbs posterior stopped at the temperature",
         "the run is not a number",
-        "The fit has no run: ",
     ];
     for ((kind, message), expected) in errors.iter().zip(expected) {
         assert_eq!(*kind, ErrorKind::Failed, "{message}");

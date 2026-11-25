@@ -148,7 +148,7 @@ class JackknifePlus(ConformalMethod, EngineChecked, RangeChecked):
 
     Attributes
     ----------
-    block_length : int | "auto"
+    block_length : int
         Positions per block; it must leave at least two blocks.
     positions : list[float]
         Where the intervals are, for each series of the problem.
@@ -158,7 +158,7 @@ class JackknifePlus(ConformalMethod, EngineChecked, RangeChecked):
 
     _runner = staticmethod(run_jackknife_plus)
 
-    block_length: int | Literal["auto"] = Field(description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     positions: list[float] = Field(description="Where the intervals are.")
     starts: int = Field(default=1, description="Starts per fit.")
 
@@ -178,7 +178,7 @@ class EnbPI(ConformalMethod, EngineChecked, RangeChecked):
     ----------
     replicates : int
         Number of replicates, at least 2.
-    block_length : int | "auto"
+    block_length : int
         Positions per block.
     positions : list[float]
         Where the intervals are, for each series of the problem.
@@ -189,7 +189,7 @@ class EnbPI(ConformalMethod, EngineChecked, RangeChecked):
     _runner = staticmethod(run_enbpi)
 
     replicates: int = Field(description="Number of replicates.")
-    block_length: int | Literal["auto"] = Field(description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     positions: list[float] = Field(description="Where the intervals are.")
     starts: int = Field(default=1, description="Starts per fit.")
 

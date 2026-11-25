@@ -152,10 +152,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so a bound such as `2 - k * M_radius` is one constraint; a rate reads them at
   the values of its run. See
   [Constraints](../guide/calibration-constraints.md#a-bound-on-a-matrix).
-- `GibbsResult` and `ConformalResult` give `block_length` and
-  `block_length_estimates`, as the bootstraps, the jackknife and the sandwich
-  do: the length a method ran with, and with `block_length="auto"` the
-  estimate of each series, by label. `GibbsResult` gives them for
+- `GibbsResult` and `ConformalResult` give `block_length`, as the
+  bootstraps, the jackknife and the sandwich do: the length a method ran
+  with. `GibbsResult` gives it for
   `InformationMatchingEta` and `BootstrapCoverageEta`, and `None` for a
   number `η`; `ConformalResult` for `JackknifePlus` and `EnbPI`, and `None`
   for the variants without blocks. See
@@ -816,6 +815,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   levels of nesting, within the limits of the parser. The
   build still rejects a variable that the model does not define. See
   [Limits of the parser](../guide/mathematical-expressions.md#limits-of-the-parser).
+- **Breaking:** `block_length="auto"` is removed from every method that reads
+  blocks (`BayesianBootstrap`, `ResidualBootstrap`, `WildBootstrap`,
+  `BlockJackknife`, `Sandwich`, `InformationMatchingEta`,
+  `BootstrapCoverageEta`, `JackknifePlus`, `EnbPI`): `block_length` is a whole
+  number of at least 1, and `"auto"` raises `pydantic.ValidationError`, a
+  `ValueError`, that names it, as any text that is not a whole number does.
+  The field `block_length_estimates` is removed from `ResamplingDiagnostics`
+  and `SandwichResult`; `block_length` stays. The removal changes no
+  result of a given number. `"auto"` took the largest of the lengths its rule
+  gave the series, whatever the use. Migration: read
+  `residual_dependence` of the fit, choose the length, and compare the result
+  at several lengths, as
+  [Choose the length](../guide/uncertainty/resampling.md#choose-the-length)
+  shows; to repeat a result, give the `block_length` it reports. A method saved
+  with `"auto"` or a result saved with `block_length_estimates` no longer
+  loads: set the number, and delete the field. In Rust, `BlockScheme::new`
+  takes the place of `BlockScheme::resolve` and `BlockScheme::at_fit`;
+  `sandwich_approximation` and `information_matching_eta` take a `usize`;
+  `BayesianBootstrap::new` takes the problem and the fit, and refuses a fit
+  with no run, as `block_jackknife`, `jackknife_plus`, `enbpi` and
+  `bootstrap_coverage_eta` do; `automatic_length`, `automatic_block_length`,
+  `AutomaticLength`, `BlockDrawing`, `Estimates`, `BlockScheme::estimates`,
+  `blocks_at`, `Curvature::predictions` and the field `estimates` of
+  `SandwichRun` are removed.
 
 ### Fixed
 
@@ -875,11 +898,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `BinomialObservations` (and a binomial count of all its trials at a mean
   of all of them), such as a series that stays 0 until a process starts,
   has the limit of its score there. These observations add nothing to the
-  log-likelihood. With a given `block_length`, and when other series
-  observe their positions, `InformationMatchingEta` and the meat of
-  `Sandwich` give the same result with and without them. With
-  `block_length="auto"`, or at positions of their own, they can still
-  change the blocks (#517). The floors of a `ProfileLikelihood` stay
+  log-likelihood. When other series observe their positions,
+  `InformationMatchingEta` and the meat of `Sandwich` give the same result
+  with and without these counts. At positions of their own they count in the
+  windows of the blocks. The floors of a `ProfileLikelihood` stay
   finite with them. Before, their score was NaN, information matching
   failed with a message that the scores were all 0, and the evaluation
   floor of a profile was NaN.
@@ -925,14 +947,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   over 2 steps and a total over 40 steps that both end at 40, is refused by
   the methods that read one residual per position of a series, with a
   message that names the series and the position: `ResidualNoise`,
-  `ResidualBootstrap`, `block_length="auto"` of every method, and
-  `RollingConformal`, which counts a horizon in observations. Before, the
-  residual noise and the residual bootstrap gave both observations the
-  residual of one of them, and the automatic block length read them as
-  consecutive positions, with no message. A calibration, the likelihood, the
-  scores, and the Bayesian and wild bootstraps, the block jackknife, the
-  sandwich and the other conformal methods with a `block_length` of a number
-  read each observation with its own residual, and accept such a series. Give one of the two
+  `ResidualBootstrap`, and `RollingConformal`, which counts a horizon in
+  observations. Before, the residual noise and the residual bootstrap gave
+  both observations the residual of one of them, with no message. A
+  calibration, the likelihood, the scores, and the Bayesian and wild
+  bootstraps, the block jackknife, the sandwich and the other conformal
+  methods read each observation with its own residual, and accept such a
+  series. Give one of the two
   observations a label of its own for the methods that refuse it. See
   [One position, two observations](../guide/calibration-observations.md#one-position-two-observations).
 - `InformationMatchingEta` gave an `η` far too large, so a posterior far

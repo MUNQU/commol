@@ -24,8 +24,6 @@ from commol import (
 )
 from commol.distributions import Priors
 from commol.local import Sandwich
-from commol.local.results import SandwichResult
-from commol.resampling import BayesianBootstrap
 from commol.smc import (
     ABCSMC,
     ABCRejection,
@@ -176,7 +174,6 @@ class TestGibbsPosterior:
         assert result.eta == 1 / (2 * NOISE**2)
         assert result.fit is None
         assert result.block_length is None
-        assert result.block_length_estimates is None
         assert result.degrees_of_freedom is None
 
     def test_information_matching_recovers_eta(self) -> None:
@@ -192,7 +189,6 @@ class TestGibbsPosterior:
         assert result.fit is not None
         assert result.coverage is None
         assert result.block_length == 1
-        assert result.block_length_estimates is None
         assert result.sample.method.settings["eta"] == {
             "kind": "information_matching",
             "block_length": 1,
@@ -265,7 +261,7 @@ class TestGibbsPosterior:
         )
         method = _gibbs(
             eta=BootstrapCoverageEta(
-                replicates=10, block_length="auto", confidence_level=0.8
+                replicates=10, block_length=1, confidence_level=0.8
             )
         )
         with pytest.raises(ValueError, match="loss at the fit is 0"):
@@ -290,40 +286,6 @@ class TestGibbsPosterior:
         # 1/(2σ²).
         assert 0.25 < result.eta * 2 * NOISE**2 < 4.0
         assert result.degrees_of_freedom is None
-
-
-@pytest.mark.parametrize(
-    ("eta", "reference"),
-    [
-        (
-            InformationMatchingEta(block_length="auto"),
-            Sandwich(block_length="auto", draws=2),
-        ),
-        (
-            BootstrapCoverageEta(
-                replicates=3, block_length="auto", confidence_level=0.8
-            ),
-            BayesianBootstrap(replicates=1, block_length="auto"),
-        ),
-    ],
-    ids=["information_matching", "bootstrap_coverage"],
-)
-def test_a_gibbs_posterior_gives_its_block_length_estimates(
-    eta: InformationMatchingEta | BootstrapCoverageEta,
-    reference: Sandwich | BayesianBootstrap,
-) -> None:
-    calibrator = _flow(_flow_data(40, 8))
-
-    result = calibrator.uncertainty(_gibbs(eta=eta, particles=50))
-
-    # Each calibration of η resolves "auto" on the residuals of the fit, as
-    # the method of the same blocks does.
-    blocks = calibrator.uncertainty(reference)
-    expected = blocks if isinstance(blocks, SandwichResult) else blocks.diagnostics
-    estimates = result.block_length_estimates
-    assert estimates is not None and list(estimates) == ["B"]
-    assert estimates == expected.block_length_estimates
-    assert result.block_length == expected.block_length
 
 
 class TestABC:
@@ -521,7 +483,7 @@ def test_the_eta_calibrations_fit_from_their_starts(
     "eta",
     [
         InformationMatchingEta(block_length=1),
-        BootstrapCoverageEta(replicates=3, block_length="auto", confidence_level=0.5),
+        BootstrapCoverageEta(replicates=3, block_length=1, confidence_level=0.5),
     ],
     ids=["information_matching", "bootstrap_coverage"],
 )
@@ -555,28 +517,49 @@ def test_the_priors_are_required() -> None:
         commol_rs.json.check("ABCRejection", json.dumps(method | {"priors": None}))
 
 
-def test_information_matching_ignores_observations_of_mean_and_value_zero() -> None:
+@pytest.mark.parametrize("block_length", [1, 2, 3, 6])
+def test_the_blocks_ignore_observations_that_carry_no_information_at_shared_positions(
+    block_length: int,
+) -> None:
     # An observation of value 0 at a mean of exactly 0 adds log p = 0 to the
-    # log-likelihood, and its score is its limit: it moves no score of a term.
-    method = _gibbs(eta=InformationMatchingEta(block_length=2), particles=50)
+    # log-likelihood, and its score is its limit. B is at its position: it
+    # moves no block and no score of a term.
+    without = structural_zero_calibrator(11)
+    with_zeros = structural_zero_calibrator(1)
+    eta = InformationMatchingEta(block_length=block_length)
+    sandwich = Sandwich(block_length=block_length, draws=2)
 
-    without = structural_zero_calibrator(11).uncertainty(method)
-    with_zeros = structural_zero_calibrator(1).uncertainty(method)
-
-    assert with_zeros.fit is not None
-    assert without.fit is not None
-    assert with_zeros.fit.best_parameters == pytest.approx(
-        without.fit.best_parameters, rel=1e-9
+    first, second = (
+        c.uncertainty(_gibbs(eta=eta, particles=50)) for c in (without, with_zeros)
     )
-    assert with_zeros.eta == pytest.approx(without.eta, rel=1e-9)
+    assert first.fit is not None
+    assert second.fit is not None
+    assert second.fit.best_parameters == pytest.approx(
+        first.fit.best_parameters, rel=1e-9
+    )
+    assert second.eta == pytest.approx(first.eta, rel=1e-9)
+    assert second.degrees_of_freedom == pytest.approx(first.degrees_of_freedom)
     # The meat of the sandwich reads the same scores.
-    sandwiches = [
-        structural_zero_calibrator(first).uncertainty(Sandwich(block_length=2, draws=2))
-        for first in (11, 1)
-    ]
-    assert isinstance(sandwiches[0], SandwichResult)
-    assert isinstance(sandwiches[1], SandwichResult)
-    assert np.allclose(sandwiches[1].covariance, sandwiches[0].covariance, rtol=1e-9)
+    meats = [c.uncertainty(sandwich) for c in (without, with_zeros)]
+    assert meats[1].blocks == meats[0].blocks
+    assert np.allclose(meats[1].covariance, meats[0].covariance, rtol=1e-9)
+
+
+def test_a_position_of_observations_with_no_information_counts_in_the_windows() -> None:
+    # B starts at step 5, and C is 0 at steps 1 to 4: with them 20 positions
+    # make 5 blocks of 4, the first with scores of 0, and 16 make 4.
+    without = structural_zero_calibrator(11, first_b=5)
+    with_zeros = structural_zero_calibrator(1, first_b=5)
+    sandwich = Sandwich(block_length=4, draws=2)
+
+    first, second = (c.uncertainty(sandwich) for c in (without, with_zeros))
+
+    assert (first.blocks, second.blocks) == (4, 5)
+    assert (first.degrees_of_freedom(), second.degrees_of_freedom()) == (3, 4)
+    # The meat sums the same scores, times G/(G − 1).
+    ratio = (5 / 4) / (4 / 3)
+    expected = ratio * np.array(first.covariance)
+    assert np.allclose(second.covariance, expected, rtol=1e-9)
 
 
 def test_information_matching_refuses_a_curvature_singular_to_working_precision() -> (

@@ -19,6 +19,7 @@ use crate::conformal::predict::{ensemble_mean, ensemble_spread, set_predictions,
 use crate::conformal::quantile::group_quantiles;
 use crate::conformal::score::{ConformalSettings, NonconformityScore, scales};
 use crate::error::MethodError;
+use crate::resampling::residuals::fitted_values;
 use crate::resampling::{BlockScheme, FitUnit, Perturbation, ReplicateRunner};
 use commol_random::Stream;
 
@@ -70,7 +71,8 @@ impl BlockMultinomial {
 /// # Errors
 ///
 /// [`MethodError::Invalid`] when `replicates` is outside its range
-/// ([`crate::ranges::TWO_REPLICATES`]). Returns an error when a block is
+/// ([`crate::ranges::TWO_REPLICATES`]); as [`MethodError::of_point`] when the
+/// fit of `runner` has no run. Returns an error when a block is
 /// left out by no replicate that fitted, every replicate fails
 /// ([`FitUnit::require`]), a point cannot be predicted, or the score has no
 /// scale at a point.
@@ -88,6 +90,7 @@ where
         .check(replicates)
         .map_err(MethodError::Invalid)?;
     let problem = runner.problem();
+    fitted_values(problem, runner.fit())?;
     let observed = problem.observed_data();
     let resampler = BlockMultinomial::new(observed, scheme);
     let counts: Vec<Vec<usize>> = (0..replicates)

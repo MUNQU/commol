@@ -1,22 +1,14 @@
-//! Blocks of observations, and the automatic block length.
+//! Blocks of observations.
 //!
 //! A block holds every observation, of every series, whose position falls in
 //! one window of consecutive distinct positions, so that the dependence
 //! across series and along the positions stays inside blocks. The
 //! resamplers, the jackknife, the residual noise, the sandwich, the
-//! calibration of `η` and the conformal methods read their blocks here, and
-//! resolve a block length, given or automatic, with
-//! [`BlockScheme::resolve`] or [`BlockScheme::at_fit`].
+//! calibration of `η` and the conformal methods read their blocks here.
 
-use commol_calibration::{CalibrationProblem, ObservedDataPoint, SeriesIndex, index_at};
-use commol_core::SimulationEngine;
+use commol_calibration::{ObservedDataPoint, SeriesIndex, index_at};
 
 use crate::error::MethodError;
-use crate::resampling::residuals::{ResidualScale, Residuals};
-
-/// The estimate of the automatic block length of each series, by label, in
-/// order of first appearance.
-pub type Estimates = Vec<(String, f64)>;
 
 /// The observations of a problem grouped into blocks of `length`
 /// consecutive distinct positions.
@@ -29,7 +21,6 @@ pub struct BlockScheme {
     positions: Vec<f64>,
     position_of: Vec<usize>,
     blocks: Vec<Vec<usize>>,
-    estimates: Option<Estimates>,
 }
 
 impl BlockScheme {
@@ -53,61 +44,7 @@ impl BlockScheme {
             positions,
             position_of,
             blocks,
-            estimates: None,
         })
-    }
-
-    /// The blocks of `observations` with `requested` positions each, or for
-    /// `None` with the automatic length of `residuals`, one per observation,
-    /// for blocks drawn as `drawing` ([`automatic_block_length`]); then the
-    /// scheme keeps the estimate of each series ([`Self::estimates`]).
-    ///
-    /// # Errors
-    ///
-    /// As [`Self::new`], and, for `None`, as [`automatic_block_length`].
-    pub fn resolve(
-        observations: &[ObservedDataPoint],
-        residuals: &[f64],
-        requested: Option<usize>,
-        drawing: BlockDrawing,
-    ) -> Result<Self, MethodError> {
-        match requested {
-            Some(length) => Self::new(observations, length),
-            None => {
-                let automatic = automatic_block_length(observations, residuals, drawing)?;
-                let mut scheme = Self::new(observations, automatic.length)?;
-                scheme.estimates = Some(automatic.estimates);
-                Ok(scheme)
-            }
-        }
-    }
-
-    /// The blocks of the observations of `problem`, as [`Self::resolve`]
-    /// with the additive residuals of the fit `fit`.
-    ///
-    /// # Errors
-    ///
-    /// As [`Residuals::new`] when the fit has no run, and as
-    /// [`Self::resolve`].
-    pub fn at_fit<E: SimulationEngine>(
-        problem: &CalibrationProblem<E>,
-        fit: &[f64],
-        requested: Option<usize>,
-        drawing: BlockDrawing,
-    ) -> Result<Self, MethodError> {
-        let residuals = Residuals::new(problem, fit, ResidualScale::Additive)?;
-        Self::resolve(
-            problem.observed_data(),
-            residuals.residuals(),
-            requested,
-            drawing,
-        )
-    }
-
-    /// With the automatic length, the estimate of each series; `None` for a
-    /// length given.
-    pub fn estimates(&self) -> Option<&[(String, f64)]> {
-        self.estimates.as_deref()
     }
 
     /// The number of positions of a block.
@@ -172,7 +109,7 @@ pub fn position_indices(observations: &[ObservedDataPoint], positions: &[f64]) -
 
 /// Refuse a series of `observations` with two observations at one position,
 /// for a reader that reads one value per position of a series: `reader`
-/// says what it reads, and `instead` what else the user can do.
+/// says what it reads.
 ///
 /// A label may hold two observations at one position (an increment and a
 /// total that end there), each read by the loss with its own window. A
@@ -181,7 +118,6 @@ pub fn position_indices(observations: &[ObservedDataPoint], positions: &[f64]) -
 pub(crate) fn one_per_position(
     observations: &[ObservedDataPoint],
     reader: &str,
-    instead: &str,
 ) -> Result<(), String> {
     let series = SeriesIndex::new(observations);
     for (label, members) in series.labels().iter().zip(series.indices()) {
@@ -191,7 +127,7 @@ pub(crate) fn one_per_position(
         {
             return Err(format!(
                 "{reader}, and the series '{label}' has two observations at {}. Give one of \
-                 them a label of its own{instead}",
+                 them a label of its own",
                 observations[pair[0]].at
             ));
         }
@@ -204,171 +140,15 @@ pub(crate) fn check_length(length: usize, positions: usize) -> Result<(), String
     if length > positions {
         return Err(format!(
             "block_length is {length}; it must be between 1 and the number of distinct \
-             positions of the observations, {positions}, or \"auto\""
+             positions of the observations, {positions}"
         ));
     }
     Ok(())
 }
 
-/// How the blocks of a method are drawn, which sets the constant of the
-/// automatic block length.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BlockDrawing {
-    /// Blocks that do not overlap: the Bayesian bootstrap, the jackknife and
-    /// the wild bootstrap.
-    NonOverlapping,
-    /// Moving blocks (Künsch 1989), as the circular block bootstrap.
-    Moving,
-    /// Stationary blocks of geometric length (Politis and Romano 1994).
-    Stationary,
-}
-
-/// The automatic block length of one series, in positions: the rule of
-/// Politis and White (2004) with the correction of Patton, Politis and White
-/// (2009).
-///
-/// The series is centered. The bandwidth `M` is twice the smallest lag `m`
-/// after which `K_N = max(5, ⌈√log₁₀ n⌉)` autocorrelations in a row are
-/// below `2 √(log₁₀ n / n)`, at most `⌈√n⌉ + K_N`. With the flat-top kernel
-/// `λ`, `G = Σ λ(k/M) |k| R(k)` and `ĝ = Σ λ(k/M) R(k)` over `|k| ≤ M`, and
-/// the length is `(2 G² / D)^{1/3} n^{1/3}`, with `D = (4/3) ĝ²` for moving
-/// blocks and `D = 2 ĝ²` for stationary and non-overlapping blocks, at most
-/// `min(3√n, n/3)` and at least 1.
-pub fn automatic_length(series: &[f64], drawing: BlockDrawing) -> f64 {
-    let n = series.len();
-    if n < 4 {
-        return 1.0;
-    }
-    let size = n as f64;
-    let mean = series.iter().sum::<f64>() / size;
-    let centered: Vec<f64> = series.iter().map(|value| value - mean).collect();
-    let lags_in_a_row = 5usize.max(size.log10().sqrt().ceil() as usize);
-    let max_bandwidth = (size.sqrt().ceil() as usize + lags_in_a_row).min(n - 1);
-    let autocovariance: Vec<f64> = (0..=max_bandwidth)
-        .map(|lag| {
-            centered[lag..]
-                .iter()
-                .zip(&centered[..n - lag])
-                .map(|(a, b)| a * b)
-                .sum::<f64>()
-                / size
-        })
-        .collect();
-    if autocovariance[0] <= 0.0 {
-        return 1.0;
-    }
-    let threshold = 2.0 * (size.log10() / size).sqrt();
-    let small = |lag: usize| {
-        lag > max_bandwidth || (autocovariance[lag] / autocovariance[0]).abs() < threshold
-    };
-    let first_quiet_lag = (0..=max_bandwidth.saturating_sub(lags_in_a_row))
-        .find(|&m| (1..=lags_in_a_row).all(|k| small(m + k)));
-    let bandwidth = match first_quiet_lag {
-        Some(m) => (2 * m.max(1)).min(max_bandwidth),
-        None => max_bandwidth,
-    };
-    // The flat-top kernel on `[0, 1]`, the lags up to the bandwidth.
-    let kernel = |t: f64| if t <= 0.5 { 1.0 } else { 2.0 * (1.0 - t) };
-    let mut g = 0.0;
-    let mut spectral = autocovariance[0];
-    for (lag, &value) in autocovariance
-        .iter()
-        .enumerate()
-        .take(bandwidth + 1)
-        .skip(1)
-    {
-        let weight = kernel(lag as f64 / bandwidth as f64);
-        g += 2.0 * weight * lag as f64 * value;
-        spectral += 2.0 * weight * value;
-    }
-    let d = match drawing {
-        BlockDrawing::Moving => 4.0 / 3.0 * spectral * spectral,
-        BlockDrawing::NonOverlapping | BlockDrawing::Stationary => 2.0 * spectral * spectral,
-    };
-    if d <= 0.0 || g == 0.0 {
-        return 1.0;
-    }
-    let length = (2.0 * g * g / d).cbrt() * size.cbrt();
-    length.min((3.0 * size.sqrt()).min(size / 3.0)).max(1.0)
-}
-
-/// The block length `"auto"` chose, and the estimate of each series.
-#[derive(Debug, Clone, PartialEq)]
-pub struct AutomaticLength {
-    /// The length used: the largest estimate, rounded, between 1 and the
-    /// number of distinct positions.
-    pub length: usize,
-    /// The estimate of each series, by label, in order of first appearance.
-    pub estimates: Estimates,
-}
-
-/// The automatic block length of `residuals`, one per observation: the
-/// [`automatic_length`] of each series (its observations in position order),
-/// and the largest of them.
-///
-/// # Errors
-///
-/// [`MethodError::Invalid`], which names the series and the position, when
-/// a series has two observations at one position: the estimate reads one
-/// residual per position.
-pub fn automatic_block_length(
-    observations: &[ObservedDataPoint],
-    residuals: &[f64],
-    drawing: BlockDrawing,
-) -> Result<AutomaticLength, MethodError> {
-    one_per_position(
-        observations,
-        "block_length=\"auto\" reads one residual per position of a series",
-        ", or a block_length of a number of positions",
-    )
-    .map_err(MethodError::Invalid)?;
-    let series = SeriesIndex::new(observations);
-    let estimates: Estimates = series
-        .labels()
-        .iter()
-        .zip(series.indices())
-        .map(|(label, members)| {
-            let values: Vec<f64> = members.iter().map(|&i| residuals[i]).collect();
-            (label.clone(), automatic_length(&values, drawing))
-        })
-        .collect();
-    let positions = distinct_positions(observations).len();
-    let largest = estimates.iter().map(|(_, b)| *b).fold(1.0, f64::max);
-    Ok(AutomaticLength {
-        length: (largest.round() as usize).clamp(1, positions),
-        estimates,
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn a_series_of_no_dependence_at_the_first_lags_has_blocks_of_one() {
-        // ±1 six positions apart, of mean 0: every lag up to 5 is exactly 0.
-        let series: Vec<f64> = (0..60)
-            .map(|i| match (i % 6, (i / 6) % 2) {
-                (0, 0) => 1.0,
-                (0, _) => -1.0,
-                _ => 0.0,
-            })
-            .collect();
-
-        assert_eq!(automatic_length(&series, BlockDrawing::Moving), 1.0);
-    }
-
-    #[test]
-    fn a_trend_that_never_quiets_takes_the_widest_bandwidth_within_the_caps() {
-        let series: Vec<f64> = (0..50).map(f64::from).collect();
-
-        let length = automatic_length(&series, BlockDrawing::Stationary);
-
-        assert!(
-            length > 1.0 && length <= (3.0 * 50f64.sqrt()).min(50.0 / 3.0),
-            "{length}"
-        );
-    }
 
     fn observed(positions: &[f64], label: &str) -> Vec<ObservedDataPoint> {
         positions
@@ -412,11 +192,5 @@ mod tests {
             long.contains("block_length") && long.contains("3"),
             "{long}"
         );
-    }
-
-    #[test]
-    fn a_constant_or_short_series_has_length_one() {
-        assert_eq!(automatic_length(&[2.0; 50], BlockDrawing::Moving), 1.0);
-        assert_eq!(automatic_length(&[1.0, -1.0], BlockDrawing::Moving), 1.0);
     }
 }

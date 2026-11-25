@@ -124,7 +124,7 @@ impl Layout {
                 let points: Vec<ObservedDataPoint> =
                     members.iter().map(|&i| observations[i].clone()).collect();
                 let positions: Vec<f64> = points.iter().map(|obs| obs.at).collect();
-                let layout = one_per_position(&points, READER, "").and_then(|()| {
+                let layout = one_per_position(&points, READER).and_then(|()| {
                     grid(&positions).map_err(|reason| {
                         format!("The series '{label}' has no statistics: {reason}")
                     })

@@ -57,18 +57,6 @@ def _noisy(count: int, seed: int, level: float = 10.0) -> list[float]:
 
 
 class TestSettings:
-    def test_block_length_is_required_and_checked(self) -> None:
-        with pytest.raises(ValidationError, match="block_length"):
-            BayesianBootstrap(replicates=4)  # type: ignore[call-arg]
-        with pytest.raises(ValidationError, match="block_length"):
-            BayesianBootstrap(replicates=4, block_length=0)
-        with pytest.raises(ValidationError, match="block_length"):
-            BayesianBootstrap(replicates=4, block_length="long")  # type: ignore[arg-type]
-
-        calibrator = flow_calibrator(_noisy(10, 1), windowed=True)
-        with pytest.raises(ValueError, match="block_length is 11.*10"):
-            calibrator.uncertainty(BayesianBootstrap(replicates=2, block_length=11))
-
     def test_modelling_choices_have_no_default(self) -> None:
         with pytest.raises(ValidationError, match="residual_scale"):
             ResidualBootstrap(replicates=2, block_length=1, scheme="moving")  # type: ignore[call-arg]
@@ -94,7 +82,6 @@ class TestBayesianBootstrap:
         assert result.sample.method.settings["seed"] == 4
         assert result.fit == calibrator.run()
         assert result.diagnostics.block_length == 2
-        assert result.diagnostics.block_length_estimates is None
         assert result.failed == []
 
     def test_bayesian_bootstrap_matches_the_sandwich_variance(self) -> None:
@@ -116,17 +103,6 @@ class TestBayesianBootstrap:
         variance = result.sample.covariance()[0][0]
         # The sample variance has a relative standard error of about √(2/R).
         assert variance == pytest.approx(sandwich, rel=3 * math.sqrt(2 / replicates))
-
-    def test_automatic_length_reports_each_series(self) -> None:
-        calibrator = flow_calibrator(_noisy(60, 3), windowed=True)
-
-        result = calibrator.uncertainty(
-            BayesianBootstrap(replicates=3, block_length="auto")
-        )
-
-        estimates = result.diagnostics.block_length_estimates
-        assert estimates is not None and list(estimates) == ["B"]
-        assert result.diagnostics.block_length == max(1, round(estimates["B"]))
 
     def test_the_monte_carlo_error_brackets_each_bound(self) -> None:
         calibrator = flow_calibrator(_noisy(30, 5), windowed=True)
@@ -230,9 +206,7 @@ class TestResidualBootstraps:
                     scheme="moving",
                 )
             )
-        with pytest.raises(ValueError, match=shared + r".*or a block_length"):
-            calibrator.uncertainty(BayesianBootstrap(replicates=3, block_length="auto"))
-        # Blocks of a given length keep both observations: the wild bootstrap
+        # Blocks keep both observations: the wild bootstrap
         # multiplies each residual in place.
         wild = calibrator.uncertainty(
             WildBootstrap(replicates=3, block_length=2, multipliers="rademacher")
@@ -507,7 +481,7 @@ def _gibbs(monkeypatch: pytest.MonkeyPatch) -> _Result:
         GibbsPosterior(
             priors=Priors.uniform_on_bounds(),
             eta=BootstrapCoverageEta(
-                replicates=3, block_length="auto", confidence_level=0.5
+                replicates=3, block_length=1, confidence_level=0.5
             ),
             particles=50,
             target_cess=0.5,

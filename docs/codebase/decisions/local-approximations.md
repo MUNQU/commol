@@ -111,8 +111,8 @@ infinite information, is refused after it is summed.
 `B = G/(G − 1) · Σ_b s_b s_bᵀ` over the non-overlapping blocks of
 `BlockScheme` (CR1), and its draws and intervals read a Student t with
 `G − 1` degrees of freedom. `G ≤ p` is refused, since the block scores of a
-fit sum to zero and `B` would have rank below `p`. `block_length` has no
-default; `"auto"` is the length of non-overlapping blocks of the residuals.
+fit sum to zero and `B` would have rank below `p`.
+[The user gives the length of a block](dependence.md#the-user-gives-the-length-of-a-block).
 Information matching (`smc/gibbs.rs`) reads the same `H` as `J` and the same
 block scores for `I`, so it takes a likelihood and holds under dependence; it
 reads them only through a trace, so it needs two blocks, not more than `p`

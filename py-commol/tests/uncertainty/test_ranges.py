@@ -6,12 +6,13 @@ each gives an object, a setting, a value outside its range and the message of
 the rule. A count also gets ``-1``, which has the same wording.
 """
 
+import json
 import math
 import re
 from collections.abc import Callable
 
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from commol import AxisPattern, Simulation
 from commol._simulation.simulation import ReplicateRuns
@@ -143,3 +144,31 @@ def test_each_number_of_a_tuple_is_checked() -> None:
         ValueError, match=re.escape("at is a finite number of at least 0, got -1")
     ):
         commol_rs.core.check_ranges("CalibrationConstraint", {"at": (1.0, -1.0)})
+
+
+@pytest.mark.parametrize("text", ["auto", "long", ""])
+@pytest.mark.parametrize(
+    "owner",
+    [
+        owner
+        for owner, name, _outside, _message in commol_rs.core.range_rules()
+        if name == "block_length"
+    ],
+)
+def test_a_block_length_is_a_whole_number(owner: str, text: str) -> None:
+    valid = VALID[owner]()
+    assert isinstance(valid, BaseModel)
+
+    with pytest.raises(ValidationError) as raised:
+        type(valid)(**outside_settings(valid, "block_length", text))
+    assert [error["loc"] for error in raised.value.errors()] == [("block_length",)]
+
+    # A text of a whole number is read as the number, as for any count.
+    read = type(valid)(**outside_settings(valid, "block_length", "3"))
+    assert isinstance(read, BaseModel)
+    assert read.model_dump()["block_length"] == 3
+
+    # The engine reads the length of a method it gets as JSON alike.
+    settings = valid.model_dump(mode="json") | {"block_length": text}
+    with pytest.raises(ValueError, match="^block_length: "):
+        commol_rs.json.check(owner, json.dumps(settings))

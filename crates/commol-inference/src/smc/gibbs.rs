@@ -16,9 +16,9 @@ use super::TemperedTarget;
 use super::kernel::Kernel;
 use super::sampler::{SmcEvent, SmcRun, SmcSampler, SmcState, SmcSteps, Stop, stopped};
 use crate::error::MethodError;
-use crate::local::{Curvature, CurvatureKind, block_scores, blocks_at, curvature_at};
+use crate::local::{Curvature, CurvatureKind, block_scores, curvature_at};
 use crate::priors::Priors;
-use crate::resampling::{BayesianBootstrap, BlockScheme, Estimates};
+use crate::resampling::{BayesianBootstrap, BlockScheme};
 use crate::sensitivity::Matrix;
 use crate::target::discrepancy_in_support;
 use commol_random::Stream;
@@ -161,13 +161,13 @@ pub(crate) fn reached_the_posterior(run: SmcRun, posterior: &str) -> Result<SmcR
 /// 2011; Ribatet, Cooley and Davison 2012), for `p` parameters. `J` is the
 /// Gauss–Newton [`crate::local::Curvature`] of the objective, and `I` the
 /// variance of the scores of the terms summed over blocks of `block_length`
-/// positions, or of the automatic length for `None`, so `I` holds under
-/// dependence inside blocks. The terms are those of the sum of squares or of
-/// `−log L`; with a correct observation model `I ≈ J` and `η ≈ 1`. `I`
-/// enters only through a trace, so `η` needs no inverse of `I`, takes fewer
-/// blocks than parameters, and is the same on every scale of the
-/// parameters. With `I = J/η` it equals `tr(J I⁻¹ J) / tr(J)` (Holmes and
-/// Walker 2017; Lyddon, Holmes and Walker 2019).
+/// positions, so `I` holds under dependence inside blocks. The terms are
+/// those of the sum of squares or of `−log L`; with a correct observation
+/// model `I ≈ J` and `η ≈ 1`. `I` enters only through a trace, so `η` needs
+/// no inverse of `I`, takes fewer blocks than parameters, and is the same on
+/// every scale of the parameters. With `I = J/η` it equals
+/// `tr(J I⁻¹ J) / tr(J)` (Holmes and Walker 2017; Lyddon, Holmes and Walker
+/// 2019).
 ///
 /// The trace sums `s_bᵀ J⁻¹ s_b` over the block scores ([`block_scores`]),
 /// times `p / (p − L)` with `L = Σ_b tr((J⁻¹ J_b)²)` and `J_b` the curvature
@@ -176,8 +176,7 @@ pub(crate) fn reached_the_posterior(run: SmcRun, posterior: &str) -> Result<SmcR
 /// when the blocks share the curvature unevenly. `η` is then scaled by
 /// `median(χ²_ν)/ν`, with `ν` Satterthwaite's degrees of freedom of the
 /// trace, so that the median of `η` over data sets is its value. The outcome
-/// keeps `ν`, the block length and, with the automatic length, the estimate
-/// of each series ([`BlockScheme::estimates`]).
+/// keeps `ν` and the block length.
 ///
 /// # Errors
 ///
@@ -189,7 +188,7 @@ pub(crate) fn reached_the_posterior(run: SmcRun, posterior: &str) -> Result<SmcR
 pub fn information_matching_eta<E>(
     problem: &CalibrationProblem<E>,
     fit: &[f64],
-    block_length: Option<usize>,
+    block_length: usize,
 ) -> Result<InformationCalibration, MethodError>
 where
     E: SimulationEngine + Send + Sync,
@@ -215,7 +214,7 @@ where
         ));
     }
     let curvature = curvature_at(problem, fit, CurvatureKind::GaussNewton)?;
-    let blocks = blocks_at(problem, &curvature, block_length)?;
+    let blocks = BlockScheme::new(problem.observed_data(), block_length)?;
     if blocks.count() < 2 {
         return Err(MethodError::Invalid(format!(
             "block_length {} makes 1 block; information matching needs at least two, \
@@ -277,7 +276,6 @@ where
         eta: read * median / trace,
         degrees_of_freedom,
         block_length: blocks.length(),
-        estimates: blocks.estimates().map(<[_]>::to_vec),
     })
 }
 
@@ -334,8 +332,6 @@ pub struct InformationCalibration {
     pub degrees_of_freedom: f64,
     /// The positions per block of the scores.
     pub block_length: usize,
-    /// With the automatic length, the estimate of each series by label.
-    pub estimates: Option<Estimates>,
 }
 
 impl InformationCalibration {
@@ -527,12 +523,12 @@ fn interpolated_eta(thresholds: &[f64], confidence_level: f64) -> Result<f64, Me
 ///
 /// # Errors
 ///
-/// [`MethodError::Invalid`] when `confidence_level` is not strictly between
-/// 0 and 1, the replicates times the parameters are too few for it, the fit
-/// is outside the support or its loss is 0, or even the intervals of the
-/// priors cover the fit too rarely; [`MethodError::Failed`] when the model
-/// fails at the fit, every replicate fails, or the coverage does not cross
-/// the level.
+/// As [`BayesianBootstrap::new`]; [`MethodError::Invalid`] when
+/// `confidence_level` is not strictly between 0 and 1, the replicates times
+/// the parameters are too few for it, the fit is outside the support or its
+/// loss is 0, or even the intervals of the priors cover the fit too rarely;
+/// [`MethodError::Failed`] when the model fails at the fit, every replicate
+/// fails, or the coverage does not cross the level.
 #[allow(clippy::too_many_arguments)]
 pub fn bootstrap_coverage_eta<E, K>(
     problem: &CalibrationProblem<E>,
@@ -553,6 +549,7 @@ where
         .check(replicates)
         .and(CONFIDENCE_LEVEL.check(confidence_level))
         .map_err(MethodError::Invalid)?;
+    let resampler = BayesianBootstrap::new(problem, fit, blocks)?;
     let levels = interval_levels(confidence_level);
     check_threshold_count(replicates * fit.len(), confidence_level)?;
     let mut workspace = Workspace::default();
@@ -570,7 +567,6 @@ where
     }
     let observed = problem.observed_data();
     let values: Vec<f64> = observed.iter().map(|obs| obs.value).collect();
-    let resampler = BayesianBootstrap::new(observed, blocks);
     let mut eta_max = 1.0 / loss;
 
     let problems = (0..replicates)

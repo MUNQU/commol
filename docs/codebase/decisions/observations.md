@@ -174,15 +174,14 @@ parts, as it mixes windows: the window sets the scale of an observation, not
 A label may hold two observations at one position (an increment and a total
 that end there), each with its own window, scale and residual. The loss, the
 likelihood, the scores, the predictive with `NoNoise` or `DistributionNoise`,
-and the block methods of a given `block_length` that weigh blocks or
+and the block methods that weigh blocks or
 multiply residuals in place (the Bayesian and wild bootstraps, the block
 jackknife, the sandwich, the conformal methods other than rolling origins)
 read each observation alone and accept it. A reader that pairs
 the observations of a series by position refuses it, with a message that
 names the series and the position: `ResidualNoise` and `ResidualBootstrap`
 (`SeriesResiduals::new`, one residual per position, and
-`ResidualNoise::check` for the observations it serves), the automatic block
-length (`automatic_block_length`, the residuals as consecutive values) and
+`ResidualNoise::check` for the observations it serves) and
 `RollingConformal` (a horizon is a count of observations). The dependence
 analyses (`crates/commol-inference/src/dependence/grid.rs`) pair a series
 by position too, and give such a series no statistics, with the message,

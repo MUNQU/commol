@@ -17,9 +17,6 @@ class ResamplingDiagnostics(ResultModel):
     block_length : int | None
         The block length the method ran with; None for the parametric
         bootstrap, which draws no blocks.
-    block_length_estimates : dict[str, float] | None
-        With ``block_length="auto"``, the estimate of each series, by label;
-        otherwise None.
     negative_values : int
         Synthetic observed values below zero, over every replicate. They are
         kept; many of them point to ``residual_scale="multiplicative"``.
@@ -28,9 +25,6 @@ class ResamplingDiagnostics(ResultModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     block_length: int | None = Field(description="The block length used.")
-    block_length_estimates: dict[str, float] | None = Field(
-        description="The estimate of each series with the automatic length."
-    )
     negative_values: int = Field(description="Synthetic values below zero.")
 
 

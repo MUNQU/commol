@@ -100,9 +100,6 @@ class GibbsResult(SMCResult):
     block_length : int | None
         With a calibration of `η`, the positions per block it ran with; None
         when `η` is a number.
-    block_length_estimates : dict[str, float] | None
-        With a calibration of `η` and ``block_length="auto"``, the estimate
-        of each series, by label; otherwise None.
     degrees_of_freedom : float | None
         With `InformationMatchingEta`, the degrees of freedom `ν` that `η`
         reads from its blocks, with the blocks and the parameters counted as
@@ -115,6 +112,5 @@ class GibbsResult(SMCResult):
     fit: CalibrationResult | None
     coverage: float | None
     block_length: int | None
-    block_length_estimates: dict[str, float] | None
     degrees_of_freedom: float | None
     failed: list[str] = Field(default_factory=list)

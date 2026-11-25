@@ -16,7 +16,7 @@ use super::approximation::{CurvatureKind, curvature_at};
 use super::curvature::Curvature;
 use super::gaussian::{Gaussian, inverse};
 use crate::error::MethodError;
-use crate::resampling::{BlockDrawing, BlockScheme, Estimates};
+use crate::resampling::BlockScheme;
 use crate::sensitivity::Matrix;
 
 /// The sandwich of `curvature` with the blocks of `blocks`: a Student t on
@@ -87,34 +87,6 @@ pub fn block_scores(curvature: &Curvature, blocks: &BlockScheme) -> Matrix {
     scores
 }
 
-/// The blocks of `problem` of `block_length` positions, or of the
-/// automatic length of non-overlapping blocks of the residuals at the fit of
-/// `curvature` (Politis and White 2004) for `None`, with the estimate of
-/// each series ([`BlockScheme::resolve`]).
-///
-/// # Errors
-///
-/// [`MethodError::Invalid`] when the block length does not fit the
-/// positions.
-pub fn blocks_at<E: SimulationEngine>(
-    problem: &CalibrationProblem<E>,
-    curvature: &Curvature,
-    block_length: Option<usize>,
-) -> Result<BlockScheme, MethodError> {
-    let observed = problem.observed_data();
-    let residuals: Vec<f64> = observed
-        .iter()
-        .zip(curvature.predictions())
-        .map(|(obs, prediction)| obs.value - prediction)
-        .collect();
-    BlockScheme::resolve(
-        observed,
-        &residuals,
-        block_length,
-        BlockDrawing::NonOverlapping,
-    )
-}
-
 /// A sandwich and the blocks it summed over.
 #[derive(Debug, Clone)]
 pub struct SandwichRun {
@@ -126,35 +98,30 @@ pub struct SandwichRun {
     pub blocks: usize,
     /// The positions per block.
     pub block_length: usize,
-    /// With the automatic length, the estimate of each series by label.
-    pub estimates: Option<Estimates>,
 }
 
 /// The sandwich of `problem` at `fit` with blocks of `block_length`
-/// positions, or of the automatic length of non-overlapping blocks of the
-/// residuals at the fit (Politis and White 2004) for `None`.
+/// positions.
 ///
 /// # Errors
 ///
-/// As [`curvature_at`] and [`sandwich`], and [`MethodError::Invalid`] when
-/// the block length does not fit the positions.
+/// As [`curvature_at`], [`BlockScheme::new`] and [`sandwich`].
 pub fn sandwich_approximation<E>(
     problem: &CalibrationProblem<E>,
     fit: &[f64],
     kind: CurvatureKind,
-    block_length: Option<usize>,
+    block_length: usize,
 ) -> Result<SandwichRun, MethodError>
 where
     E: SimulationEngine + Send + Sync,
 {
     let curvature = curvature_at(problem, fit, kind)?;
-    let blocks = blocks_at(problem, &curvature, block_length)?;
+    let blocks = BlockScheme::new(problem.observed_data(), block_length)?;
     let gaussian = sandwich(&curvature, &blocks)?;
     Ok(SandwichRun {
         curvature,
         gaussian,
         blocks: blocks.count(),
         block_length: blocks.length(),
-        estimates: blocks.estimates().map(<[_]>::to_vec),
     })
 }

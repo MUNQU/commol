@@ -7,7 +7,7 @@ use commol_core::{CONFIDENCE_LEVEL, Rule, checked, tagged};
 use serde::de::{self, Deserializer};
 use serde::{Deserialize, Serialize, Serializer};
 
-use super::{BlockLength, PriorsSettings};
+use super::PriorsSettings;
 use crate::ranges::{
     BLOCK_LENGTH, ETA, MIN_ACCEPTANCE, PARTICLES, QUANTILE, REPLICATES, RESAMPLE_THRESHOLD,
     STAY_PROBABILITY, TARGET_CESS, TWO_DRAWS,
@@ -20,7 +20,7 @@ use crate::smc::{Distance, SeriesMetric};
 #[serde(remote = "Self", deny_unknown_fields)]
 pub struct InformationMatchingEta {
     /// Positions per block of the scores.
-    pub block_length: BlockLength,
+    pub block_length: usize,
     /// Starts of the fit.
     pub starts: usize,
 }
@@ -39,7 +39,7 @@ pub struct BootstrapCoverageEta {
     /// Number of Bayesian-bootstrap data sets.
     pub replicates: usize,
     /// Positions per block.
-    pub block_length: BlockLength,
+    pub block_length: usize,
     /// The level of the intervals.
     pub confidence_level: f64,
     /// Starts of the fit.
