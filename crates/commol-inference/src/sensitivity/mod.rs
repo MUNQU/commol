@@ -35,9 +35,9 @@ pub enum Design {
     /// ignored: can this design determine the parameters?
     Observations,
     /// Every series of the observations, with its outputs, factor and window
-    /// and the scale of its first observation, at every unit position from 0
-    /// up to the last observation: can denser data of the same series
-    /// determine them?
+    /// and the scale and the background of its first observation, at every
+    /// unit position from 0 up to the last observation: can denser data of the
+    /// same series determine them?
     Dense,
 }
 
