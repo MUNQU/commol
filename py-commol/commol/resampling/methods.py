@@ -39,7 +39,7 @@ class BayesianBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
         The bootstrap, which the engine reads.
     replicates : int
         Number of replicates, at least 1.
-    block_length : int | "auto"
+    block_length : int
         Positions per block.
     starts : int
         Starts of the fit and of each replicate (default 1): the fit, then
@@ -50,7 +50,7 @@ class BayesianBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
 
     kind: Literal["bayesian"] = Field(default="bayesian", description="The bootstrap.")
     replicates: int = Field(description="Number of replicates.")
-    block_length: int | Literal["auto"] = Field(description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     starts: int = Field(default=1, description="Starts per fit.")
 
 
@@ -98,7 +98,7 @@ class ResidualBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
         The bootstrap, which the engine reads.
     replicates : int
         Number of replicates, at least 1.
-    block_length : int | "auto"
+    block_length : int
         Positions per block; with ``scheme="stationary"`` the mean length.
     residual_scale : {"additive", "multiplicative"}
         ``"additive"``: ``r = y − ŷ`` and ``ŷ + r*``. ``"multiplicative"``:
@@ -116,7 +116,7 @@ class ResidualBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
 
     kind: Literal["residual"] = Field(default="residual", description="The bootstrap.")
     replicates: int = Field(description="Number of replicates.")
-    block_length: int | Literal["auto"] = Field(description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     residual_scale: Literal["additive", "multiplicative"] = Field(
         description="The scale of the residuals."
     )
@@ -141,7 +141,7 @@ class WildBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
         The bootstrap, which the engine reads.
     replicates : int
         Number of replicates, at least 1.
-    block_length : int | "auto"
+    block_length : int
         Positions per block.
     multipliers : {"rademacher", "mammen"}
         ``"rademacher"``: ±1 with probability 1/2. ``"mammen"``: two values
@@ -155,7 +155,7 @@ class WildBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
 
     kind: Literal["wild"] = Field(default="wild", description="The bootstrap.")
     replicates: int = Field(description="Number of replicates.")
-    block_length: int | Literal["auto"] = Field(description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     multipliers: Literal["rademacher", "mammen"] = Field(
         description="The distribution of the multipliers."
     )
@@ -172,7 +172,7 @@ class BlockJackknife(UncertaintyMethod[JackknifeResult], RangeChecked):
 
     Attributes
     ----------
-    block_length : int | "auto"
+    block_length : int
         Positions per block; it must leave at least two blocks.
     starts : int
         Starts of the fit and of each leave-out fit (default 1).
@@ -180,5 +180,5 @@ class BlockJackknife(UncertaintyMethod[JackknifeResult], RangeChecked):
 
     _runner = staticmethod(run_block_jackknife)
 
-    block_length: int | Literal["auto"] = Field(description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     starts: int = Field(default=1, description="Starts per fit.")

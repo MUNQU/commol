@@ -6,7 +6,6 @@ use commol_calibration::ranges::STARTS;
 use commol_core::{Rule, checked, tagged};
 use serde::{Deserialize, Serialize};
 
-use super::BlockLength;
 use crate::ranges::{BLOCK_LENGTH, REPLICATES};
 use crate::resampling::{Multipliers, ResidualBlocks, ResidualScale};
 
@@ -17,7 +16,7 @@ pub struct BayesianBootstrapSettings {
     /// Number of replicates.
     pub replicates: usize,
     /// Positions per block.
-    pub block_length: BlockLength,
+    pub block_length: usize,
     /// Starts of the fit and of each replicate, the fit first.
     pub starts: usize,
 }
@@ -57,7 +56,7 @@ pub struct ResidualBootstrapSettings {
     /// Number of replicates.
     pub replicates: usize,
     /// Positions per block.
-    pub block_length: BlockLength,
+    pub block_length: usize,
     /// The scale of the residuals.
     pub residual_scale: ResidualScale,
     /// How the blocks are drawn.
@@ -83,7 +82,7 @@ pub struct WildBootstrapSettings {
     /// Number of replicates.
     pub replicates: usize,
     /// Positions per block.
-    pub block_length: BlockLength,
+    pub block_length: usize,
     /// The distribution of the multipliers.
     pub multipliers: Multipliers,
     /// Starts of the fit and of each replicate, the fit first.
@@ -143,7 +142,7 @@ impl Bootstrap {
 #[serde(remote = "Self", deny_unknown_fields)]
 pub struct BlockJackknifeSettings {
     /// Positions per block.
-    pub block_length: BlockLength,
+    pub block_length: usize,
     /// Starts of the fit and of each refit, the fit first.
     pub starts: usize,
 }

@@ -922,8 +922,7 @@ fn a_difference_of_finite_runs_that_overflows_is_refused() {
         for error in [
             Curvature::gauss_newton(&problem, &source, &fit).unwrap_err(),
             Curvature::hessian(&problem, &source, &fit).unwrap_err(),
-            sandwich_approximation(&problem, &fit, CurvatureKind::GaussNewton, Some(1))
-                .unwrap_err(),
+            sandwich_approximation(&problem, &fit, CurvatureKind::GaussNewton, 1).unwrap_err(),
         ] {
             assert_eq!(
                 error,
@@ -1057,7 +1056,7 @@ fn an_end_whose_curvature_is_singular_gives_no_component() {
 }
 
 #[test]
-fn a_sandwich_needs_more_blocks_than_parameters_and_reads_the_automatic_length() {
+fn a_sandwich_needs_more_blocks_than_parameters() {
     let values: Vec<f64> = (0..8)
         .map(|t| 1.0 + 0.5 * t as f64 + [0.3, -0.2, 0.1, -0.4][t % 4])
         .collect();
@@ -1075,22 +1074,16 @@ fn a_sandwich_needs_more_blocks_than_parameters_and_reads_the_automatic_length()
     .unwrap();
     let fit = [1.0, 0.5];
 
-    let error =
-        sandwich_approximation(&problem, &fit, CurvatureKind::GaussNewton, Some(4)).unwrap_err();
+    let error = sandwich_approximation(&problem, &fit, CurvatureKind::GaussNewton, 4).unwrap_err();
     assert!(
         error
             .to_string()
             .contains("makes 2 blocks for 2 parameters"),
         "{error}"
     );
-    let run = sandwich_approximation(&problem, &fit, CurvatureKind::GaussNewton, None).unwrap();
-    let estimates = run.estimates.unwrap();
-    assert_eq!(estimates.len(), 1);
-    assert_eq!(run.blocks, 8_usize.div_ceil(run.block_length));
-    assert_eq!(
-        run.gaussian.degrees_of_freedom(),
-        Some((run.blocks - 1) as f64)
-    );
+    let run = sandwich_approximation(&problem, &fit, CurvatureKind::GaussNewton, 3).unwrap();
+    assert_eq!((run.blocks, run.block_length), (3, 3));
+    assert_eq!(run.gaussian.degrees_of_freedom(), Some(2.0));
 }
 
 #[test]

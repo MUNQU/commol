@@ -13,7 +13,7 @@ from commol._calibration.method import CalibrationPort
 from commol._data.engine_json import engine_json
 from commol._fit.starts import fit_result
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.resampling.runners import block_length_estimates, log_failed, sample_method
+from commol.resampling.runners import log_failed, sample_method
 from commol.smc.results import GibbsResult, SMCDiagnostics, SMCResult
 from commol.uncertainty.sample import ParameterSample, SampleMethod
 
@@ -68,13 +68,10 @@ def _eta_notes(eta: "EtaCalibrationProtocol") -> list[str]:
     if eta.few_coverage is None:
         return []
     level = commol_rs.inference.FEW_COVERAGE_LEVEL
-    length = str(eta.block_length)
-    if eta.block_length_estimates is not None:
-        length += ', from "auto"'
     note = (
         f"η rests on few degrees of freedom, ν = {eta.degrees_of_freedom:.3g} "
-        f"(block_length {length}): {level:.0%} intervals are expected to cover "
-        f"about {eta.few_coverage:.0%}, with flat priors and noise of one scale "
+        f"(block_length {eta.block_length}): {level:.0%} intervals are expected to "
+        f"cover about {eta.few_coverage:.0%}, with flat priors and noise of one scale "
         "that is independent between blocks and between series."
     )
     if eta.block_length != 1:
@@ -103,8 +100,8 @@ def run_gibbs_posterior(
     -------
     GibbsResult
         The sample, the levels, the log evidence, the diagnostics, `η`
-        and, with a calibration of `η`, its block length, the estimates
-        of the automatic length and the degrees of freedom of `η`.
+        and, with a calibration of `η`, its block length and the degrees
+        of freedom of `η`.
     """
     starts, run, eta = commol_rs.inference.gibbs_posterior(
         calibrator._engine_problem, engine_json(method), logger
@@ -129,7 +126,6 @@ def run_gibbs_posterior(
         coverage=eta.coverage,
         failed=log_failed(eta.failed, logger),
         block_length=eta.block_length,
-        block_length_estimates=block_length_estimates(eta.block_length_estimates),
         degrees_of_freedom=eta.degrees_of_freedom,
     )
 

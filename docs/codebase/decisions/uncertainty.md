@@ -109,7 +109,7 @@ of its data: it starts from the fit and, with more starts, from a Latin
 hypercube, and keeps the best start of `optimize_starts`, the function a
 calibration calls (`ReplicateRunner::fit_one`, `resampling/runner.rs`;
 [Optimizers](optimizers.md#one-function-runs-the-starts-and-chooses-the-best)). Blocks hold every series in a
-window of positions (`BlockScheme`), and `block_length` has no default.
+window of positions (`BlockScheme`), of [a given length](dependence.md#the-user-gives-the-length-of-a-block).
 
 | Alternative | Why not |
 |---|---|

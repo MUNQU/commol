@@ -7,7 +7,6 @@ use commol_calibration::ranges::STARTS;
 use commol_core::{CONFIDENCE_LEVEL, Rule, checked};
 use serde::{Deserialize, Serialize};
 
-use super::BlockLength;
 use crate::conformal::{ConformalSettings, NonconformityScore, Pooling};
 use crate::error::MethodError;
 use crate::ranges::{BLOCK_LENGTH, STEP, TWO_REPLICATES};
@@ -155,7 +154,7 @@ pub struct JackknifePlusSettings {
     /// The level of the intervals.
     pub confidence_level: f64,
     /// Positions per block.
-    pub block_length: BlockLength,
+    pub block_length: usize,
     /// Where the intervals are.
     pub positions: Vec<f64>,
     /// Starts of the fit and of each refit.
@@ -190,7 +189,7 @@ pub struct EnbPiSettings {
     /// Number of replicates.
     pub replicates: usize,
     /// Positions per block.
-    pub block_length: BlockLength,
+    pub block_length: usize,
     /// Where the intervals are.
     pub positions: Vec<f64>,
     /// Starts of the fit and of each replicate.

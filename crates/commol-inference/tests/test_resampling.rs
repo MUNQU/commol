@@ -11,13 +11,17 @@ use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
 use commol_inference::conformal::{
     ConformalSettings, NonconformityScore, Pooling, enbpi, jackknife_plus, rolling_conformal,
 };
-use commol_inference::local::{CurvatureKind, sandwich_approximation};
+use commol_inference::local::{
+    CurvatureKind, block_scores, curvature_at, sandwich, sandwich_approximation,
+};
 use commol_inference::profiles::{ProfiledQuantity, bootstrap_thresholds};
 use commol_inference::resampling::{
-    BayesianBootstrap, BlockDrawing, BlockScheme, Multipliers, Perturbation, ReplicateRunner,
-    Resampler, ResidualBlocks, ResidualBootstrap, ResidualNoise, ResidualScale, Residuals,
-    WildBootstrap, automatic_block_length, automatic_length, block_jackknife, bootstrap,
+    BayesianBootstrap, BlockScheme, Multipliers, Perturbation, ReplicateRunner, Resampler,
+    ResidualBlocks, ResidualBootstrap, ResidualNoise, ResidualScale, Residuals, WildBootstrap,
+    block_jackknife, bootstrap,
 };
+use commol_inference::sensitivity::Matrix;
+use commol_inference::smc::information_matching_eta;
 use commol_inference::{NoNoise, ObservationNoise, ParameterSample, observation_draws};
 use commol_random::Generator;
 use commol_random::Stream;
@@ -149,6 +153,25 @@ fn line_problem(values: &[f64]) -> CalibrationProblem<ClosedForm> {
     problem(line, &[("a", -50.0, 50.0), ("b", -10.0, 10.0)], values)
 }
 
+/// The problem of fitting the line to `observations`.
+fn line_problem_of(observations: Vec<ObservedDataPoint>) -> CalibrationProblem<ClosedForm> {
+    CalibrationProblem::new(
+        ClosedForm {
+            formula: line,
+            parameters: HashMap::from([("a".to_string(), 0.0), ("b".to_string(), 0.0)]),
+        },
+        observations,
+        vec![
+            CalibrationParameter::new("a".to_string(), -50.0, 50.0),
+            CalibrationParameter::new("b".to_string(), -10.0, 10.0),
+        ],
+        None,
+        vec![],
+        LossConfig::SumSquaredError,
+    )
+    .unwrap()
+}
+
 fn config() -> OptimizationConfig {
     OptimizationConfig::NelderMead(NelderMeadConfig {
         sd_tolerance: 1e-12,
@@ -167,14 +190,6 @@ fn ar1(phi: f64, count: usize, seed: u64) -> Vec<f64> {
             previous = phi * previous + e;
             previous
         })
-        .collect()
-}
-
-fn residual_observations(series: &[f64]) -> Vec<ObservedDataPoint> {
-    series
-        .iter()
-        .enumerate()
-        .map(|(t, _)| ObservedDataPoint::new(t as f64, "x".to_string(), 0.0))
         .collect()
 }
 
@@ -207,145 +222,93 @@ fn blocks_cover_every_observation_once_across_series() {
 }
 
 #[test]
-fn automatic_length_matches_the_reference_implementation() {
-    // `arch` 8.0.0, `optimal_block_length` of this series: stationary
-    // 2.8995633204762306, circular 3.3191714301343724. Its bandwidth rule
-    // starts one lag earlier than Politis and White (2004); on this series
-    // both rules choose the same bandwidth.
-    let series = ar1(0.0, 400, 2);
-    let stationary = automatic_length(&series, BlockDrawing::Stationary);
-    let moving = automatic_length(&series, BlockDrawing::Moving);
-    assert!(
-        (stationary - 2.899_563_320_476_230_6).abs() < 1e-9,
-        "{stationary}"
-    );
-    assert!((moving - 3.319_171_430_134_372_4).abs() < 1e-9, "{moving}");
-}
-
-#[test]
-fn automatic_length_of_a_strong_autocorrelation_matches_the_reference_implementation() {
-    // `arch` 8.0.0, `optimal_block_length` of this series: stationary
-    // 19.37076455883211, circular 22.173990079642422.
-    let series = ar1(0.95, 300, 11);
-    let stationary = automatic_length(&series, BlockDrawing::Stationary);
-    let moving = automatic_length(&series, BlockDrawing::Moving);
-    let non_overlapping = automatic_length(&series, BlockDrawing::NonOverlapping);
-    assert!(
-        (stationary - 19.370_764_558_832_11).abs() < 1e-9,
-        "{stationary}"
-    );
-    assert!((moving - 22.173_990_079_642_422).abs() < 1e-9, "{moving}");
-    assert_eq!(non_overlapping, stationary);
-}
-
-#[test]
-fn automatic_length_of_a_short_series_matches_the_reference_implementation() {
-    // `arch` 8.0.0, `optimal_block_length` of 20 values: stationary
-    // 1.6740553467716044, circular 1.9163149982720122.
-    let series = ar1(0.5, 20, 0);
-    let stationary = automatic_length(&series, BlockDrawing::Stationary);
-    let moving = automatic_length(&series, BlockDrawing::Moving);
-    assert!(
-        (stationary - 1.674_055_346_771_604_4).abs() < 1e-9,
-        "{stationary}"
-    );
-    assert!((moving - 1.916_314_998_272_012_2).abs() < 1e-9, "{moving}");
-    // Here the estimate passes a third of the size; `arch` rounds that cap up,
-    // to 7.
-    let capped = automatic_length(&ar1(0.3, 20, 1), BlockDrawing::Stationary);
-    assert!((capped - 20.0 / 3.0).abs() < 1e-12, "{capped}");
-}
-
-#[test]
-fn automatic_length_is_at_most_three_times_the_root_of_the_size() {
-    // `arch` rounds the cap up, to 43.
-    let series = ar1(0.8, 200, 5);
-    let length = automatic_length(&series, BlockDrawing::Stationary);
-    assert!((length - 3.0 * 200f64.sqrt()).abs() < 1e-12, "{length}");
-    // Below 81 values a third of the size is the smaller cap; four values
-    // are enough for an estimate.
-    assert_eq!(automatic_length(&ar1(0.5, 6, 5), BlockDrawing::Moving), 2.0);
-    assert_eq!(
-        automatic_length(&ar1(0.5, 4, 3), BlockDrawing::Moving),
-        4.0 / 3.0
-    );
-}
-
-#[test]
-fn the_median_length_of_white_noise_is_one() {
-    let mut lengths: Vec<usize> = (0..51)
-        .map(|seed| {
-            let series = ar1(0.0, 400, seed);
-            automatic_block_length(
-                &residual_observations(&series),
-                &series,
-                BlockDrawing::Moving,
-            )
-            .unwrap()
-            .length
-        })
+fn a_given_block_length_gives_the_blocks_of_its_windows() {
+    // `x` at 0 to 4 and 8 to 12, `y` at 3, 9, 12 and 14: 11 distinct
+    // positions, with a gap that no window of the axis would skip.
+    let positions = [0.0, 1.0, 2.0, 3.0, 4.0, 8.0, 9.0, 10.0, 11.0, 12.0];
+    let mut observations: Vec<ObservedDataPoint> = positions
+        .iter()
+        .zip(ar1(0.5, 10, 4))
+        .map(|(&t, e)| ObservedDataPoint::new(t, "x".to_string(), 2.0 + 0.5 * t + e))
         .collect();
-    lengths.sort_unstable();
-    assert_eq!(lengths[25], 1, "{lengths:?}");
+    observations.extend([3.0, 9.0, 12.0, 14.0].map(|t| {
+        ObservedDataPoint::of_sum(t, "y".to_string(), vec!["x".to_string()], 2.5 + 0.5 * t)
+    }));
+    let problem = line_problem_of(observations);
+    let fit = [2.0, 0.5];
+    let curvature = curvature_at(&problem, &fit, CurvatureKind::GaussNewton).unwrap();
+    let gradients = curvature.gradients();
+
+    // The `η` of each length, and its blocks as windows of the distinct
+    // positions, which hold the observations of `y` as 10, 11, 12 and 13.
+    let windows: [(usize, f64, Vec<Vec<usize>>); 2] = [
+        (
+            3,
+            0.11636936919447627,
+            vec![
+                vec![0, 1, 2],
+                vec![3, 4, 5, 10],
+                vec![6, 7, 8, 11],
+                vec![9, 12, 13],
+            ],
+        ),
+        (
+            4,
+            0.07649049084066743,
+            vec![
+                vec![0, 1, 2, 3, 10],
+                vec![4, 5, 6, 7, 11],
+                vec![8, 9, 12, 13],
+            ],
+        ),
+    ];
+    for (length, eta, blocks) in windows {
+        let scheme = BlockScheme::new(problem.observed_data(), length).unwrap();
+        assert_eq!(scheme.blocks(), blocks);
+
+        let run =
+            sandwich_approximation(&problem, &fit, CurvatureKind::GaussNewton, length).unwrap();
+        let expected = sandwich(&curvature, &scheme).unwrap();
+        assert_eq!((run.block_length, run.blocks), (length, blocks.len()));
+        assert_eq!(run.gaussian.covariance(), expected.covariance());
+
+        let found = information_matching_eta(&problem, &fit, length).unwrap();
+        assert_eq!(found.block_length, length);
+        assert!((found.eta / eta - 1.0).abs() < 1e-9, "{}", found.eta);
+        // The scores the two readers sum, to the bit.
+        let mut scores = Matrix::zeros(blocks.len(), 2);
+        for (b, block) in blocks.iter().enumerate() {
+            for &i in block {
+                for j in 0..2 {
+                    scores[(b, j)] += gradients[(i, j)];
+                }
+            }
+        }
+        assert_eq!(block_scores(&curvature, &scheme), scores);
+    }
 }
 
 #[test]
-fn every_method_resolves_an_automatic_block_length_alike() {
-    let noise = ar1(0.8, 60, 3);
-    let values: Vec<f64> = noise
+fn a_block_of_scores_of_zero_counts_in_the_sandwich() {
+    // The line runs through the observations of the first two of five blocks.
+    let values: Vec<f64> = [0.0, 0.0, 0.0, 0.0, 0.3, -0.2, 0.5, 0.1, -0.4, 0.2]
         .iter()
         .enumerate()
         .map(|(t, e)| 2.0 + 0.5 * t as f64 + e)
         .collect();
     let problem = line_problem(&values);
-    let fit = [2.0, 0.5];
-    let drawing = BlockDrawing::NonOverlapping;
 
-    // The bootstrap, the jackknife, the calibration of η and the conformal
-    // methods resolve at the fit; the sandwich from its curvature.
-    let at_fit = BlockScheme::at_fit(&problem, &fit, None, drawing).unwrap();
-    let sandwich =
-        sandwich_approximation(&problem, &fit, CurvatureKind::GaussNewton, None).unwrap();
-    let additive = Residuals::new(&problem, &fit, ResidualScale::Additive).unwrap();
-    let resolved =
-        BlockScheme::resolve(problem.observed_data(), additive.residuals(), None, drawing).unwrap();
+    let run = sandwich_approximation(&problem, &[2.0, 0.5], CurvatureKind::GaussNewton, 2).unwrap();
 
-    assert!(at_fit.length() > 1, "{at_fit:?}");
-    assert_eq!(sandwich.block_length, at_fit.length());
-    assert_eq!(sandwich.estimates.as_deref(), at_fit.estimates());
-    assert_eq!(resolved, at_fit);
-    let given = BlockScheme::at_fit(&problem, &fit, Some(3), drawing).unwrap();
-    assert_eq!((given.length(), given.estimates()), (3, None));
-}
-
-#[test]
-fn automatic_length_grows_with_autocorrelation() {
-    let weak = ar1(0.3, 400, 7);
-    let strong = ar1(0.8, 400, 7);
-    let mut observations = residual_observations(&weak);
-    observations.extend(
-        strong
-            .iter()
-            .enumerate()
-            .map(|(t, _)| ObservedDataPoint::new(t as f64, "y".to_string(), 0.0)),
-    );
-    let residuals: Vec<f64> = weak.iter().chain(&strong).copied().collect();
-
-    let chosen =
-        automatic_block_length(&observations, &residuals, BlockDrawing::Stationary).unwrap();
-
-    assert_eq!(chosen.estimates.len(), 2);
-    let (x, y) = (&chosen.estimates[0], &chosen.estimates[1]);
-    assert_eq!((x.0.as_str(), y.0.as_str()), ("x", "y"));
-    assert!(y.1 > 2.0 * x.1, "{chosen:?}");
-    assert_eq!(chosen.length, y.1.round() as usize);
+    assert_eq!(run.blocks, 5);
+    assert_eq!(run.gaussian.degrees_of_freedom(), Some(4.0));
 }
 
 #[test]
 fn bayesian_weights_have_mean_one_and_are_shared_by_a_block() {
     let problem = line_problem(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
     let scheme = BlockScheme::new(problem.observed_data(), 2).unwrap();
-    let resampler = BayesianBootstrap::new(problem.observed_data(), &scheme);
+    let resampler = BayesianBootstrap::new(&problem, &[1.0, 1.0], &scheme).unwrap();
     let Perturbation::Weights(weights) = resampler.replicate(&mut Generator::from_seed(3)) else {
         panic!("a Bayesian bootstrap draws weights");
     };
@@ -368,7 +331,7 @@ fn a_bootstrap_has_one_draw_per_replicate_grouped_by_replicate() {
 
     let run = bootstrap(
         &runner,
-        &BayesianBootstrap::new(problem.observed_data(), &scheme),
+        &BayesianBootstrap::new(&problem, &[1.0, 1.0], &scheme).unwrap(),
         6,
     )
     .unwrap();
@@ -672,7 +635,7 @@ fn one_seed_gives_one_bootstrap() {
     let config = config();
     let runner = ReplicateRunner::new(&problem, &config, &[1.0, 1.0], 2, 21).unwrap();
     let scheme = BlockScheme::new(problem.observed_data(), 2).unwrap();
-    let resampler = BayesianBootstrap::new(problem.observed_data(), &scheme);
+    let resampler = BayesianBootstrap::new(&problem, &[1.0, 1.0], &scheme).unwrap();
     let first = bootstrap(&runner, &resampler, 5).unwrap();
     let again = bootstrap(&runner, &resampler, 5).unwrap();
     assert_eq!(first.sample, again.sample);
@@ -802,21 +765,7 @@ fn shared_position_problem() -> CalibrationProblem<ClosedForm> {
         .map(|(t, &value)| ObservedDataPoint::new(t as f64, "x".to_string(), value))
         .collect();
     observations.push(ObservedDataPoint::new(3.0, "x".to_string(), 9.0));
-    CalibrationProblem::new(
-        ClosedForm {
-            formula: line,
-            parameters: HashMap::from([("a".to_string(), 0.0), ("b".to_string(), 0.0)]),
-        },
-        observations,
-        vec![
-            CalibrationParameter::new("a".to_string(), -50.0, 50.0),
-            CalibrationParameter::new("b".to_string(), -10.0, 10.0),
-        ],
-        None,
-        vec![],
-        LossConfig::SumSquaredError,
-    )
-    .unwrap()
+    line_problem_of(observations)
 }
 
 #[test]
@@ -843,16 +792,6 @@ fn readers_of_a_series_by_position_refuse_two_observations_at_one_position() {
             .unwrap_err()
             .to_string(),
     );
-    named(
-        automatic_block_length(observed, residuals.residuals(), BlockDrawing::Moving)
-            .unwrap_err()
-            .to_string(),
-    );
-    named(
-        BlockScheme::at_fit(&problem, &fit, None, BlockDrawing::NonOverlapping)
-            .unwrap_err()
-            .to_string(),
-    );
     let config = config();
     let runner = ReplicateRunner::new(&problem, &config, &fit, 1, 4).unwrap();
     let settings =
@@ -866,7 +805,7 @@ fn readers_of_a_series_by_position_refuse_two_observations_at_one_position() {
     // A block of a given length holds both observations, and the wild
     // bootstrap multiplies each by the sign of its block: each keeps its own
     // residual.
-    let given = BlockScheme::at_fit(&problem, &fit, Some(2), BlockDrawing::NonOverlapping).unwrap();
+    let given = BlockScheme::new(observed, 2).unwrap();
     assert_eq!(given.blocks()[1], [2, 3, 6]);
     let wild = WildBootstrap::new(residuals.clone(), &given, Multipliers::Rademacher);
     let Perturbation::Values(values) = wild.replicate(&mut Generator::from_seed(2)) else {
@@ -986,7 +925,7 @@ fn every_replicate_method_counts_the_same_fits() {
     let values = [1.0, 2.2, 2.9, 4.1, 5.0, 5.8, 7.2, 8.0];
     let problem = line_problem(&values);
     let scheme = BlockScheme::new(problem.observed_data(), 2).unwrap();
-    let resampler = BayesianBootstrap::new(problem.observed_data(), &scheme);
+    let resampler = BayesianBootstrap::new(&problem, &[1.0, 1.0], &scheme).unwrap();
     let settings =
         ConformalSettings::new(NonconformityScore::Absolute, Pooling::Series, 0.5).unwrap();
     let held = [ProfiledQuantity::Parameter(0)];
@@ -1022,20 +961,4 @@ fn every_replicate_method_counts_the_same_fits() {
         assert!(fits > 0);
         assert_eq!(not_converged, fits);
     }
-}
-
-#[test]
-fn a_block_length_is_a_number_or_auto() {
-    use commol_inference::settings::BlockLength;
-
-    for text in [r#""auto""#, "3"] {
-        let length: BlockLength = commol_core::json::read(text).unwrap();
-
-        assert_eq!(commol_core::json::write(&length), text);
-    }
-    let message = commol_core::json::read::<BlockLength>("true").unwrap_err();
-    assert_eq!(
-        message,
-        r#"block_length is a whole number of at least 1 or "auto""#
-    );
 }

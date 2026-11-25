@@ -18,7 +18,7 @@ from commol.conformal.results import (
     PredictionIntervals,
     SeriesIntervals,
 )
-from commol.resampling.runners import block_length_estimates, log_failed
+from commol.resampling.runners import log_failed
 
 if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import ConformalRunProtocol, StartsProtocol
@@ -71,7 +71,6 @@ def _result(
         failed=log_failed(run.failed, logger),
         not_converged=run.not_converged,
         block_length=run.block_length,
-        block_length_estimates=block_length_estimates(run.block_length_estimates),
     )
 
 

@@ -19,7 +19,7 @@ from commol.local.results import (
     MixtureComponent,
     SandwichResult,
 )
-from commol.resampling.runners import block_length_estimates, sample_method
+from commol.resampling.runners import sample_method
 from commol.uncertainty.sample import ParameterSample, SampleMethod
 
 if TYPE_CHECKING:
@@ -95,7 +95,7 @@ def run_sandwich(calibrator: CalibrationPort, method: "Sandwich") -> SandwichRes
         The fit, the sandwich covariance on the unbounded scale, the draws
         and the blocks.
     """
-    starts, run, blocks, block_length, estimates = commol_rs.inference.sandwich(
+    starts, run, blocks, block_length = commol_rs.inference.sandwich(
         calibrator._engine_problem, engine_json(method)
     )
     return SandwichResult(
@@ -109,7 +109,6 @@ def run_sandwich(calibrator: CalibrationPort, method: "Sandwich") -> SandwichRes
         notes=_notes(run),
         blocks=blocks,
         block_length=block_length,
-        block_length_estimates=block_length_estimates(estimates),
     )
 
 

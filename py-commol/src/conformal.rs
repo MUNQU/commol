@@ -10,7 +10,7 @@ use crate::parallelism::{parallel, parallel_logged};
 use crate::records::StepLog;
 use commol_calibration::observed_data;
 use commol_inference::conformal::{self, ConformalRun, Predictor};
-use commol_inference::resampling::{BlockDrawing, BlockScheme, FitUnit, ReplicateRunner};
+use commol_inference::resampling::{BlockScheme, FitUnit, ReplicateRunner};
 use commol_inference::settings::conformal::{
     AdaptiveConformalSettings, EnbPiSettings, JackknifePlusSettings, RollingConformalSettings,
     ScoreAndPooling, SplitConformalSettings,
@@ -45,8 +45,6 @@ pub struct PyConformalRun {
     blocks: Option<usize>,
     /// The block length used, for a method with blocks
     block_length: Option<usize>,
-    /// The estimate of each series, with the automatic length
-    block_length_estimates: Option<Vec<(String, f64)>>,
 }
 
 impl PyConformalRun {
@@ -66,7 +64,6 @@ impl PyConformalRun {
             bound: None,
             blocks: None,
             block_length: None,
-            block_length_estimates: None,
         }
     }
 }
@@ -204,16 +201,6 @@ fn rolling_conformal(
     Ok((starts, PyConformalRun::of(run, FitUnit::Origin)))
 }
 
-/// The blocks of `runner`'s problem with `block_length` positions, or the
-/// automatic length of the residuals of its fit
-fn blocks(
-    runner: &ReplicateRunner<'_, crate::engine::Engine>,
-    block_length: Option<usize>,
-    drawing: BlockDrawing,
-) -> PyResult<BlockScheme> {
-    BlockScheme::at_fit(runner.problem(), runner.fit(), block_length, drawing).map_err(method_error)
-}
-
 /// Jackknife+ intervals at the positions of the settings, for each series
 /// of the problem
 ///
@@ -227,9 +214,11 @@ fn blocks(
 ///     The starts of the fit, and the intervals
 ///
 /// Raises:
-///     ValueError: If a setting is not valid or the blocks are fewer than
-///         two
-///     RuntimeError: If the fit fails or fewer than two refits succeed
+///     ValueError: If a setting is not valid, the block length does not fit
+///         the positions or makes fewer than two blocks, or the fit is not
+///         feasible
+///     RuntimeError: If the fit or the run at the fit fails, or fewer than
+///         two refits succeed
 #[pyfunction]
 fn jackknife_plus(
     py: Python<'_>,
@@ -239,13 +228,10 @@ fn jackknife_plus(
 ) -> PyResult<(PyStarts, PyConformalRun)> {
     let settings: JackknifePlusSettings = crate::json::read(settings)?;
     let conformal = settings.conformal().map_err(method_error)?;
+    let scheme = BlockScheme::new(problem.inner.observed_data(), settings.block_length)
+        .map_err(method_error)?;
     let log = StepLog::new(logger).with_unit(FitUnit::Block);
     let (starts, runner) = refits(py, problem, settings.starts, &log)?;
-    let scheme = blocks(
-        &runner,
-        settings.block_length.0,
-        BlockDrawing::NonOverlapping,
-    )?;
     let run = parallel_logged(py, &log, |steps| {
         conformal::jackknife_plus(
             &runner.with_steps(steps),
@@ -259,7 +245,6 @@ fn jackknife_plus(
         bound: Some(run.bound),
         blocks: Some(run.blocks),
         block_length: Some(scheme.length()),
-        block_length_estimates: scheme.estimates().map(<[_]>::to_vec),
         ..PyConformalRun::of(run.run, FitUnit::Block)
     };
     Ok((starts, run))
@@ -278,9 +263,10 @@ fn jackknife_plus(
 ///     The starts of the fit, and the intervals
 ///
 /// Raises:
-///     ValueError: If a setting is not valid or a block is left out by no
-///         replicate
-///     RuntimeError: If the fit or every replicate fails
+///     ValueError: If a setting is not valid, the block length does not fit
+///         the positions, the fit is not feasible, or a block is left out by
+///         no replicate
+///     RuntimeError: If the fit, the run at the fit or every replicate fails
 #[pyfunction]
 fn enbpi(
     py: Python<'_>,
@@ -290,13 +276,10 @@ fn enbpi(
 ) -> PyResult<(PyStarts, PyConformalRun)> {
     let settings: EnbPiSettings = crate::json::read(settings)?;
     let conformal = settings.conformal().map_err(method_error)?;
+    let scheme = BlockScheme::new(problem.inner.observed_data(), settings.block_length)
+        .map_err(method_error)?;
     let log = StepLog::new(logger);
     let (starts, runner) = refits(py, problem, settings.starts, &log)?;
-    let scheme = blocks(
-        &runner,
-        settings.block_length.0,
-        BlockDrawing::NonOverlapping,
-    )?;
     let run = parallel_logged(py, &log, |steps| {
         conformal::enbpi(
             &runner.with_steps(steps),
@@ -310,7 +293,6 @@ fn enbpi(
     let run = PyConformalRun {
         blocks: Some(scheme.count()),
         block_length: Some(scheme.length()),
-        block_length_estimates: scheme.estimates().map(<[_]>::to_vec),
         ..PyConformalRun::of(run, FitUnit::Replicate)
     };
     Ok((starts, run))

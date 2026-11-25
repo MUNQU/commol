@@ -2,8 +2,8 @@
 
 [Back to Design decisions](../design-decisions.md)
 
-How a series of values is read for dependence, and which law its tests
-take.
+How a series of values is read for dependence, which law its tests take, and
+who decides the length of a block from it.
 
 ## A test of dependence takes its reference
 
@@ -91,3 +91,41 @@ conservative, and many lags make `Q̃` liberal (7.5 % at `max_lag=17` of
 **Guards:** `crates/commol-inference/tests/test_dependence.rs`
 (`a_lag_with_few_pairs_leaves_the_portmanteau`), `tests/uncertainty/test_dependence.py`,
 `tests/uncertainty/test_dependence_coverage.py::TestValues::test_lags_with_few_pairs_keep_the_level`.
+
+## The user gives the length of a block
+
+Every method that reads blocks takes `block_length`, a whole number of at
+least 1, required, and groups the observations with `BlockScheme::new`
+(`crates/commol-inference/src/resampling/blocks.rs`). commol measures the
+dependence (`residual_dependence`) and does not choose a length from it. The
+length that serves best depends on the method and on the question. A rule such
+as that of Politis and White (2004) minimizes the mean squared error of a
+variance, not the error of the coverage: in a simulation with constant means
+and 90 % intervals of the sandwich, for 12 series of 35 values of an AR(1) of
+0.6 it covers 83 % and blocks of 12 positions 88 %; for one such series, 71 %
+and 88 %. Nor does one number reduce several series: the largest of their
+estimates grows with their count, a pooled one covers less when one of them is
+dependent, and structural zeros and series of other spacings each need another
+rule. The choice changes the result (in one calibration 12 positions gave an
+`η` of 0.093 and 4 gave 0.227), so it is in the settings of the method. The
+figures are from [#548](https://github.com/MUNQU/commol/issues/548).
+
+A length counts the distinct positions of all the series, whether or not an
+observation there carries information: to skip a position, `BlockScheme` would
+read the scores of a fit, and the blocks would change with it.
+
+The error of a text that is no whole number is the one of any such setting.
+
+| Alternative | Why not |
+|---|---|
+| A function that estimates the length of each series | It repeats `residual_dependence`, reads each series on its own grid when a block counts the positions of all, and has no caller. |
+| An automatic length pooled over the series | One rule for uses commol does not know: the bootstraps, the meat of the sandwich and `η`. |
+| An automatic length with a warning | The number stays the one nobody chose. |
+| A message of its own for the text `"auto"` | The rule of `block_length` names the setting, as for any other text; the changelog gives the migration. |
+
+**Guards:** `tests/uncertainty/test_ranges.py::test_a_block_length_is_a_whole_number`,
+`tests/uncertainty/test_results_equality.py::test_no_result_has_the_estimates_of_a_block_length`,
+`crates/commol-inference/tests/test_resampling.rs::a_given_block_length_gives_the_blocks_of_its_windows`,
+`tests/uncertainty/test_smc.py::test_a_position_of_observations_with_no_information_counts_in_the_windows`,
+`tests/uncertainty/test_block_length.py`
+and the example of [Choose the length](../../guide/uncertainty/resampling.md#choose-the-length).

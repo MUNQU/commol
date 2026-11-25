@@ -42,11 +42,34 @@ pub struct Residuals {
     residuals: Vec<f64>,
 }
 
+/// The fitted values of `problem` at the parameter values `fit`: the
+/// prediction of each observation; with a stochastic engine, the mean of the
+/// predictions of the replicates.
+///
+/// A method that refits reweighted or fewer observations around a fit runs it
+/// here first: at a point with no run the optimizer reads a penalty, and
+/// refits that start on a plateau of it end there, all at one point and
+/// converged.
+///
+/// # Errors
+///
+/// As [`MethodError::of_point`] when the fit has no run.
+pub(crate) fn fitted_values<E: SimulationEngine>(
+    problem: &CalibrationProblem<E>,
+    fit: &[f64],
+) -> Result<Vec<f64>, MethodError> {
+    let mut workspace = Workspace::default();
+    let applied = problem.applied_parameter_values(fit);
+    let predictions = problem
+        .forward()
+        .run_observed(&applied, &mut workspace)
+        .map_err(|error| MethodError::of_point("The fit has no run", error))?;
+    let n = problem.observed_data().len();
+    Ok(replicate_mean(predictions.chunks(n.max(1)), n))
+}
+
 impl Residuals {
     /// The residuals of `problem` at the parameter values `fit`.
-    ///
-    /// The fitted value of an observation is its prediction; with a
-    /// stochastic engine, the mean of the predictions of the replicates.
     ///
     /// # Errors
     ///
@@ -58,16 +81,9 @@ impl Residuals {
         fit: &[f64],
         scale: ResidualScale,
     ) -> Result<Self, MethodError> {
-        let mut workspace = Workspace::default();
-        let applied = problem.applied_parameter_values(fit);
-        let predictions = problem
-            .forward()
-            .run_observed(&applied, &mut workspace)
-            .map_err(|error| MethodError::of_point("The fit has no run", error))?;
-        let observed = problem.observed_data();
-        let n = observed.len();
-        let fitted = replicate_mean(predictions.chunks(n.max(1)), n);
-        let residuals = observed
+        let fitted = fitted_values(problem, fit)?;
+        let residuals = problem
+            .observed_data()
             .iter()
             .zip(&fitted)
             .map(|(obs, &fit)| match scale {
@@ -142,7 +158,6 @@ impl SeriesResiduals {
         one_per_position(
             observations,
             "Residual noise and the residual bootstrap read one residual per position of a series",
-            "",
         )?;
         let positions = distinct_positions(observations);
         let position_of = position_indices(observations, &positions);

@@ -9,7 +9,9 @@ use commol_random::sample::exponential;
 use crate::error::MethodError;
 use crate::predictive::{DistributionNoise, ObservationNoise};
 use crate::resampling::blocks::BlockScheme;
-use crate::resampling::residuals::{ResidualBlocks, Residuals, SeriesResiduals, source_positions};
+use crate::resampling::residuals::{
+    ResidualBlocks, Residuals, SeriesResiduals, fitted_values, source_positions,
+};
 
 /// What a replicate changes in the data of the problem: one weight or one
 /// observed value per observation, in problem order.
@@ -38,13 +40,27 @@ pub struct BayesianBootstrap {
 }
 
 impl BayesianBootstrap {
-    /// The bootstrap of `observations` with `blocks`.
-    pub fn new(observations: &[ObservedDataPoint], blocks: &BlockScheme) -> Self {
-        Self {
-            weights: observations.iter().map(|obs| obs.weight).collect(),
+    /// The bootstrap of the observations of `problem` with `blocks`, around
+    /// the fit `fit`.
+    ///
+    /// # Errors
+    ///
+    /// As [`MethodError::of_point`] when the fit has no run.
+    pub fn new<E: SimulationEngine>(
+        problem: &CalibrationProblem<E>,
+        fit: &[f64],
+        blocks: &BlockScheme,
+    ) -> Result<Self, MethodError> {
+        fitted_values(problem, fit)?;
+        Ok(Self {
+            weights: problem
+                .observed_data()
+                .iter()
+                .map(|obs| obs.weight)
+                .collect(),
             block_of: blocks.block_of(),
             blocks: blocks.count(),
-        }
+        })
     }
 }
 

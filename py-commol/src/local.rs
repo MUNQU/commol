@@ -93,15 +93,9 @@ fn laplace(
     Ok((PyStarts { inner: starts }, run))
 }
 
-/// A sandwich: the starts of the fit, the run, the blocks, the block length
-/// and its estimates.
-type SandwichTables = (
-    PyStarts,
-    PyLocalRun,
-    usize,
-    usize,
-    Option<Vec<(String, f64)>>,
-);
+/// A sandwich: the starts of the fit, the run, the blocks and the block
+/// length.
+type SandwichTables = (PyStarts, PyLocalRun, usize, usize);
 
 /// Fit the problem, then take the sandwich covariance at the fit, with the
 /// meat summed over blocks
@@ -111,9 +105,8 @@ type SandwichTables = (
 ///     settings: The JSON of a `Sandwich`
 ///
 /// Returns:
-///     The starts of the fit, the run, the number of blocks, the positions
-///     per block and, with the automatic length, the estimate of each
-///     series
+///     The starts of the fit, the run, the number of blocks and the
+///     positions per block
 ///
 /// Raises:
 ///     ValueError: If a setting is not valid, the loss is the absolute
@@ -135,7 +128,7 @@ fn sandwich(
             &problem.inner,
             &fit,
             settings.curvature,
-            settings.block_length.0,
+            settings.block_length,
         )
     })?
     .map_err(method_error)?;
@@ -150,7 +143,6 @@ fn sandwich(
         local,
         run.blocks,
         run.block_length,
-        run.estimates,
     ))
 }
 

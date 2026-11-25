@@ -4,7 +4,7 @@ use commol_calibration::ranges::STARTS;
 use commol_core::{Rule, checked, tagged};
 use serde::{Deserialize, Serialize};
 
-use super::{BlockLength, PriorsSettings};
+use super::PriorsSettings;
 use crate::local::CurvatureKind;
 use crate::ranges::{BLOCK_LENGTH, DRAWS, ETA, MIXTURE_DRAWS};
 
@@ -31,7 +31,7 @@ checked!(
 #[serde(remote = "Self", deny_unknown_fields)]
 pub struct SandwichSettings {
     /// Positions per block of the meat.
-    pub block_length: BlockLength,
+    pub block_length: usize,
     /// Number of draws.
     pub draws: usize,
     /// The curvature at the fit.

@@ -39,7 +39,6 @@ pub struct Curvature {
     derivatives: Vec<f64>,
     matrix: Matrix,
     gradients: Matrix,
-    predictions: Vec<f64>,
     terms: Vec<TermDerivatives>,
     part_jacobian: Matrix,
     first_parts: Vec<usize>,
@@ -114,7 +113,6 @@ impl Curvature {
             }
         }
         curvature.gradients = gradients;
-        curvature.predictions = sensitivities.predictions;
         curvature.terms = terms;
         curvature.part_jacobian = sensitivities.parts.jacobian;
         curvature.first_parts = first_parts;
@@ -124,8 +122,7 @@ impl Curvature {
     /// The curvature of `problem` at `fit` by central differences of its
     /// objective: the stepped central Hessian of the `finitediff` crate of
     /// the argmin fork, with its estimated error. The gradients of the terms
-    /// and the predictions are those of [`Self::gauss_newton`] with
-    /// `source`.
+    /// are those of [`Self::gauss_newton`] with `source`.
     ///
     /// The step of parameter `j` is `h_j = δ^{1/4} · s_j`, which balances the
     /// truncation error of the central second difference, of order `h²`,
@@ -192,7 +189,6 @@ impl Curvature {
             errors,
         );
         curvature.gradients = expected.gradients;
-        curvature.predictions = expected.predictions;
         curvature.terms = expected.terms;
         curvature.part_jacobian = expected.part_jacobian;
         curvature.first_parts = expected.first_parts;
@@ -239,7 +235,6 @@ impl Curvature {
             derivatives,
             matrix,
             gradients: Matrix::zeros(0, p),
-            predictions: Vec::new(),
             terms: Vec::new(),
             part_jacobian: Matrix::zeros(0, p),
             first_parts: Vec::new(),
@@ -273,11 +268,6 @@ impl Curvature {
     /// meat of the sandwich.
     pub fn gradients(&self) -> &Matrix {
         &self.gradients
-    }
-
-    /// The predicted observations at the fit.
-    pub fn predictions(&self) -> &[f64] {
-        &self.predictions
     }
 
     /// The Gauss–Newton curvature of the terms of `observations` alone, on

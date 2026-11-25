@@ -76,7 +76,7 @@ fn every_confidence_level_has_one_check() {
     let config = OptimizationConfig::NelderMead(NelderMeadConfig::default());
     let runner = ReplicateRunner::new(&problem, &config, &[0.1], 1, 0).unwrap();
     let blocks = BlockScheme::new(problem.observed_data(), 1).unwrap();
-    let resampler = BayesianBootstrap::new(problem.observed_data(), &blocks);
+    let resampler = BayesianBootstrap::new(&problem, &[0.1], &blocks).unwrap();
     let draws = ObservationDraws {
         values: vec![vec![1.0], vec![2.0]],
         weights: vec![0.5, 0.5],

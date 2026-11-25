@@ -18,9 +18,9 @@ use commol_calibration::{
 };
 use commol_core::NoSteps;
 use commol_inference::resampling::{
-    BayesianBootstrap, BlockDrawing, BlockScheme, FitUnit, Multipliers, ParametricResampler,
-    ReplicateRunner, Resampler, ResidualBlocks, ResidualBootstrap, ResidualNoise, ResidualScale,
-    Residuals, WildBootstrap, bootstrap as run_replicates,
+    BayesianBootstrap, BlockScheme, FitUnit, Multipliers, ParametricResampler, ReplicateRunner,
+    Resampler, ResidualBlocks, ResidualBootstrap, ResidualNoise, ResidualScale, Residuals,
+    WildBootstrap, bootstrap as run_replicates,
 };
 use commol_inference::settings::resampling::{BlockJackknifeSettings, Bootstrap, NoiseSettings};
 use commol_inference::{
@@ -82,20 +82,19 @@ fn prediction_error(index: usize, error: EvaluationError) -> PyErr {
 
 /// How a bootstrap draws the data of its replicates.
 pub(crate) enum ResamplerSpec {
-    /// Weights by blocks (Bayesian bootstrap); `None` for the automatic
-    /// length.
-    Bayesian { block_length: Option<usize> },
+    /// Weights by blocks (Bayesian bootstrap).
+    Bayesian { block_length: usize },
     /// Values drawn from the observation models at the fit.
     Parametric,
     /// The fit plus blocks of its residuals.
     Residual {
-        block_length: Option<usize>,
+        block_length: usize,
         scale: ResidualScale,
         blocks: ResidualBlocks,
     },
     /// The fit plus its residuals times multipliers shared by a block.
     Wild {
-        block_length: Option<usize>,
+        block_length: usize,
         multipliers: Multipliers,
     },
 }
@@ -105,16 +104,16 @@ impl ResamplerSpec {
     pub(crate) fn of(settings: &Bootstrap) -> Self {
         match settings {
             Bootstrap::Bayesian(settings) => Self::Bayesian {
-                block_length: settings.block_length.0,
+                block_length: settings.block_length,
             },
             Bootstrap::Parametric(_) => Self::Parametric,
             Bootstrap::Residual(settings) => Self::Residual {
-                block_length: settings.block_length.0,
+                block_length: settings.block_length,
                 scale: settings.residual_scale,
                 blocks: settings.scheme,
             },
             Bootstrap::Wild(settings) => Self::Wild {
-                block_length: settings.block_length.0,
+                block_length: settings.block_length,
                 multipliers: settings.multipliers,
             },
         }
@@ -243,40 +242,27 @@ impl PyCalibrationProblem {
         fit: &[f64],
     ) -> PyResult<(Box<dyn Resampler>, Option<BlockScheme>)> {
         let observed = self.inner.observed_data();
-        let blocks = |scale: ResidualScale, requested: Option<usize>, drawing: BlockDrawing| {
-            let residuals = Residuals::new(&self.inner, fit, scale).map_err(method_error)?;
-            let scheme = BlockScheme::resolve(observed, residuals.residuals(), requested, drawing)
-                .map_err(method_error)?;
-            Ok::<_, PyErr>((residuals, scheme))
-        };
+        let blocks = |length: usize| BlockScheme::new(observed, length).map_err(method_error);
+        let residuals =
+            |scale: ResidualScale| Residuals::new(&self.inner, fit, scale).map_err(method_error);
         match spec {
             ResamplerSpec::Parametric => {
                 let resampler = ParametricResampler::new(&self.inner, fit).map_err(method_error)?;
                 Ok((Box::new(resampler), None))
             }
             ResamplerSpec::Bayesian { block_length } => {
-                let scheme = BlockScheme::at_fit(
-                    &self.inner,
-                    fit,
-                    *block_length,
-                    BlockDrawing::NonOverlapping,
-                )
-                .map_err(method_error)?;
-                Ok((
-                    Box::new(BayesianBootstrap::new(observed, &scheme)),
-                    Some(scheme),
-                ))
+                let scheme = blocks(*block_length)?;
+                let resampler =
+                    BayesianBootstrap::new(&self.inner, fit, &scheme).map_err(method_error)?;
+                Ok((Box::new(resampler), Some(scheme)))
             }
             ResamplerSpec::Residual {
                 block_length,
                 scale,
                 blocks: residual_blocks,
             } => {
-                let drawing = match residual_blocks {
-                    ResidualBlocks::Moving => BlockDrawing::Moving,
-                    ResidualBlocks::Stationary => BlockDrawing::Stationary,
-                };
-                let (residuals, scheme) = blocks(*scale, *block_length, drawing)?;
+                let scheme = blocks(*block_length)?;
+                let residuals = residuals(*scale)?;
                 let resampler =
                     ResidualBootstrap::new(observed, residuals, &scheme, *residual_blocks)
                         .map_err(method_error)?;
@@ -286,11 +272,8 @@ impl PyCalibrationProblem {
                 block_length,
                 multipliers,
             } => {
-                let (residuals, scheme) = blocks(
-                    ResidualScale::Additive,
-                    *block_length,
-                    BlockDrawing::NonOverlapping,
-                )?;
+                let scheme = blocks(*block_length)?;
+                let residuals = residuals(ResidualScale::Additive)?;
                 Ok((
                     Box::new(WildBootstrap::new(residuals, &scheme, *multipliers)),
                     Some(scheme),
@@ -666,10 +649,6 @@ fn bootstrap(
         not_converged: run.not_converged,
         negative_values: run.negative_values,
         block_length: scheme.as_ref().map(BlockScheme::length),
-        block_length_estimates: scheme
-            .as_ref()
-            .and_then(BlockScheme::estimates)
-            .map(<[_]>::to_vec),
     };
     Ok((PyStarts { inner: starts }, run))
 }
@@ -686,9 +665,11 @@ fn bootstrap(
 ///     The starts of the fit, and the jackknife
 ///
 /// Raises:
-///     ValueError: If a setting is not valid, or the block length does not
-///         fit the positions or makes fewer than two blocks
-///     RuntimeError: If the fit fails or fewer than two refits succeed
+///     ValueError: If a setting is not valid, the block length does not fit
+///         the positions or makes fewer than two blocks, or the fit is not
+///         feasible
+///     RuntimeError: If the fit or the run at the fit fails, or fewer than
+///         two refits succeed
 #[pyfunction]
 fn block_jackknife(
     py: Python<'_>,
@@ -697,16 +678,11 @@ fn block_jackknife(
     logger: Py<PyAny>,
 ) -> PyResult<(PyStarts, PyJackknifeRun)> {
     let settings: BlockJackknifeSettings = crate::json::read(settings)?;
+    let scheme = BlockScheme::new(problem.inner.observed_data(), settings.block_length)
+        .map_err(method_error)?;
     let log = StepLog::new(logger).with_unit(FitUnit::Block);
     let starts = problem.fit_logged(py, settings.starts, &log)?;
     let runner = problem.runner(&best_values(&starts), settings.starts)?;
-    let scheme = BlockScheme::at_fit(
-        &problem.inner,
-        runner.fit(),
-        settings.block_length.0,
-        BlockDrawing::NonOverlapping,
-    )
-    .map_err(method_error)?;
     let jackknife = parallel_logged(py, &log, |steps| {
         commol_inference::resampling::block_jackknife(&runner.with_steps(steps), &scheme)
     })?
@@ -722,7 +698,6 @@ fn block_jackknife(
         failed: FitUnit::Block.entries(&jackknife.failed),
         not_converged: jackknife.not_converged,
         block_length: scheme.length(),
-        block_length_estimates: scheme.estimates().map(<[_]>::to_vec),
     };
     Ok((PyStarts { inner: starts }, run))
 }
@@ -742,8 +717,6 @@ pub struct PyBootstrapRun {
     negative_values: usize,
     /// The block length used, or None for a bootstrap with no blocks
     block_length: Option<usize>,
-    /// The estimate of each series, with the automatic length
-    block_length_estimates: Option<Vec<(String, f64)>>,
 }
 
 /// A block jackknife, as the runner returns it
@@ -767,8 +740,6 @@ pub struct PyJackknifeRun {
     not_converged: usize,
     /// The block length used
     block_length: usize,
-    /// The estimate of each series, with the automatic length
-    block_length_estimates: Option<Vec<(String, f64)>>,
 }
 
 pub(crate) fn value_error(message: String) -> PyErr {

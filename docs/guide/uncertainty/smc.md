@@ -172,9 +172,8 @@ is the problem's loss with its weights and normalization. It returns a
 a calibration of `η` read (`fit`), the coverage of a bootstrap calibration
 (`coverage`), each replicate of a bootstrap calibration whose sampler
 failed, `"Replicate <index> failed: <reason>"`, also logged as a warning
-(`failed`), the block length of a calibration with the estimate of each
-series of the automatic length (`block_length`, `block_length_estimates`), and
-the degrees of freedom of information matching (`degrees_of_freedom`).
+(`failed`), the block length of a calibration (`block_length`), and the
+degrees of freedom of information matching (`degrees_of_freedom`).
 
 ### What `η` means
 
@@ -192,13 +191,8 @@ variance `σ²`, `η = 1/(2σ²)` makes the Gibbs posterior the Bayesian posteri
 Both calibrations read the fit `Calibrator.run(starts)`, the best of
 [several starts](../calibration-optimizers.md#several-starts).
 
-Both take `block_length="auto"`, the automatic length of
-[Blocks and their length](resampling.md#blocks-and-their-length) for
-non-overlapping blocks. `GibbsResult.block_length` gives the length used,
-and `block_length_estimates` the estimate of each series, by label, as the
-bootstraps, the sandwich and the conformal methods give them. Both are `None`
-for a number `η`, and `block_length_estimates` is `None` for an integer
-`block_length`.
+Both take a `block_length` that [you choose](resampling.md#choose-the-length),
+and `GibbsResult.block_length` gives it; it is `None` for a number `η`.
 
 Information matching is cheap and local; it needs a sum of smooth terms, so
 `"rmse"` (a square root of a sum), `"mae"` (no curvature) and a stochastic

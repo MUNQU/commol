@@ -180,14 +180,10 @@ class SandwichResult(LocalResult):
         ``G − 1`` degrees of freedom.
     block_length : int
         The positions per block.
-    block_length_estimates : dict[str, float] | None
-        With ``block_length="auto"``, the estimate of each series, by label;
-        otherwise None.
     """
 
     blocks: int
     block_length: int
-    block_length_estimates: dict[str, float] | None
 
     def degrees_of_freedom(self) -> float | None:
         """

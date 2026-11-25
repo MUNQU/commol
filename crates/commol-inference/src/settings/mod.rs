@@ -20,8 +20,7 @@
 //! | [`identifiability`] | `StructuralRank`, `Collinearity`, `SampleIdentifiability`, `StartsIdentifiability` |
 //! | [`sensitivity`] | `InputSpace`, `Propagation`, `PRCC`, `Morris`, `Sobol`, `PolynomialChaos` |
 //!
-//! [`PriorsSettings`] reads `Priors`, and [`BlockLength`] the union
-//! `int | "auto"` of a block length.
+//! [`PriorsSettings`] reads `Priors`.
 
 pub mod conformal;
 pub mod dependence;
@@ -85,35 +84,6 @@ impl PriorsSettings {
         match &self.distributions {
             None => Priors::uniform_on_bounds(names, bounds),
             Some(Pairs(families)) => Priors::new(names, bounds, families),
-        }
-    }
-}
-
-/// The positions per block of a method: a number, or `"auto"` for the
-/// length the engine estimates from the residuals of the fit (None).
-///
-/// The range rule of the number is the rule `block_length` of the method
-/// that holds it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BlockLength(pub Option<usize>);
-
-impl Serialize for BlockLength {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self.0 {
-            Some(length) => serializer.serialize_u64(length as u64),
-            None => serializer.serialize_str("auto"),
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for BlockLength {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        match Value::deserialize(deserializer)? {
-            Value::String(text) if text == "auto" => Ok(Self(None)),
-            value @ Value::Int(_) => json::from_value(value).map(|length| Self(Some(length))),
-            _ => Err(de::Error::custom(
-                "block_length is a whole number of at least 1 or \"auto\"",
-            )),
         }
     }
 }

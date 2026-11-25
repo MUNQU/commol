@@ -67,7 +67,6 @@ impl ObservationNoise for ResidualNoise {
             None => one_per_position(
                 observations,
                 "Residual noise draws one residual per position of a series",
-                "",
             ),
         }
     }

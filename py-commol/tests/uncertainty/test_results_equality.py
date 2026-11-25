@@ -11,23 +11,35 @@ import pytest
 from pydantic import BaseModel
 
 from commol import Simulation
+from commol._calibration.method import UncertaintyMethod
 from commol._data.result_model import ResultModel
 from commol._fit.result import CalibrationResult, StartSummary
+from commol.conformal import EnbPI, JackknifePlus
 from commol.conformal.results import (
     ConformalResult,
     PredictionIntervals,
     SeriesIntervals,
 )
+from commol.distributions import Priors
+from commol.local import Sandwich
 from commol.quantities import ValueAt
+from commol.resampling import (
+    BayesianBootstrap,
+    BlockJackknife,
+    ResidualBootstrap,
+    WildBootstrap,
+)
 from commol.sensitivity import PRCC, SensitivityAnalysis
 from commol.sensitivity.results import PRCCResult
+from commol.smc import BootstrapCoverageEta, GibbsPosterior, InformationMatchingEta
 from commol.uncertainty import ParameterSample, SampleMethod
 from commol.uncertainty.sample import ParameterSummary
 from tests.suite.test_methods import method_classes
-from tests.support import abc_rates
+from tests.support import abc_rates, flow_calibrator, normal_values
 
 # With these 10 draws k2 orders B at 5 alone, so the PRCC of k1 is NaN.
 NAN_SEED = 2496558405389616264
+INTERVALS = {"score": "absolute", "by": "series", "confidence_level": 0.5}
 
 
 def _nan_prcc(simulation: Simulation) -> PRCCResult:
@@ -54,7 +66,6 @@ def _conformal(lower: float, scores: dict[str, list[float]]) -> ConformalResult:
         failed=[],
         not_converged=0,
         block_length=None,
-        block_length_estimates=None,
     )
 
 
@@ -213,3 +224,54 @@ def test_a_result_saved_by_0_10_with_bare_constants_still_loads(
 
     assert "NaN" in saved and '"NaN"' not in saved
     assert ConformalResult.from_json(path) == result
+
+
+def _gibbs(eta: InformationMatchingEta | BootstrapCoverageEta) -> GibbsPosterior:
+    return GibbsPosterior(
+        priors=Priors.uniform_on_bounds(),
+        eta=eta,
+        particles=50,
+        target_cess=0.5,
+        resample_threshold=0.5,
+        stay_probability=0.05,
+    )
+
+
+def _blocks_of(dump: object) -> Iterator[tuple[str, object]]:
+    """Each field of a dump whose name starts with ``block_length``, at any
+    depth, but in the settings of the method."""
+    if isinstance(dump, dict):
+        for name, value in dump.items():
+            if name.startswith("block_length"):
+                yield name, value
+            elif name != "settings":
+                yield from _blocks_of(value)
+
+
+@pytest.mark.parametrize(
+    "method",
+    [
+        BayesianBootstrap(replicates=3, block_length=4),
+        ResidualBootstrap(
+            replicates=3, block_length=4, residual_scale="additive", scheme="moving"
+        ),
+        WildBootstrap(replicates=3, block_length=4, multipliers="mammen"),
+        BlockJackknife(block_length=4),
+        Sandwich(block_length=4, draws=2),
+        JackknifePlus(block_length=4, positions=[21.0], **INTERVALS),
+        EnbPI(replicates=20, block_length=4, positions=[21.0], **INTERVALS),
+        _gibbs(InformationMatchingEta(block_length=4)),
+        _gibbs(
+            BootstrapCoverageEta(replicates=3, block_length=4, confidence_level=0.8)
+        ),
+    ],
+    ids=lambda method: getattr(method, "eta", method).__class__.__name__,
+)
+def test_no_result_has_the_estimates_of_a_block_length(
+    method: UncertaintyMethod[ResultModel],
+) -> None:
+    calibrator = flow_calibrator(normal_values(20, 6, sd=1.0), windowed=True)
+
+    result = calibrator.uncertainty(method)
+
+    assert list(_blocks_of(result.model_dump())) == [("block_length", 4)]

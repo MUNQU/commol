@@ -3,7 +3,7 @@
 //!
 //! | Module | Holds |
 //! |---|---|
-//! | [`blocks`] | [`BlockScheme`]: blocks of consecutive positions across series, and the resolution of a block length, given or automatic |
+//! | [`blocks`] | [`BlockScheme`]: blocks of consecutive positions across series |
 //! | [`residuals`] | [`Residuals`] of a fit on a [`ResidualScale`] |
 //! | [`resamplers`] | The [`Resampler`] port and its methods: the Bayesian, residual and wild block bootstraps, and the parametric bootstrap of observation models |
 //! | [`runner`] | [`ReplicateRunner`]: fits the data of each replicate, in parallel, into [`ReplicateFits`], sending the events of its stages ([`RunnerEvent`]) to its steps; [`FitUnit`] names a fit in messages; [`bootstrap`] gathers a sample |
@@ -21,9 +21,7 @@ pub mod resamplers;
 pub mod residuals;
 pub mod runner;
 
-pub use blocks::{
-    AutomaticLength, BlockDrawing, BlockScheme, Estimates, automatic_block_length, automatic_length,
-};
+pub use blocks::BlockScheme;
 pub use jackknife::{Jackknife, JackknifeStatistics, block_jackknife, jackknife_statistics};
 pub use noise::ResidualNoise;
 pub use resamplers::{

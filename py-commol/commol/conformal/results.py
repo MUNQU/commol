@@ -78,9 +78,6 @@ class ConformalResult(ResultModel):
     block_length : int | None
         With `JackknifePlus` and `EnbPI`, the positions per block they ran
         with; None for a method without blocks.
-    block_length_estimates : dict[str, float] | None
-        With ``block_length="auto"``, the estimate of each series, by label;
-        otherwise None.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -91,6 +88,3 @@ class ConformalResult(ResultModel):
     failed: list[str] = Field(description="Each refit that failed.")
     not_converged: int = Field(description="Refits that did not converge.")
     block_length: int | None = Field(description="The block length used.")
-    block_length_estimates: dict[str, float] | None = Field(
-        description="The estimate of each series with the automatic length."
-    )

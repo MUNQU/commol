@@ -753,26 +753,34 @@ fn bootstrap_coverage_fails_when_no_eta_narrows_the_intervals() {
 
 #[test]
 fn a_calibration_of_eta_needs_a_fit_inside_the_support() {
-    let (problem, priors) = brittle_problem(false);
-    let blocks = BlockScheme::new(problem.observed_data(), 1).unwrap();
-    // The run at 0.6 is not a number.
-    let error = bootstrap_coverage_eta(
-        &problem,
-        &priors,
-        &[0.6],
-        &mut sampler(PARTICLES, 0.1),
-        &blocks,
-        5,
-        0.8,
-        8,
-        &NoSteps,
-    )
-    .unwrap_err();
+    let calibrated = |any_run: bool, fit: f64| {
+        let (problem, priors) = brittle_problem(any_run);
+        let blocks = BlockScheme::new(problem.observed_data(), 1).unwrap();
+        bootstrap_coverage_eta(
+            &problem,
+            &priors,
+            &[fit],
+            &mut sampler(PARTICLES, 0.1),
+            &blocks,
+            5,
+            0.8,
+            8,
+            &NoSteps,
+        )
+        .unwrap_err()
+    };
+    // Outside the bounds of a model with a run at every `k`.
     assert_eq!(
-        error,
+        calibrated(true, 1.5),
         MethodError::Invalid("The fit is outside the support of the problem".to_string())
     );
-    let error = information_matching_eta(&problem, &[0.6], Some(1))
+    // The run at 0.6 is not a number.
+    assert_eq!(
+        calibrated(false, 0.6),
+        MethodError::Invalid("The fit has no run: Infeasible point: NonFinite".to_string())
+    );
+    let (problem, _) = brittle_problem(false);
+    let error = information_matching_eta(&problem, &[0.6], 1)
         .unwrap_err()
         .to_string();
     assert!(error.contains("infeasible"), "{error}");
@@ -905,7 +913,7 @@ fn information_matching_gives_eta_near_its_value_with_few_blocks_per_parameter()
             .iter()
             .map(|series| {
                 let (problem, fit) = means_problem(series);
-                information_matching_eta(&problem, &fit, Some(block_length))
+                information_matching_eta(&problem, &fit, block_length)
                     .unwrap()
                     .eta
             })
@@ -919,7 +927,7 @@ fn information_matching_gives_eta_near_its_value_with_few_blocks_per_parameter()
 fn information_matching_needs_two_blocks_and_scores_that_are_not_all_0() {
     let series = vec![vec![5.0, 6.0, 4.0], vec![2.0, 1.0, 3.0]];
     let (problem, fit) = means_problem(&series);
-    let error = information_matching_eta(&problem, &fit, Some(3))
+    let error = information_matching_eta(&problem, &fit, 3)
         .unwrap_err()
         .to_string();
     assert!(
@@ -927,9 +935,7 @@ fn information_matching_needs_two_blocks_and_scores_that_are_not_all_0() {
         "{error}"
     );
     // Two blocks for two parameters are enough.
-    let eta = information_matching_eta(&problem, &fit, Some(2))
-        .unwrap()
-        .eta;
+    let eta = information_matching_eta(&problem, &fit, 2).unwrap().eta;
     assert!(eta.is_finite() && eta > 0.0, "{eta}");
 
     // `x0` only in the first block and `x1` only in the second: each block
@@ -956,7 +962,7 @@ fn information_matching_needs_two_blocks_and_scores_that_are_not_all_0() {
         LossConfig::SumSquaredError,
     )
     .unwrap();
-    let error = information_matching_eta(&problem, &[5.5, 1.5], Some(2)).unwrap_err();
+    let error = information_matching_eta(&problem, &[5.5, 1.5], 2).unwrap_err();
     assert!(matches!(error, MethodError::Invalid(_)), "{error}");
     assert!(
         error
@@ -967,7 +973,7 @@ fn information_matching_needs_two_blocks_and_scores_that_are_not_all_0() {
     // Away from the fit the block scores are not 0, but each block holds
     // all the curvature of its parameter, so the blocks read no degree of
     // freedom.
-    let error = information_matching_eta(&problem, &[5.0, 1.5], Some(2)).unwrap_err();
+    let error = information_matching_eta(&problem, &[5.0, 1.5], 2).unwrap_err();
     assert!(matches!(error, MethodError::Invalid(_)), "{error}");
     assert!(
         error
@@ -978,7 +984,7 @@ fn information_matching_needs_two_blocks_and_scores_that_are_not_all_0() {
 
     // Data the fit runs through: every score is 0.
     let (problem, fit) = means_problem(&[vec![5.0; 4], vec![2.0; 4]]);
-    let error = information_matching_eta(&problem, &fit, Some(1)).unwrap_err();
+    let error = information_matching_eta(&problem, &fit, 1).unwrap_err();
     assert!(matches!(error, MethodError::Failed(_)), "{error}");
     assert!(error.to_string().contains("all 0"), "{error}");
 }
@@ -1103,7 +1109,7 @@ fn information_matching_gives_eta_near_its_value_with_blocks_of_uneven_curvature
             .map(|_| {
                 let values: Vec<f64> = noise(n).iter().map(|e| 5.0 + e).collect();
                 let (problem, fit) = means_problem(&[values]);
-                information_matching_eta(&problem, &fit, Some(block_length))
+                information_matching_eta(&problem, &fit, block_length)
                     .unwrap()
                     .eta
             })
@@ -1123,7 +1129,7 @@ fn information_matching_gives_eta_near_its_value_with_blocks_of_uneven_curvature
                     .map(|(t, e)| 5.0 + 0.5 * t as f64 + e)
                     .collect();
                 let (problem, fit) = line_problem(&values);
-                information_matching_eta(&problem, &fit, Some(block_length))
+                information_matching_eta(&problem, &fit, block_length)
                     .unwrap()
                     .eta
             })
@@ -1145,7 +1151,7 @@ fn information_matching_gives_its_degrees_of_freedom() {
     };
     let calibration = |count: usize| {
         let (problem, fit) = problem(count);
-        information_matching_eta(&problem, &fit, Some(1)).unwrap()
+        information_matching_eta(&problem, &fit, 1).unwrap()
     };
     let z = normal_quantile(0.95);
 
@@ -1180,7 +1186,7 @@ fn information_matching_gives_its_degrees_of_freedom() {
         .map(|i| (0..10).map(|t| ((i + t * t) % 7) as f64).collect())
         .collect();
     let (problem, fit) = means_problem(&series);
-    let ten = information_matching_eta(&problem, &fit, Some(5)).unwrap();
+    let ten = information_matching_eta(&problem, &fit, 5).unwrap();
     assert!((ten.degrees_of_freedom - 10.0).abs() < 1e-9);
     assert!(ten.few_coverage().is_none());
 
@@ -1188,7 +1194,7 @@ fn information_matching_gives_its_degrees_of_freedom() {
     // the integral of the normal coverage over `χ²_ν` is 0.789.
     let values: Vec<f64> = (0..24).map(|t| (t * t % 7) as f64).collect();
     let (problem, fit) = line_problem(&values);
-    let line = information_matching_eta(&problem, &fit, Some(8)).unwrap();
+    let line = information_matching_eta(&problem, &fit, 8).unwrap();
     assert!((line.degrees_of_freedom - 1.479).abs() < 1e-3);
     assert!((line.few_coverage().unwrap() - 0.789).abs() < 1e-3);
 }
@@ -1202,7 +1208,7 @@ fn information_matching_reads_the_degrees_of_freedom_of_its_blocks() {
         vec![2.0, 1.0, 3.0, 2.5, 0.5, 2.0, 1.5, 3.5, 2.0, 1.0, 2.5, 3.0],
     ];
     let (problem, fit) = means_problem(&series);
-    let calibration = information_matching_eta(&problem, &fit, Some(4)).unwrap();
+    let calibration = information_matching_eta(&problem, &fit, 4).unwrap();
     assert!(
         (calibration.degrees_of_freedom - 4.0).abs() < 1e-9,
         "{}",
@@ -1213,7 +1219,7 @@ fn information_matching_reads_the_degrees_of_freedom_of_its_blocks() {
     // `n/(n − 1)` and `ν = n − 1`, so `η = median(χ²_{n−1}) / (2 Σ r²)`.
     let values = &series[0];
     let (problem, fit) = means_problem(std::slice::from_ref(values));
-    let calibration = information_matching_eta(&problem, &fit, Some(1)).unwrap();
+    let calibration = information_matching_eta(&problem, &fit, 1).unwrap();
     let n = values.len() as f64;
     let squares: f64 = values.iter().map(|value| (value - fit[0]).powi(2)).sum();
     let expected = chi_square_quantile(n - 1.0, 0.5) / (2.0 * squares);

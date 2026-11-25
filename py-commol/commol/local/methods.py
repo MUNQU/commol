@@ -71,9 +71,9 @@ class Sandwich(UncertaintyMethod[SandwichResult], RangeChecked):
 
     Attributes
     ----------
-    block_length : int | "auto"
-        Positions per block; ``"auto"`` is the rule of Politis and White
-        (2004) for non-overlapping blocks on the residuals of the fit.
+    block_length : int
+        Positions per block of the meat; they must make more blocks than
+        parameters.
     draws : int
         Number of draws of the Student t, at least 1.
     curvature : {"gauss_newton", "hessian"}
@@ -86,7 +86,7 @@ class Sandwich(UncertaintyMethod[SandwichResult], RangeChecked):
 
     _runner = staticmethod(run_sandwich)
 
-    block_length: int | Literal["auto"] = Field(description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     draws: int = Field(description="Number of draws.")
     curvature: Literal["gauss_newton", "hessian"] = Field(
         default="gauss_newton", description="The curvature."

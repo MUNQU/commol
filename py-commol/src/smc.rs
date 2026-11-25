@@ -8,7 +8,7 @@
 
 use crate::parallelism::parallel_logged;
 use crate::records::StepLog;
-use commol_inference::resampling::{BlockDrawing, BlockScheme, FitUnit};
+use commol_inference::resampling::{BlockScheme, FitUnit};
 use commol_inference::settings::PriorsSettings;
 use commol_inference::settings::smc::{
     AbcRejectionSettings, AbcSmcSettings, BayesianPosteriorSettings, Eta, EtaCalibration,
@@ -162,8 +162,6 @@ pub struct PyEtaCalibration {
     failed: Vec<String>,
     /// The positions per block of a calibration
     block_length: Option<usize>,
-    /// With the automatic length, the estimate of each series by label
-    block_length_estimates: Option<Vec<(String, f64)>>,
     /// The degrees of freedom `η` reads, for information matching
     degrees_of_freedom: Option<f64>,
     /// The coverage expected of intervals of `FEW_COVERAGE_LEVEL`, when the
@@ -215,7 +213,7 @@ fn calibrated_eta(
             let found = smc::information_matching_eta(
                 &problem.inner,
                 &best_values(&starts),
-                calibration.block_length.0,
+                calibration.block_length,
             )
             .map_err(method_error)?;
             Ok((
@@ -227,20 +225,14 @@ fn calibrated_eta(
                     block_length: Some(found.block_length),
                     degrees_of_freedom: Some(found.degrees_of_freedom),
                     few_coverage: found.few_coverage(),
-                    block_length_estimates: found.estimates,
                 },
             ))
         }
         EtaCalibration::BootstrapCoverage(calibration) => {
+            let blocks = BlockScheme::new(problem.inner.observed_data(), calibration.block_length)
+                .map_err(method_error)?;
             let starts = problem.fit_logged(py, calibration.starts, log)?;
             let fit = best_values(&starts);
-            let blocks = BlockScheme::at_fit(
-                &problem.inner,
-                &fit,
-                calibration.block_length.0,
-                BlockDrawing::NonOverlapping,
-            )
-            .map_err(method_error)?;
             let mut sampler = gibbs_sampler(settings);
             let found = parallel_logged(py, log, |steps| {
                 smc::bootstrap_coverage_eta(
@@ -263,7 +255,6 @@ fn calibrated_eta(
                     coverage: Some(found.coverage),
                     failed: FitUnit::Replicate.entries(&found.failed),
                     block_length: Some(blocks.length()),
-                    block_length_estimates: blocks.estimates().map(<[_]>::to_vec),
                     degrees_of_freedom: None,
                     few_coverage: None,
                 },
@@ -308,7 +299,6 @@ fn gibbs_posterior(
                 coverage: None,
                 failed: Vec::new(),
                 block_length: None,
-                block_length_estimates: None,
                 degrees_of_freedom: None,
                 few_coverage: None,
             },

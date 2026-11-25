@@ -24,8 +24,6 @@ from commol.conformal import (
     RollingConformal,
     SplitConformal,
 )
-from commol.conformal.results import ConformalResult
-from commol.resampling import BayesianBootstrap
 from commol.uncertainty import ParameterSample, SampleMethod
 from tests.support import (
     a_to_b_builder,
@@ -455,64 +453,3 @@ def test_a_conformal_method_takes_a_confidence_level() -> None:
     assert "probability at least 0.5 " in result.guarantee
     # Split conformal draws no blocks.
     assert result.block_length is None
-    assert result.block_length_estimates is None
-
-
-@pytest.mark.parametrize(
-    ("variant", "settings"),
-    [(JackknifePlus, {}), (EnbPI, {"replicates": 20})],
-    ids=["jackknife_plus", "enbpi"],
-)
-def test_a_conformal_result_gives_its_block_length_and_estimates(
-    variant: type, settings: dict[str, object]
-) -> None:
-    values = (C + np.random.default_rng(6).normal(0.0, 1.0, 30)).tolist()
-    calibrator = flow_calibrator(values, windowed=True)
-
-    def run(block_length: int | str) -> ConformalResult:
-        return calibrator.uncertainty(
-            variant(
-                **settings,
-                block_length=block_length,
-                score="absolute",
-                by="series",
-                confidence_level=0.5,
-                positions=[31.0],
-            )
-        )
-
-    automatic, given = run("auto"), run(3)
-
-    # The blocks are those of the Bayesian bootstrap: non-overlapping, on the
-    # residuals of the fit.
-    blocks = calibrator.uncertainty(
-        BayesianBootstrap(replicates=1, block_length="auto")
-    ).diagnostics
-    estimates = automatic.block_length_estimates
-    assert estimates is not None and list(estimates) == ["B"]
-    assert estimates == blocks.block_length_estimates
-    assert automatic.block_length == blocks.block_length
-    assert given.block_length == 3
-    assert given.block_length_estimates is None
-
-
-@pytest.mark.parametrize(
-    ("variant", "settings"),
-    [(JackknifePlus, {}), (EnbPI, {"replicates": 20})],
-    ids=["jackknife_plus", "enbpi"],
-)
-def test_a_block_longer_than_the_data_is_an_error(
-    variant: type, settings: dict[str, object]
-) -> None:
-    values = (C + np.random.default_rng(6).normal(0.0, 1.0, 30)).tolist()
-    method = variant(
-        **settings,
-        block_length=1000,
-        score="absolute",
-        by="series",
-        confidence_level=0.5,
-        positions=[31.0],
-    )
-
-    with pytest.raises(ValueError, match="block_length is 1000; it must be between 1"):
-        flow_calibrator(values, windowed=True).uncertainty(method)

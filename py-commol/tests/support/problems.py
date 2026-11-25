@@ -331,12 +331,13 @@ def overdispersed_calibrator(rates: Sequence[str] = ("k1", "k2")) -> Calibrator:
     return Calibrator(Simulation(model), problem)
 
 
-def structural_zero_calibrator(first_c: int) -> Calibrator:
+def structural_zero_calibrator(first_c: int, *, first_b: int = 1) -> Calibrator:
     """
     ``k1`` of A → B → C with negative binomial counts of B and C.
 
     C fills from B only from step 10, so its mean is exactly 0 up to step 10;
-    C is observed from step ``first_c``, at value 0 up to step 10.
+    C is observed from step ``first_c``, at value 0 up to step 10, and B from
+    step ``first_b``.
     """
     model = build(
         abc_builder(
@@ -351,6 +352,7 @@ def structural_zero_calibrator(first_c: int) -> Calibrator:
     data = [
         ObservedDataPoint(at=t, output="B", value=float(v), label="B")
         for t, v in enumerate(b, start=1)
+        if t >= first_b
     ]
     c = [0] * 10 + [10, 95, 80, 170, 120, 240, 190, 310, 250, 380]
     data += [

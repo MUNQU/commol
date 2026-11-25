@@ -17,6 +17,7 @@ use crate::conformal::predict::{ensemble_spread, set_predictions, targets};
 use crate::conformal::quantile::{lower_quantile, upper_quantile};
 use crate::conformal::score::{ConformalSettings, NonconformityScore, scales};
 use crate::error::MethodError;
+use crate::resampling::residuals::fitted_values;
 use crate::resampling::{BlockScheme, FitUnit, Perturbation, ReplicateRunner};
 
 /// The coverage jackknife+ guarantees under exchangeable blocks, with `n`
@@ -52,7 +53,8 @@ pub struct JackknifePlusRun {
 ///
 /// # Errors
 ///
-/// Returns an error when `scheme` has fewer than two blocks, fewer than two
+/// As [`MethodError::of_point`] when the fit of `runner` has no run. Returns an
+/// error when `scheme` has fewer than two blocks, fewer than two
 /// refits succeed ([`FitUnit::require`]), a point cannot be predicted, or
 /// the score has no scale at a point.
 pub fn jackknife_plus<E>(
@@ -64,6 +66,8 @@ pub fn jackknife_plus<E>(
 where
     E: SimulationEngine + Send + Sync,
 {
+    let problem = runner.problem();
+    fitted_values(problem, runner.fit())?;
     if scheme.count() < 2 {
         return Err(MethodError::Invalid(format!(
             "block_length {} makes {} block; jackknife+ needs at least two",
@@ -71,7 +75,6 @@ where
             scheme.count()
         )));
     }
-    let problem = runner.problem();
     let observed = problem.observed_data();
     let perturbations: Vec<Perturbation> = scheme
         .blocks()
