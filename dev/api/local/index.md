@@ -66,7 +66,7 @@ Attributes:
 
 | Name           | Type                      | Description                                                                                                 |
 | -------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `block_length` | \`int                     | auto\`                                                                                                      |
+| `block_length` | `int`                     | Positions per block of the meat; they must make more blocks than parameters.                                |
 | `draws`        | `int`                     | Number of draws of the Student t, at least 1.                                                               |
 | `curvature`    | `{gauss_newton, hessian}` | The curvature H (default "gauss_newton"). With the Hessian, the sandwich also holds when the mean is wrong. |
 | `starts`       | `int`                     | Starts of the fit (default 1): the initial guess, then rows of a Latin hypercube over the bounds.           |
@@ -92,9 +92,9 @@ class Sandwich(UncertaintyMethod[SandwichResult], RangeChecked):
 
     Attributes
     ----------
-    block_length : int | "auto"
-        Positions per block; ``"auto"`` is the rule of Politis and White
-        (2004) for non-overlapping blocks on the residuals of the fit.
+    block_length : int
+        Positions per block of the meat; they must make more blocks than
+        parameters.
     draws : int
         Number of draws of the Student t, at least 1.
     curvature : {"gauss_newton", "hessian"}
@@ -107,7 +107,7 @@ class Sandwich(UncertaintyMethod[SandwichResult], RangeChecked):
 
     _runner = staticmethod(run_sandwich)
 
-    block_length: int | Literal["auto"] = Field(description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     draws: int = Field(description="Number of draws.")
     curvature: Literal["gauss_newton", "hessian"] = Field(
         default="gauss_newton", description="The curvature."
@@ -524,15 +524,14 @@ The result of a sandwich: a Student t on the unbounded scale of the parameters, 
 
 Attributes:
 
-| Name                     | Type                | Description                                                                          |
-| ------------------------ | ------------------- | ------------------------------------------------------------------------------------ |
-| `fit`                    | `CalibrationResult` | The fit the sandwich is centred on: Calibrator.run(starts).                          |
-| `covariance`             | `list[list[float]]` | H⁻¹ B H⁻¹ on the unbounded scale of the parameters.                                  |
-| `sample`                 | `ParameterSample`   | Draws of the Student t, mapped back to the parameters, with equal weights.           |
-| `notes`                  | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale. |
-| `blocks`                 | `int`               | The number of blocks G; intervals read a Student t with G − 1 degrees of freedom.    |
-| `block_length`           | `int`               | The positions per block.                                                             |
-| `block_length_estimates` | \`dict[str, float]  | None\`                                                                               |
+| Name           | Type                | Description                                                                          |
+| -------------- | ------------------- | ------------------------------------------------------------------------------------ |
+| `fit`          | `CalibrationResult` | The fit the sandwich is centred on: Calibrator.run(starts).                          |
+| `covariance`   | `list[list[float]]` | H⁻¹ B H⁻¹ on the unbounded scale of the parameters.                                  |
+| `sample`       | `ParameterSample`   | Draws of the Student t, mapped back to the parameters, with equal weights.           |
+| `notes`        | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale. |
+| `blocks`       | `int`               | The number of blocks G; intervals read a Student t with G − 1 degrees of freedom.    |
+| `block_length` | `int`               | The positions per block.                                                             |
 
 Source code in `commol/local/results.py`
 
@@ -560,14 +559,10 @@ class SandwichResult(LocalResult):
         ``G − 1`` degrees of freedom.
     block_length : int
         The positions per block.
-    block_length_estimates : dict[str, float] | None
-        With ``block_length="auto"``, the estimate of each series, by label;
-        otherwise None.
     """
 
     blocks: int
     block_length: int
-    block_length_estimates: dict[str, float] | None
 
     def degrees_of_freedom(self) -> float | None:
         """

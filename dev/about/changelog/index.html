@@ -5575,10 +5575,9 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   so a bound such as <code>2 - k * M_radius</code> is one constraint; a rate reads them at
   the values of its run. See
   <a href="../../guide/calibration-constraints/#a-bound-on-a-matrix">Constraints</a>.</li>
-<li><code>GibbsResult</code> and <code>ConformalResult</code> give <code>block_length</code> and
-  <code>block_length_estimates</code>, as the bootstraps, the jackknife and the sandwich
-  do: the length a method ran with, and with <code>block_length="auto"</code> the
-  estimate of each series, by label. <code>GibbsResult</code> gives them for
+<li><code>GibbsResult</code> and <code>ConformalResult</code> give <code>block_length</code>, as the
+  bootstraps, the jackknife and the sandwich do: the length a method ran
+  with. <code>GibbsResult</code> gives it for
   <code>InformationMatchingEta</code> and <code>BootstrapCoverageEta</code>, and <code>None</code> for a
   number <code>η</code>; <code>ConformalResult</code> for <code>JackknifePlus</code> and <code>EnbPI</code>, and <code>None</code>
   for the variants without blocks. See
@@ -6249,6 +6248,30 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   levels of nesting, within the limits of the parser. The
   build still rejects a variable that the model does not define. See
   <a href="../../guide/mathematical-expressions/#limits-of-the-parser">Limits of the parser</a>.</li>
+<li><strong>Breaking:</strong> <code>block_length="auto"</code> is removed from every method that reads
+  blocks (<code>BayesianBootstrap</code>, <code>ResidualBootstrap</code>, <code>WildBootstrap</code>,
+  <code>BlockJackknife</code>, <code>Sandwich</code>, <code>InformationMatchingEta</code>,
+  <code>BootstrapCoverageEta</code>, <code>JackknifePlus</code>, <code>EnbPI</code>): <code>block_length</code> is a whole
+  number of at least 1, and <code>"auto"</code> raises <code>pydantic.ValidationError</code>, a
+  <code>ValueError</code>, that names it, as any text that is not a whole number does.
+  The field <code>block_length_estimates</code> is removed from <code>ResamplingDiagnostics</code>
+  and <code>SandwichResult</code>; <code>block_length</code> stays. The removal changes no
+  result of a given number. <code>"auto"</code> took the largest of the lengths its rule
+  gave the series, whatever the use. Migration: read
+  <code>residual_dependence</code> of the fit, choose the length, and compare the result
+  at several lengths, as
+  <a href="../../guide/uncertainty/resampling/#choose-the-length">Choose the length</a>
+  shows; to repeat a result, give the <code>block_length</code> it reports. A method saved
+  with <code>"auto"</code> or a result saved with <code>block_length_estimates</code> no longer
+  loads: set the number, and delete the field. In Rust, <code>BlockScheme::new</code>
+  takes the place of <code>BlockScheme::resolve</code> and <code>BlockScheme::at_fit</code>;
+  <code>sandwich_approximation</code> and <code>information_matching_eta</code> take a <code>usize</code>;
+  <code>BayesianBootstrap::new</code> takes the problem and the fit, and refuses a fit
+  with no run, as <code>block_jackknife</code>, <code>jackknife_plus</code>, <code>enbpi</code> and
+  <code>bootstrap_coverage_eta</code> do; <code>automatic_length</code>, <code>automatic_block_length</code>,
+  <code>AutomaticLength</code>, <code>BlockDrawing</code>, <code>Estimates</code>, <code>BlockScheme::estimates</code>,
+  <code>blocks_at</code>, <code>Curvature::predictions</code> and the field <code>estimates</code> of
+  <code>SandwichRun</code> are removed.</li>
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
@@ -6315,11 +6338,10 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>BinomialObservations</code> (and a binomial count of all its trials at a mean
   of all of them), such as a series that stays 0 until a process starts,
   has the limit of its score there. These observations add nothing to the
-  log-likelihood. With a given <code>block_length</code>, and when other series
-  observe their positions, <code>InformationMatchingEta</code> and the meat of
-  <code>Sandwich</code> give the same result with and without them. With
-  <code>block_length="auto"</code>, or at positions of their own, they can still
-  change the blocks (#517). The floors of a <code>ProfileLikelihood</code> stay
+  log-likelihood. When other series observe their positions,
+  <code>InformationMatchingEta</code> and the meat of <code>Sandwich</code> give the same result
+  with and without these counts. At positions of their own they count in the
+  windows of the blocks. The floors of a <code>ProfileLikelihood</code> stay
   finite with them. Before, their score was NaN, information matching
   failed with a message that the scores were all 0, and the evaluation
   floor of a profile was NaN.</p>
@@ -6369,14 +6391,13 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   over 2 steps and a total over 40 steps that both end at 40, is refused by
   the methods that read one residual per position of a series, with a
   message that names the series and the position: <code>ResidualNoise</code>,
-  <code>ResidualBootstrap</code>, <code>block_length="auto"</code> of every method, and
-  <code>RollingConformal</code>, which counts a horizon in observations. Before, the
-  residual noise and the residual bootstrap gave both observations the
-  residual of one of them, and the automatic block length read them as
-  consecutive positions, with no message. A calibration, the likelihood, the
-  scores, and the Bayesian and wild bootstraps, the block jackknife, the
-  sandwich and the other conformal methods with a <code>block_length</code> of a number
-  read each observation with its own residual, and accept such a series. Give one of the two
+  <code>ResidualBootstrap</code>, and <code>RollingConformal</code>, which counts a horizon in
+  observations. Before, the residual noise and the residual bootstrap gave
+  both observations the residual of one of them, with no message. A
+  calibration, the likelihood, the scores, and the Bayesian and wild
+  bootstraps, the block jackknife, the sandwich and the other conformal
+  methods read each observation with its own residual, and accept such a
+  series. Give one of the two
   observations a label of its own for the methods that refuse it. See
   <a href="../../guide/calibration-observations/#one-position-two-observations">One position, two observations</a>.</p>
 </li>

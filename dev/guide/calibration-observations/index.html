@@ -4601,10 +4601,6 @@ label with a message that names it and the position
 <td>One residual of the series, drawn for every observation there</td>
 </tr>
 <tr>
-<td><code>block_length="auto"</code> of any method</td>
-<td>The residuals of the series as consecutive values</td>
-</tr>
-<tr>
 <td><code>RollingConformal</code></td>
 <td>One observation per horizon</td>
 </tr>
@@ -4612,9 +4608,9 @@ label with a message that names it and the position
 </table>
 <p>The two observations also have different scales: a total over 40 steps is
 about 20 times an increment over 2. Give one of them a label of its own when a
-method needs one scale per series. With a <code>block_length</code> of a number, the
-Bayesian and wild bootstraps, the block jackknife and the sandwich keep both
-in one label, each in the block of its position.</p>
+method needs one scale per series. The Bayesian and wild bootstraps, the block
+jackknife and the sandwich keep both in one label, each in the block of its
+position.</p>
 <h3 id="parts-of-a-window">Parts of a window<a class="headerlink" href="#parts-of-a-window" title="Permanent link">&para;</a></h3>
 <p>A total is often the sum of counts that were measured apart: a weekly report
 adds 7 daily counts, each with its own noise. <code>parts=K</code> says so: the window

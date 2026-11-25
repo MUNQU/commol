@@ -69,10 +69,9 @@ problem = CalibrationProblem(
 )
 calibrator = Calibrator(Simulation(ab_model(None)), problem)
 
-result = calibrator.uncertainty(BayesianBootstrap(replicates=100, block_length="auto"))
+result = calibrator.uncertainty(BayesianBootstrap(replicates=100, block_length=1))
 lower, upper = result.sample.interval(0.9)["k"]
-print(round(lower, 4), round(upper, 4))  # 0.0486 0.0508
-print(result.diagnostics.block_length)  # 1
+print(round(lower, 4), round(upper, 4))  # 0.0483 0.0512
 ```
 
 `result.fit` is the fit, `result.sample` holds one draw per replicate that fitted, `result.failed` lists the replicates that failed, and `result.diagnostics` gives the block length.
@@ -92,15 +91,93 @@ None of them needs a noise model. The Bayesian bootstrap never changes the obser
 
 A block holds every observation, of every series, whose position falls in one window of `block_length` consecutive distinct positions (`BlockScheme`, `resampling/blocks.rs`). The dependence of the data across series and along the positions stays inside blocks, so the methods hold for noise that is correlated in time or between series.
 
-`block_length` has no default:
+`block_length` is a whole number of at least 1, with no default: it is your decision, about your data. `1` states that the noise of different positions is independent. A longer block states that the noise depends on its neighbours no further than the block holds. Every method that reads blocks, here and on the other pages, takes it so.
 
-| Value      | Use it when                                                                                                                                                                                                      |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `1`        | The noise of different positions is independent                                                                                                                                                                  |
-| An integer | You know how far the dependence of the noise reaches                                                                                                                                                             |
-| `"auto"`   | You do not know: the rule of Politis and White (2004), with the correction of Patton, Politis and White (2009), estimates a length for each series on the residuals of the fit, and the method takes the largest |
+commol does not choose it. The best length changes with the method and with the number of blocks, and one number has no single answer for several series of different dependence.
 
-With `"auto"`, `diagnostics.block_length_estimates` gives the estimate of each series and `diagnostics.block_length` the length used. The estimate depends on how a method draws its blocks: moving blocks get a length about 15 % longer than stationary or non-overlapping ones. `"auto"` reads the residuals of a series one per position, so it refuses a series with two observations at one position; a number does, except for `ResidualBootstrap`, which draws one residual per position ([One position, two observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#one-position-two-observations)).
+### The length counts positions
+
+- **Of all the series together.** A block holds consecutive distinct positions of the data, whichever series has an observation there. With a weekly series beside a daily one, the positions are days: a length of 7 holds one value of the weekly series, and 4 of its values need 28.
+- **Also where no observation carries information.** A series that the model holds at exactly 0 until a process starts says nothing about the parameters while it is observed at 0: those scores are 0 for the count models (Poisson, negative binomial, binomial), for a normal or Student t model whose `sd`, `scale` and `df` are numbers, and for a loss without `normalize_observations`. A model with a fitted `sd`, `scale` or `df` reads them, and so does the normalization of a series: there they change the result at any position. Where the scores are 0, at a position that another series also observes they change nothing in the `Sandwich` or in `InformationMatchingEta`. At a position that only such observations hold, it still counts: it takes a place in a window, so it shifts the windows after it, and a window of such positions alone is one more block.
+
+### Choose the length
+
+1. **Read the dependence of the residuals of the fit** with [`residual_dependence`](https://munqu.github.io/commol/latest/guide/uncertainty/dependence/index.md): for each series its autocorrelations, the integrated autocorrelation time `τ` with its band, and `cut_lag`, the largest lag in the sum of `τ`. They count steps of the grid of that series, so a lag of 3 of the weekly series is 21 days. A fit absorbs dependence and a short series hides it ([The bias of `τ`](https://munqu.github.io/commol/latest/guide/uncertainty/dependence/#the-bias-of)): a small `τ` does not show that the noise is independent.
+1. **Use what you know of the process**: a weekly pattern of the reports, an event that moves several positions, the time that a disturbance lasts. A cycle at a long lag does not reach `τ`.
+1. **Compare the result at several lengths**, with the number of blocks each leaves, for the method and the parameters you report.
+
+The same model with a noise that depends on its neighbours, an AR(1) of 0.7:
+
+```python
+from commol.dependence import Refitted, residual_dependence
+
+rng = np.random.default_rng(1)
+shock = np.zeros(61)
+for t in range(1, 61):
+    shock[t] = 0.7 * shock[t - 1] + rng.normal(0.0, 0.05)
+dependent = [
+    ObservedDataPoint(at=t, output="B", value=truth["B"][t] * float(np.exp(shock[t])))
+    for t in range(1, 61)
+]
+dependent_calibrator = Calibrator(
+    Simulation(ab_model(None)), problem.model_copy(update={"observed_data": dependent})
+)
+fit = dependent_calibrator.run()
+
+(series,) = residual_dependence(
+    Predictive(dependent_calibrator, dependent_calibrator.point_sample(fit), positions=[1]),
+    dependent,
+    NoNoise(),
+    max_lag=10,
+    randomizations=1,
+    reference=Refitted(replicates=99),
+    confidence_level=0.9,
+).series
+print([round(r, 2) for r in series.correlations[:4]])  # [0.6, 0.28, 0.16, 0.03]
+print(series.p_value, series.cut_lag)  # 0.01 3
+print(round(series.tau, 2), [round(b, 2) for b in series.tau_band])  # 3.09 [0.52, 2.05]
+
+for length in (1, 3, 6, 10, 15):
+    compared = dependent_calibrator.uncertainty(
+        BayesianBootstrap(replicates=300, block_length=length)
+    )
+    low, high = compared.sample.interval(0.9)["k"]
+    blocks = -(-len(dependent) // length)
+    print(length, blocks, round(high - low, 4))
+# 1 60 0.003
+# 3 20 0.0049
+# 6 10 0.0058
+# 10 6 0.0049
+# 15 4 0.003
+```
+
+The residuals depend on their neighbours: the test rejects independence, `τ` is above its band, and the autocorrelations fall to about 0 at lag 4. Blocks of one position give the narrowest interval, since they ignore that dependence. From 3 to 10 positions the interval keeps about one width, and blocks of 15 leave only 4, whose spread says little: the interval narrows again although the data did not change.
+
+A range of lengths with one width is not a range with the coverage of the level. Over 2000 data sets of this example, the 90 % interval of `k` covers its value in this share of them (300 replicates, or 4000 draws of the sandwich):
+
+| `block_length`      | 1    | 3    | 6    | 10   | 15   |
+| ------------------- | ---- | ---- | ---- | ---- | ---- |
+| Blocks              | 60   | 20   | 10   | 6    | 4    |
+| `BayesianBootstrap` | 46 % | 61 % | 66 % | 64 % | 62 % |
+| `Sandwich`          | 48 % | 67 % | 78 % | 84 % | 87 % |
+
+No length brings the bootstrap near 90 %: 60 values with this dependence leave few independent blocks, and its spread does not allow for that. The sandwich does, with a Student t of one degree of freedom less than its blocks, and its interval is also wider with few of them. Comparing lengths shows how far the choice moves the result, not which length is right: report the length with the result, say when the result changes with it, and, when the series is short, that the interval can cover less than its level ([Short series](#short-series)).
+
+A method also sets how few blocks it takes:
+
+| Method                                                      | Blocks it needs                                                       |
+| ----------------------------------------------------------- | --------------------------------------------------------------------- |
+| `BayesianBootstrap`, `WildBootstrap`, `ResidualBootstrap`   | None: they take one block, with no note                               |
+| `BootstrapCoverageEta`                                      | None, but with one block its replicates are equal and tell it nothing |
+| `BlockJackknife`, `JackknifePlus`, `InformationMatchingEta` | At least 2                                                            |
+| `Sandwich`                                                  | More than the parameters                                              |
+| `EnbPI`                                                     | Each left out by at least one replicate                               |
+
+[Information matching](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#what-means) gives the degrees of freedom that its blocks read, and warns when they are few; the [sandwich](https://munqu.github.io/commol/latest/guide/uncertainty/local/#sandwich) reads a Student t with one degree of freedom less than its blocks.
+
+With a length of all the positions, one block, the bootstraps draw nothing: each replicate of `BayesianBootstrap`, and of `ResidualBootstrap` with `"moving"`, has the data of the fit, so its interval has width 0; that of `WildBootstrap` is about 0 in this example, and `"stationary"` gives its narrowest. No note says so: read the number of blocks.
+
+A series with two observations at one position is refused by `ResidualBootstrap`, which draws one residual per position, whatever the length; the other block methods accept it ([One position, two observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#one-position-two-observations)).
 
 ## Bayesian bootstrap
 
@@ -121,7 +198,7 @@ Use the multiplicative scale for counts or amounts that span orders of magnitude
 residual = calibrator.uncertainty(
     ResidualBootstrap(
         replicates=100,
-        block_length="auto",
+        block_length=1,
         residual_scale="multiplicative",
         scheme="stationary",
     )
@@ -175,12 +252,12 @@ print(len(jackknife.influence["k"]))  # 6
 
 A bootstrap returns a `BootstrapResult(fit, sample, failed, not_converged, diagnostics)`. The sample has equal weights, and the group of each draw is its replicate.
 
-| Field                                                            | Meaning                                                                                                                    |
-| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `failed`                                                         | Each replicate that failed, `"Replicate <index> failed: <reason>"`; it is not in the sample, and it is logged as a warning |
-| `not_converged`                                                  | Replicates kept although their optimizer did not converge                                                                  |
-| `diagnostics.block_length`, `diagnostics.block_length_estimates` | The length used, and the estimate of each series with `"auto"`                                                             |
-| `diagnostics.negative_values`                                    | New observed values below zero, over every replicate                                                                       |
+| Field                         | Meaning                                                                                                                    |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `failed`                      | Each replicate that failed, `"Replicate <index> failed: <reason>"`; it is not in the sample, and it is logged as a warning |
+| `not_converged`               | Replicates kept although their optimizer did not converge                                                                  |
+| `diagnostics.block_length`    | The block length the method ran with; `None` for `ParametricBootstrap`                                                     |
+| `diagnostics.negative_values` | New observed values below zero, over every replicate                                                                       |
 
 Every result of a method that fits several times lists the fits that failed in `failed` and counts the fits kept without convergence in `not_converged`, in the same way: a bootstrap, the jackknife, a profile with a bootstrap threshold and the conformal methods that refit. When too few fits succeed, the method raises a `RuntimeError` that says how many of how many fitted, how many it needs, and the first reasons.
 
@@ -207,11 +284,11 @@ noise = ResidualNoise(
     residual_scale="multiplicative",
 )
 
-print(scores.coverage(predictive, held_out, NoNoise(), confidence_level=0.9).mean)  # 0.0
-print(scores.coverage(predictive, held_out, noise, confidence_level=0.9).mean)  # 0.9
+print(scores.coverage(predictive, held_out, NoNoise(), confidence_level=0.9).mean)  # 0.05
+print(scores.coverage(predictive, held_out, noise, confidence_level=0.9).mean)  # 0.85
 ```
 
-The band of the model is narrow and covers none of the held-out observations; the prediction interval covers them at its level.
+The band of the model is narrow and covers 1 of the 20 held-out observations; the prediction interval covers 17, near its level.
 
 ## Short series
 
@@ -219,7 +296,7 @@ A block bootstrap reads the dependence of the noise from few blocks. On a short 
 
 ## Checklist
 
-- [ ] You chose `block_length`, or read the estimates of `"auto"`.
+- [ ] You chose `block_length` from the dependence of the residuals and the scale of the process, read the result at several lengths, and report the length.
 - [ ] You chose the residual scale for the data: multiplicative for values that span orders of magnitude.
 - [ ] `failed` is empty, or you know why replicates failed.
 - [ ] `not_converged` is 0, or you raised `max_iterations`.

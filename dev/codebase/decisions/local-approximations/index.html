@@ -4201,8 +4201,8 @@ infinite information, is refused after it is summed.</p>
 <code>B = G/(G − 1) · Σ_b s_b s_bᵀ</code> over the non-overlapping blocks of
 <code>BlockScheme</code> (CR1), and its draws and intervals read a Student t with
 <code>G − 1</code> degrees of freedom. <code>G ≤ p</code> is refused, since the block scores of a
-fit sum to zero and <code>B</code> would have rank below <code>p</code>. <code>block_length</code> has no
-default; <code>"auto"</code> is the length of non-overlapping blocks of the residuals.
+fit sum to zero and <code>B</code> would have rank below <code>p</code>.
+<a href="../dependence/#the-user-gives-the-length-of-a-block">The user gives the length of a block</a>.
 Information matching (<code>smc/gibbs.rs</code>) reads the same <code>H</code> as <code>J</code> and the same
 block scores for <code>I</code>, so it takes a likelihood and holds under dependence; it
 reads them only through a trace, so it needs two blocks, not more than <code>p</code>

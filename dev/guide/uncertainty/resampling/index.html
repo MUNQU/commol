@@ -1369,6 +1369,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Blocks and their length">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-length-counts-positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The length counts positions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#choose-the-length" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose the length
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4043,6 +4071,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Blocks and their length">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-length-counts-positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The length counts positions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#choose-the-length" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose the length
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4246,10 +4302,9 @@ runs through <code>Calibrator.uncertainty</code>, in parallel in Rust
 </span><span id="__span-0-60"><a id="__codelineno-0-60" name="__codelineno-0-60" href="#__codelineno-0-60"></a><span class="p">)</span>
 </span><span id="__span-0-61"><a id="__codelineno-0-61" name="__codelineno-0-61" href="#__codelineno-0-61"></a><span class="n">calibrator</span> <span class="o">=</span> <span class="n">Calibrator</span><span class="p">(</span><span class="n">Simulation</span><span class="p">(</span><span class="n">ab_model</span><span class="p">(</span><span class="kc">None</span><span class="p">)),</span> <span class="n">problem</span><span class="p">)</span>
 </span><span id="__span-0-62"><a id="__codelineno-0-62" name="__codelineno-0-62" href="#__codelineno-0-62"></a>
-</span><span id="__span-0-63"><a id="__codelineno-0-63" name="__codelineno-0-63" href="#__codelineno-0-63"></a><span class="n">result</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">uncertainty</span><span class="p">(</span><span class="n">BayesianBootstrap</span><span class="p">(</span><span class="n">replicates</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">block_length</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">))</span>
+</span><span id="__span-0-63"><a id="__codelineno-0-63" name="__codelineno-0-63" href="#__codelineno-0-63"></a><span class="n">result</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">uncertainty</span><span class="p">(</span><span class="n">BayesianBootstrap</span><span class="p">(</span><span class="n">replicates</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">block_length</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
 </span><span id="__span-0-64"><a id="__codelineno-0-64" name="__codelineno-0-64" href="#__codelineno-0-64"></a><span class="n">lower</span><span class="p">,</span> <span class="n">upper</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">sample</span><span class="o">.</span><span class="n">interval</span><span class="p">(</span><span class="mf">0.9</span><span class="p">)[</span><span class="s2">&quot;k&quot;</span><span class="p">]</span>
-</span><span id="__span-0-65"><a id="__codelineno-0-65" name="__codelineno-0-65" href="#__codelineno-0-65"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">lower</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span> <span class="nb">round</span><span class="p">(</span><span class="n">upper</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>  <span class="c1"># 0.0486 0.0508</span>
-</span><span id="__span-0-66"><a id="__codelineno-0-66" name="__codelineno-0-66" href="#__codelineno-0-66"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">diagnostics</span><span class="o">.</span><span class="n">block_length</span><span class="p">)</span>  <span class="c1"># 1</span>
+</span><span id="__span-0-65"><a id="__codelineno-0-65" name="__codelineno-0-65" href="#__codelineno-0-65"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">lower</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span> <span class="nb">round</span><span class="p">(</span><span class="n">upper</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>  <span class="c1"># 0.0483 0.0512</span>
 </span></code></pre></div>
 <p><code>result.fit</code> is the fit, <code>result.sample</code> holds one draw per replicate that
 fitted, <code>result.failed</code> lists the replicates that failed, and
@@ -4303,36 +4358,188 @@ window of <code>block_length</code> consecutive distinct positions
 (<code>BlockScheme</code>, <code>resampling/blocks.rs</code>). The dependence of the data across
 series and along the positions stays inside blocks, so the methods hold for
 noise that is correlated in time or between series.</p>
-<p><code>block_length</code> has no default:</p>
+<p><code>block_length</code> is a whole number of at least 1, with no default: it is your
+decision, about your data. <code>1</code> states that the noise of different positions is
+independent. A longer block states that the noise depends on its neighbours no
+further than the block holds. Every method that reads blocks, here and on the
+other pages, takes it so.</p>
+<p>commol does not choose it. The best length changes with the method and with
+the number of blocks, and one number has no single answer for several series of
+different dependence.</p>
+<h3 id="the-length-counts-positions">The length counts positions<a class="headerlink" href="#the-length-counts-positions" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Of all the series together.</strong> A block holds consecutive distinct positions
+  of the data, whichever series has an observation there. With a weekly series
+  beside a daily one, the positions are days: a length of 7 holds one value of
+  the weekly series, and 4 of its values need 28.</li>
+<li><strong>Also where no observation carries information.</strong> A series that the model
+  holds at exactly 0 until a process starts says nothing about the parameters
+  while it is observed at 0: those scores are 0 for the count models
+  (Poisson, negative binomial, binomial), for a normal or Student t model
+  whose <code>sd</code>, <code>scale</code> and <code>df</code> are numbers, and for a loss without
+  <code>normalize_observations</code>. A model with a fitted <code>sd</code>, <code>scale</code> or <code>df</code> reads
+  them, and so does the normalization of a series: there they change the
+  result at any position. Where the scores are 0, at a position that another
+  series also observes they change nothing in the <code>Sandwich</code> or in
+  <code>InformationMatchingEta</code>. At a position that only such observations hold, it
+  still counts: it takes a place in a window, so it shifts the windows after
+  it, and a window of such positions alone is one more block.</li>
+</ul>
+<h3 id="choose-the-length">Choose the length<a class="headerlink" href="#choose-the-length" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Read the dependence of the residuals of the fit</strong> with
+   <a href="../dependence/"><code>residual_dependence</code></a>: for each series its
+   autocorrelations, the integrated autocorrelation time <code>τ</code> with its band, and
+   <code>cut_lag</code>, the largest lag in the sum of <code>τ</code>. They count steps of the grid
+   of that series, so a lag of 3 of the weekly series is 21 days. A fit absorbs
+   dependence and a short series hides it (<a href="../dependence/#the-bias-of">The bias of <code>τ</code></a>):
+   a small <code>τ</code> does not show that the noise is independent.</li>
+<li><strong>Use what you know of the process</strong>: a weekly pattern of the reports, an
+   event that moves several positions, the time that a disturbance lasts. A
+   cycle at a long lag does not reach <code>τ</code>.</li>
+<li><strong>Compare the result at several lengths</strong>, with the number of blocks each
+   leaves, for the method and the parameters you report.</li>
+</ol>
+<p>The same model with a noise that depends on its neighbours, an AR(1) of 0.7:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol.dependence</span><span class="w"> </span><span class="kn">import</span> <span class="n">Refitted</span><span class="p">,</span> <span class="n">residual_dependence</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">shock</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">61</span><span class="p">)</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">61</span><span class="p">):</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">shock</span><span class="p">[</span><span class="n">t</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.7</span> <span class="o">*</span> <span class="n">shock</span><span class="p">[</span><span class="n">t</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">rng</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">)</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="n">dependent</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="n">t</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">truth</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">][</span><span class="n">t</span><span class="p">]</span> <span class="o">*</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">shock</span><span class="p">[</span><span class="n">t</span><span class="p">])))</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">61</span><span class="p">)</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="p">]</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="n">dependent_calibrator</span> <span class="o">=</span> <span class="n">Calibrator</span><span class="p">(</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    <span class="n">Simulation</span><span class="p">(</span><span class="n">ab_model</span><span class="p">(</span><span class="kc">None</span><span class="p">)),</span> <span class="n">problem</span><span class="o">.</span><span class="n">model_copy</span><span class="p">(</span><span class="n">update</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;observed_data&quot;</span><span class="p">:</span> <span class="n">dependent</span><span class="p">})</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="p">)</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="n">fit</span> <span class="o">=</span> <span class="n">dependent_calibrator</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="p">(</span><span class="n">series</span><span class="p">,)</span> <span class="o">=</span> <span class="n">residual_dependence</span><span class="p">(</span>
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>    <span class="n">Predictive</span><span class="p">(</span><span class="n">dependent_calibrator</span><span class="p">,</span> <span class="n">dependent_calibrator</span><span class="o">.</span><span class="n">point_sample</span><span class="p">(</span><span class="n">fit</span><span class="p">),</span> <span class="n">positions</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>    <span class="n">dependent</span><span class="p">,</span>
+</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>    <span class="n">NoNoise</span><span class="p">(),</span>
+</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>    <span class="n">max_lag</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>    <span class="n">randomizations</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>    <span class="n">reference</span><span class="o">=</span><span class="n">Refitted</span><span class="p">(</span><span class="n">replicates</span><span class="o">=</span><span class="mi">99</span><span class="p">),</span>
+</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>    <span class="n">confidence_level</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span>
+</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a><span class="p">)</span><span class="o">.</span><span class="n">series</span>
+</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a><span class="nb">print</span><span class="p">([</span><span class="nb">round</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">series</span><span class="o">.</span><span class="n">correlations</span><span class="p">[:</span><span class="mi">4</span><span class="p">]])</span>  <span class="c1"># [0.6, 0.28, 0.16, 0.03]</span>
+</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a><span class="nb">print</span><span class="p">(</span><span class="n">series</span><span class="o">.</span><span class="n">p_value</span><span class="p">,</span> <span class="n">series</span><span class="o">.</span><span class="n">cut_lag</span><span class="p">)</span>  <span class="c1"># 0.01 3</span>
+</span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">series</span><span class="o">.</span><span class="n">tau</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="p">[</span><span class="nb">round</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">series</span><span class="o">.</span><span class="n">tau_band</span><span class="p">])</span>  <span class="c1"># 3.09 [0.52, 2.05]</span>
+</span><span id="__span-1-28"><a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>
+</span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a><span class="k">for</span> <span class="n">length</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">15</span><span class="p">):</span>
+</span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a>    <span class="n">compared</span> <span class="o">=</span> <span class="n">dependent_calibrator</span><span class="o">.</span><span class="n">uncertainty</span><span class="p">(</span>
+</span><span id="__span-1-31"><a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a>        <span class="n">BayesianBootstrap</span><span class="p">(</span><span class="n">replicates</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span> <span class="n">block_length</span><span class="o">=</span><span class="n">length</span><span class="p">)</span>
+</span><span id="__span-1-32"><a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a>    <span class="p">)</span>
+</span><span id="__span-1-33"><a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a>    <span class="n">low</span><span class="p">,</span> <span class="n">high</span> <span class="o">=</span> <span class="n">compared</span><span class="o">.</span><span class="n">sample</span><span class="o">.</span><span class="n">interval</span><span class="p">(</span><span class="mf">0.9</span><span class="p">)[</span><span class="s2">&quot;k&quot;</span><span class="p">]</span>
+</span><span id="__span-1-34"><a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a>    <span class="n">blocks</span> <span class="o">=</span> <span class="o">-</span><span class="p">(</span><span class="o">-</span><span class="nb">len</span><span class="p">(</span><span class="n">dependent</span><span class="p">)</span> <span class="o">//</span> <span class="n">length</span><span class="p">)</span>
+</span><span id="__span-1-35"><a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">length</span><span class="p">,</span> <span class="n">blocks</span><span class="p">,</span> <span class="nb">round</span><span class="p">(</span><span class="n">high</span> <span class="o">-</span> <span class="n">low</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+</span><span id="__span-1-36"><a id="__codelineno-1-36" name="__codelineno-1-36" href="#__codelineno-1-36"></a><span class="c1"># 1 60 0.003</span>
+</span><span id="__span-1-37"><a id="__codelineno-1-37" name="__codelineno-1-37" href="#__codelineno-1-37"></a><span class="c1"># 3 20 0.0049</span>
+</span><span id="__span-1-38"><a id="__codelineno-1-38" name="__codelineno-1-38" href="#__codelineno-1-38"></a><span class="c1"># 6 10 0.0058</span>
+</span><span id="__span-1-39"><a id="__codelineno-1-39" name="__codelineno-1-39" href="#__codelineno-1-39"></a><span class="c1"># 10 6 0.0049</span>
+</span><span id="__span-1-40"><a id="__codelineno-1-40" name="__codelineno-1-40" href="#__codelineno-1-40"></a><span class="c1"># 15 4 0.003</span>
+</span></code></pre></div>
+<p>The residuals depend on their neighbours: the test rejects independence, <code>τ</code>
+is above its band, and the autocorrelations fall to about 0 at lag 4. Blocks
+of one position give the narrowest interval, since they ignore that
+dependence. From 3 to 10 positions the interval keeps about one width, and
+blocks of 15 leave only 4, whose spread says little: the interval narrows
+again although the data did not change.</p>
+<p>A range of lengths with one width is not a range with the coverage of the
+level. Over 2000 data sets of this example, the 90 % interval of <code>k</code> covers its
+value in this share of them (300 replicates, or 4000 draws of the sandwich):</p>
 <table>
 <thead>
 <tr>
-<th>Value</th>
-<th>Use it when</th>
+<th><code>block_length</code></th>
+<th>1</th>
+<th>3</th>
+<th>6</th>
+<th>10</th>
+<th>15</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>1</code></td>
-<td>The noise of different positions is independent</td>
+<td>Blocks</td>
+<td>60</td>
+<td>20</td>
+<td>10</td>
+<td>6</td>
+<td>4</td>
 </tr>
 <tr>
-<td>An integer</td>
-<td>You know how far the dependence of the noise reaches</td>
+<td><code>BayesianBootstrap</code></td>
+<td>46 %</td>
+<td>61 %</td>
+<td>66 %</td>
+<td>64 %</td>
+<td>62 %</td>
 </tr>
 <tr>
-<td><code>"auto"</code></td>
-<td>You do not know: the rule of Politis and White (2004), with the correction of Patton, Politis and White (2009), estimates a length for each series on the residuals of the fit, and the method takes the largest</td>
+<td><code>Sandwich</code></td>
+<td>48 %</td>
+<td>67 %</td>
+<td>78 %</td>
+<td>84 %</td>
+<td>87 %</td>
 </tr>
 </tbody>
 </table>
-<p>With <code>"auto"</code>, <code>diagnostics.block_length_estimates</code> gives the estimate of each
-series and <code>diagnostics.block_length</code> the length used. The estimate depends on
-how a method draws its blocks: moving blocks get a length about 15 % longer
-than stationary or non-overlapping ones. <code>"auto"</code> reads the residuals of a
-series one per position, so it refuses a series with two observations at one
-position; a number does, except for <code>ResidualBootstrap</code>, which draws one
-residual per position
+<p>No length brings the bootstrap near 90 %: 60 values with this dependence leave
+few independent blocks, and its spread does not allow for that. The sandwich
+does, with a Student t of one degree of freedom less than its blocks, and its
+interval is also wider with few of them. Comparing lengths shows how far the
+choice moves the result, not which length is right: report the length with the
+result, say when the result changes with it, and, when the series is short,
+that the interval can cover less than its level
+(<a href="#short-series">Short series</a>).</p>
+<p>A method also sets how few blocks it takes:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Blocks it needs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BayesianBootstrap</code>, <code>WildBootstrap</code>, <code>ResidualBootstrap</code></td>
+<td>None: they take one block, with no note</td>
+</tr>
+<tr>
+<td><code>BootstrapCoverageEta</code></td>
+<td>None, but with one block its replicates are equal and tell it nothing</td>
+</tr>
+<tr>
+<td><code>BlockJackknife</code>, <code>JackknifePlus</code>, <code>InformationMatchingEta</code></td>
+<td>At least 2</td>
+</tr>
+<tr>
+<td><code>Sandwich</code></td>
+<td>More than the parameters</td>
+</tr>
+<tr>
+<td><code>EnbPI</code></td>
+<td>Each left out by at least one replicate</td>
+</tr>
+</tbody>
+</table>
+<p><a href="../smc/#what-means">Information matching</a> gives the degrees of freedom that
+its blocks read, and warns when they are few; the
+<a href="../local/#sandwich">sandwich</a> reads a Student t with one degree of freedom less
+than its blocks.</p>
+<p>With a length of all the positions, one block, the bootstraps draw nothing:
+each replicate of <code>BayesianBootstrap</code>, and of <code>ResidualBootstrap</code> with
+<code>"moving"</code>, has the data of the fit, so its interval has width 0; that of
+<code>WildBootstrap</code> is about 0 in this example, and <code>"stationary"</code> gives its
+narrowest. No note says so: read the number of blocks.</p>
+<p>A series with two observations at one position is refused by
+<code>ResidualBootstrap</code>, which draws one residual per position, whatever the
+length; the other block methods accept it
 (<a href="../../calibration-observations/#one-position-two-observations">One position, two observations</a>).</p>
 <h2 id="bayesian-bootstrap">Bayesian bootstrap<a class="headerlink" href="#bayesian-bootstrap" title="Permanent link">&para;</a></h2>
 <p><code>BayesianBootstrap(replicates, block_length, starts=1)</code> draws, for each
@@ -4368,15 +4575,15 @@ and fits the new data.</p>
 magnitude, where the noise grows with the value. On the additive scale a new
 value can fall below zero: the method keeps it, and counts it in
 <code>diagnostics.negative_values</code>. Many of them point to the multiplicative scale.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">residual</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">uncertainty</span><span class="p">(</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">ResidualBootstrap</span><span class="p">(</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>        <span class="n">replicates</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>        <span class="n">block_length</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">,</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>        <span class="n">residual_scale</span><span class="o">=</span><span class="s2">&quot;multiplicative&quot;</span><span class="p">,</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>        <span class="n">scheme</span><span class="o">=</span><span class="s2">&quot;stationary&quot;</span><span class="p">,</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="p">)</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="p">)</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="nb">print</span><span class="p">(</span><span class="n">residual</span><span class="o">.</span><span class="n">diagnostics</span><span class="o">.</span><span class="n">negative_values</span><span class="p">)</span>  <span class="c1"># 0</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">residual</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">uncertainty</span><span class="p">(</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">ResidualBootstrap</span><span class="p">(</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>        <span class="n">replicates</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>        <span class="n">block_length</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>        <span class="n">residual_scale</span><span class="o">=</span><span class="s2">&quot;multiplicative&quot;</span><span class="p">,</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>        <span class="n">scheme</span><span class="o">=</span><span class="s2">&quot;stationary&quot;</span><span class="p">,</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="p">)</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="p">)</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="nb">print</span><span class="p">(</span><span class="n">residual</span><span class="o">.</span><span class="n">diagnostics</span><span class="o">.</span><span class="n">negative_values</span><span class="p">)</span>  <span class="c1"># 0</span>
 </span></code></pre></div>
 <p>When a series has no observation at a drawn position, it takes the residual of
 the nearest position where it has one.</p>
@@ -4404,10 +4611,10 @@ mixes small and large residuals.</p>
 </tr>
 </tbody>
 </table>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">wild</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">uncertainty</span><span class="p">(</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">WildBootstrap</span><span class="p">(</span><span class="n">replicates</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">block_length</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">multipliers</span><span class="o">=</span><span class="s2">&quot;mammen&quot;</span><span class="p">)</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="p">)</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="nb">print</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">wild</span><span class="o">.</span><span class="n">sample</span><span class="p">))</span>  <span class="c1"># 100</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">wild</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">uncertainty</span><span class="p">(</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">WildBootstrap</span><span class="p">(</span><span class="n">replicates</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">block_length</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">multipliers</span><span class="o">=</span><span class="s2">&quot;mammen&quot;</span><span class="p">)</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="p">)</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="nb">print</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">wild</span><span class="o">.</span><span class="n">sample</span><span class="p">))</span>  <span class="c1"># 100</span>
 </span></code></pre></div>
 <h2 id="block-jackknife">Block jackknife<a class="headerlink" href="#block-jackknife" title="Permanent link">&para;</a></h2>
 <p><code>BlockJackknife(block_length, starts=1)</code> fits once per block, with that block
@@ -4462,9 +4669,9 @@ usually far fewer than a bootstrap.</p>
 <p>The pseudo-values are not draws: their percentiles are not an interval, so the
 result has no <code>ParameterSample</code>. A block with a large influence holds data the
 fit depends on: check it.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">jackknife</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">uncertainty</span><span class="p">(</span><span class="n">BlockJackknife</span><span class="p">(</span><span class="n">block_length</span><span class="o">=</span><span class="mi">10</span><span class="p">))</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">jackknife</span><span class="o">.</span><span class="n">blocks</span><span class="p">[:</span><span class="mi">2</span><span class="p">])</span>  <span class="c1"># [(1.0, 10.0), (11.0, 20.0)]</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nb">print</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">jackknife</span><span class="o">.</span><span class="n">influence</span><span class="p">[</span><span class="s2">&quot;k&quot;</span><span class="p">]))</span>  <span class="c1"># 6</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">jackknife</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">uncertainty</span><span class="p">(</span><span class="n">BlockJackknife</span><span class="p">(</span><span class="n">block_length</span><span class="o">=</span><span class="mi">10</span><span class="p">))</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">jackknife</span><span class="o">.</span><span class="n">blocks</span><span class="p">[:</span><span class="mi">2</span><span class="p">])</span>  <span class="c1"># [(1.0, 10.0), (11.0, 20.0)]</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nb">print</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">jackknife</span><span class="o">.</span><span class="n">influence</span><span class="p">[</span><span class="s2">&quot;k&quot;</span><span class="p">]))</span>  <span class="c1"># 6</span>
 </span></code></pre></div>
 <h2 id="the-result">The result<a class="headerlink" href="#the-result" title="Permanent link">&para;</a></h2>
 <p>A bootstrap returns a <code>BootstrapResult(fit, sample, failed, not_converged,
@@ -4487,8 +4694,8 @@ replicate.</p>
 <td>Replicates kept although their optimizer did not converge</td>
 </tr>
 <tr>
-<td><code>diagnostics.block_length</code>, <code>diagnostics.block_length_estimates</code></td>
-<td>The length used, and the estimate of each series with <code>"auto"</code></td>
+<td><code>diagnostics.block_length</code></td>
+<td>The block length the method ran with; <code>None</code> for <code>ParametricBootstrap</code></td>
 </tr>
 <tr>
 <td><code>diagnostics.negative_values</code></td>
@@ -4506,8 +4713,8 @@ needs, and the first reasons.</p>
 bound of the central interval: an order-statistic interval that holds the bound
 of infinitely many replicates with about 95 % probability. When it is wide
 against the interval, run more replicates.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">error</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">interval_error</span><span class="p">(</span><span class="mf">0.9</span><span class="p">)[</span><span class="s2">&quot;k&quot;</span><span class="p">]</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">lower</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">lower</span> <span class="o">&lt;=</span> <span class="n">error</span><span class="o">.</span><span class="n">lower</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>  <span class="c1"># True</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">error</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">interval_error</span><span class="p">(</span><span class="mf">0.9</span><span class="p">)[</span><span class="s2">&quot;k&quot;</span><span class="p">]</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">lower</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">lower</span> <span class="o">&lt;=</span> <span class="n">error</span><span class="o">.</span><span class="n">lower</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>  <span class="c1"># True</span>
 </span></code></pre></div>
 <h2 id="how-replicates-run">How replicates run<a class="headerlink" href="#how-replicates-run" title="Permanent link">&para;</a></h2>
 <p>Each replicate starts from the fit. With <code>starts &gt; 1</code> it also starts from the
@@ -4528,18 +4735,18 @@ series. It and <code>ResidualBootstrap</code> draw one residual per position of 
 so they refuse a series with two observations at one position, in the fit or
 in the observations they serve
 (<a href="../../calibration-observations/#one-position-two-observations">One position, two observations</a>).</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">predictive</span> <span class="o">=</span> <span class="n">Predictive</span><span class="p">(</span><span class="n">calibrator</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">sample</span><span class="p">,</span> <span class="n">positions</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">81</span><span class="p">)))</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">noise</span> <span class="o">=</span> <span class="n">ResidualNoise</span><span class="p">(</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">fit</span><span class="o">=</span><span class="n">result</span><span class="o">.</span><span class="n">fit</span><span class="p">,</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">block_length</span><span class="o">=</span><span class="n">result</span><span class="o">.</span><span class="n">diagnostics</span><span class="o">.</span><span class="n">block_length</span><span class="p">,</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="n">residual_scale</span><span class="o">=</span><span class="s2">&quot;multiplicative&quot;</span><span class="p">,</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="p">)</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="nb">print</span><span class="p">(</span><span class="n">scores</span><span class="o">.</span><span class="n">coverage</span><span class="p">(</span><span class="n">predictive</span><span class="p">,</span> <span class="n">held_out</span><span class="p">,</span> <span class="n">NoNoise</span><span class="p">(),</span> <span class="n">confidence_level</span><span class="o">=</span><span class="mf">0.9</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">)</span>  <span class="c1"># 0.0</span>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="nb">print</span><span class="p">(</span><span class="n">scores</span><span class="o">.</span><span class="n">coverage</span><span class="p">(</span><span class="n">predictive</span><span class="p">,</span> <span class="n">held_out</span><span class="p">,</span> <span class="n">noise</span><span class="p">,</span> <span class="n">confidence_level</span><span class="o">=</span><span class="mf">0.9</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">)</span>  <span class="c1"># 0.9</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">predictive</span> <span class="o">=</span> <span class="n">Predictive</span><span class="p">(</span><span class="n">calibrator</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">sample</span><span class="p">,</span> <span class="n">positions</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">81</span><span class="p">)))</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">noise</span> <span class="o">=</span> <span class="n">ResidualNoise</span><span class="p">(</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="n">fit</span><span class="o">=</span><span class="n">result</span><span class="o">.</span><span class="n">fit</span><span class="p">,</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="n">block_length</span><span class="o">=</span><span class="n">result</span><span class="o">.</span><span class="n">diagnostics</span><span class="o">.</span><span class="n">block_length</span><span class="p">,</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="n">residual_scale</span><span class="o">=</span><span class="s2">&quot;multiplicative&quot;</span><span class="p">,</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="p">)</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="nb">print</span><span class="p">(</span><span class="n">scores</span><span class="o">.</span><span class="n">coverage</span><span class="p">(</span><span class="n">predictive</span><span class="p">,</span> <span class="n">held_out</span><span class="p">,</span> <span class="n">NoNoise</span><span class="p">(),</span> <span class="n">confidence_level</span><span class="o">=</span><span class="mf">0.9</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">)</span>  <span class="c1"># 0.05</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="nb">print</span><span class="p">(</span><span class="n">scores</span><span class="o">.</span><span class="n">coverage</span><span class="p">(</span><span class="n">predictive</span><span class="p">,</span> <span class="n">held_out</span><span class="p">,</span> <span class="n">noise</span><span class="p">,</span> <span class="n">confidence_level</span><span class="o">=</span><span class="mf">0.9</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">)</span>  <span class="c1"># 0.85</span>
 </span></code></pre></div>
-<p>The band of the model is narrow and covers none of the held-out observations;
-the prediction interval covers them at its level.</p>
+<p>The band of the model is narrow and covers 1 of the 20 held-out observations;
+the prediction interval covers 17, near its level.</p>
 <h2 id="short-series">Short series<a class="headerlink" href="#short-series" title="Permanent link">&para;</a></h2>
 <p>A block bootstrap reads the dependence of the noise from few blocks. On a short
 series its variance is too small by a term of order <code>1 / block_length</code>, and its
@@ -4550,7 +4757,7 @@ with 400. With few positions, prefer <code>block_length=1</code> only when the n
 independent, and report that the interval may be narrow.</p>
 <h2 id="checklist">Checklist<a class="headerlink" href="#checklist" title="Permanent link">&para;</a></h2>
 <ul>
-<li>[ ] You chose <code>block_length</code>, or read the estimates of <code>"auto"</code>.</li>
+<li>[ ] You chose <code>block_length</code> from the dependence of the residuals and the scale of the process, read the result at several lengths, and report the length.</li>
 <li>[ ] You chose the residual scale for the data: multiplicative for values that span orders of magnitude.</li>
 <li>[ ] <code>failed</code> is empty, or you know why replicates failed.</li>
 <li>[ ] <code>not_converged</code> is 0, or you raised <code>max_iterations</code>.</li>

@@ -231,10 +231,9 @@ A few methods read a series as one value per position, and they refuse such a la
 | Method                               | What it reads per position                                    |
 | ------------------------------------ | ------------------------------------------------------------- |
 | `ResidualNoise`, `ResidualBootstrap` | One residual of the series, drawn for every observation there |
-| `block_length="auto"` of any method  | The residuals of the series as consecutive values             |
 | `RollingConformal`                   | One observation per horizon                                   |
 
-The two observations also have different scales: a total over 40 steps is about 20 times an increment over 2. Give one of them a label of its own when a method needs one scale per series. With a `block_length` of a number, the Bayesian and wild bootstraps, the block jackknife and the sandwich keep both in one label, each in the block of its position.
+The two observations also have different scales: a total over 40 steps is about 20 times an increment over 2. Give one of them a label of its own when a method needs one scale per series. The Bayesian and wild bootstraps, the block jackknife and the sandwich keep both in one label, each in the block of its position.
 
 ### Parts of a window
 

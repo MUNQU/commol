@@ -18,7 +18,7 @@ Attributes:
 | -------------- | ---------- | ------------------------------------------------------------------------------------------------------------- |
 | `kind`         | `bayesian` | The bootstrap, which the engine reads.                                                                        |
 | `replicates`   | `int`      | Number of replicates, at least 1.                                                                             |
-| `block_length` | \`int      | auto\`                                                                                                        |
+| `block_length` | `int`      | Positions per block.                                                                                          |
 | `starts`       | `int`      | Starts of the fit and of each replicate (default 1): the fit, then rows of a Latin hypercube over the bounds. |
 
 Source code in `commol/resampling/methods.py`
@@ -41,7 +41,7 @@ class BayesianBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
         The bootstrap, which the engine reads.
     replicates : int
         Number of replicates, at least 1.
-    block_length : int | "auto"
+    block_length : int
         Positions per block.
     starts : int
         Starts of the fit and of each replicate (default 1): the fit, then
@@ -52,7 +52,7 @@ class BayesianBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
 
     kind: Literal["bayesian"] = Field(default="bayesian", description="The bootstrap.")
     replicates: int = Field(description="Number of replicates.")
-    block_length: int | Literal["auto"] = Field(description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     starts: int = Field(default=1, description="Starts per fit.")
 ```
 
@@ -70,7 +70,7 @@ Attributes:
 | ---------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `kind`           | `residual`                   | The bootstrap, which the engine reads.                                                                                                                                                   |
 | `replicates`     | `int`                        | Number of replicates, at least 1.                                                                                                                                                        |
-| `block_length`   | \`int                        | auto\`                                                                                                                                                                                   |
+| `block_length`   | `int`                        | Positions per block; with scheme="stationary" the mean length.                                                                                                                           |
 | `residual_scale` | `{additive, multiplicative}` | "additive": r = y − ŷ and ŷ + r\*. "multiplicative": r = log(y / ŷ) and ŷ · exp(r\*); it needs positive observed and fitted values and keeps synthetic values positive.                  |
 | `scheme`         | `{moving, stationary}`       | "moving": blocks of block_length consecutive positions (Künsch 1989). "stationary": blocks of geometric length with mean block_length, wrapped around the end (Politis and Romano 1994). |
 | `starts`         | `int`                        | Starts of the fit and of each replicate (default 1).                                                                                                                                     |
@@ -92,7 +92,7 @@ class ResidualBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
         The bootstrap, which the engine reads.
     replicates : int
         Number of replicates, at least 1.
-    block_length : int | "auto"
+    block_length : int
         Positions per block; with ``scheme="stationary"`` the mean length.
     residual_scale : {"additive", "multiplicative"}
         ``"additive"``: ``r = y − ŷ`` and ``ŷ + r*``. ``"multiplicative"``:
@@ -110,7 +110,7 @@ class ResidualBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
 
     kind: Literal["residual"] = Field(default="residual", description="The bootstrap.")
     replicates: int = Field(description="Number of replicates.")
-    block_length: int | Literal["auto"] = Field(description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     residual_scale: Literal["additive", "multiplicative"] = Field(
         description="The scale of the residuals."
     )
@@ -134,7 +134,7 @@ Attributes:
 | -------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `kind`         | `wild`                 | The bootstrap, which the engine reads.                                                                                                                           |
 | `replicates`   | `int`                  | Number of replicates, at least 1.                                                                                                                                |
-| `block_length` | \`int                  | auto\`                                                                                                                                                           |
+| `block_length` | `int`                  | Positions per block.                                                                                                                                             |
 | `multipliers`  | `{rademacher, mammen}` | "rademacher": ±1 with probability 1/2. "mammen": two values with mean 0, variance 1 and third moment 1 (Mammen 1993), which keeps the skewness of the residuals. |
 | `starts`       | `int`                  | Starts of the fit and of each replicate (default 1).                                                                                                             |
 
@@ -156,7 +156,7 @@ class WildBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
         The bootstrap, which the engine reads.
     replicates : int
         Number of replicates, at least 1.
-    block_length : int | "auto"
+    block_length : int
         Positions per block.
     multipliers : {"rademacher", "mammen"}
         ``"rademacher"``: ±1 with probability 1/2. ``"mammen"``: two values
@@ -170,7 +170,7 @@ class WildBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
 
     kind: Literal["wild"] = Field(default="wild", description="The bootstrap.")
     replicates: int = Field(description="Number of replicates.")
-    block_length: int | Literal["auto"] = Field(description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     multipliers: Literal["rademacher", "mammen"] = Field(
         description="The distribution of the multipliers."
     )
@@ -189,7 +189,7 @@ Attributes:
 
 | Name           | Type  | Description                                              |
 | -------------- | ----- | -------------------------------------------------------- |
-| `block_length` | \`int | auto\`                                                   |
+| `block_length` | `int` | Positions per block; it must leave at least two blocks.  |
 | `starts`       | `int` | Starts of the fit and of each leave-out fit (default 1). |
 
 Source code in `commol/resampling/methods.py`
@@ -205,7 +205,7 @@ class BlockJackknife(UncertaintyMethod[JackknifeResult], RangeChecked):
 
     Attributes
     ----------
-    block_length : int | "auto"
+    block_length : int
         Positions per block; it must leave at least two blocks.
     starts : int
         Starts of the fit and of each leave-out fit (default 1).
@@ -213,7 +213,7 @@ class BlockJackknife(UncertaintyMethod[JackknifeResult], RangeChecked):
 
     _runner = staticmethod(run_block_jackknife)
 
-    block_length: int | Literal["auto"] = Field(description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     starts: int = Field(default=1, description="Starts per fit.")
 ```
 
@@ -499,11 +499,10 @@ The blocks of a resampling method, and the synthetic values below zero.
 
 Attributes:
 
-| Name                     | Type               | Description                                                                                                                       |
-| ------------------------ | ------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| `block_length`           | \`int              | None\`                                                                                                                            |
-| `block_length_estimates` | \`dict[str, float] | None\`                                                                                                                            |
-| `negative_values`        | `int`              | Synthetic observed values below zero, over every replicate. They are kept; many of them point to residual_scale="multiplicative". |
+| Name              | Type  | Description                                                                                                                       |
+| ----------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `block_length`    | \`int | None\`                                                                                                                            |
+| `negative_values` | `int` | Synthetic observed values below zero, over every replicate. They are kept; many of them point to residual_scale="multiplicative". |
 
 Source code in `commol/resampling/results.py`
 
@@ -517,9 +516,6 @@ class ResamplingDiagnostics(ResultModel):
     block_length : int | None
         The block length the method ran with; None for the parametric
         bootstrap, which draws no blocks.
-    block_length_estimates : dict[str, float] | None
-        With ``block_length="auto"``, the estimate of each series, by label;
-        otherwise None.
     negative_values : int
         Synthetic observed values below zero, over every replicate. They are
         kept; many of them point to ``residual_scale="multiplicative"``.
@@ -528,9 +524,6 @@ class ResamplingDiagnostics(ResultModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     block_length: int | None = Field(description="The block length used.")
-    block_length_estimates: dict[str, float] | None = Field(
-        description="The estimate of each series with the automatic length."
-    )
     negative_values: int = Field(description="Synthetic values below zero.")
 ```
 

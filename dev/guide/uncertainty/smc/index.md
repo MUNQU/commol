@@ -132,7 +132,7 @@ None of them has a default: each sets the cost and the accuracy of the run.
 
 ## Gibbs posterior
 
-`GibbsPosterior` samples `π(θ) ∝ prior(θ) · exp(−η · loss(θ))`, where `loss` is the problem's loss with its weights and normalization. It returns a `GibbsResult`: the sample at temperature 1, the temperatures, the log of `∫ prior(θ) exp(−η loss(θ)) dθ`, the diagnostics, the `η` it ran with, the fit a calibration of `η` read (`fit`), the coverage of a bootstrap calibration (`coverage`), each replicate of a bootstrap calibration whose sampler failed, `"Replicate <index> failed: <reason>"`, also logged as a warning (`failed`), the block length of a calibration with the estimate of each series of the automatic length (`block_length`, `block_length_estimates`), and the degrees of freedom of information matching (`degrees_of_freedom`).
+`GibbsPosterior` samples `π(θ) ∝ prior(θ) · exp(−η · loss(θ))`, where `loss` is the problem's loss with its weights and normalization. It returns a `GibbsResult`: the sample at temperature 1, the temperatures, the log of `∫ prior(θ) exp(−η loss(θ)) dθ`, the diagnostics, the `η` it ran with, the fit a calibration of `η` read (`fit`), the coverage of a bootstrap calibration (`coverage`), each replicate of a bootstrap calibration whose sampler failed, `"Replicate <index> failed: <reason>"`, also logged as a warning (`failed`), the block length of a calibration (`block_length`), and the degrees of freedom of information matching (`degrees_of_freedom`).
 
 ### What `η` means
 
@@ -146,7 +146,7 @@ None of them has a default: each sets the cost and the accuracy of the run.
 
 Both calibrations read the fit `Calibrator.run(starts)`, the best of [several starts](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts).
 
-Both take `block_length="auto"`, the automatic length of [Blocks and their length](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#blocks-and-their-length) for non-overlapping blocks. `GibbsResult.block_length` gives the length used, and `block_length_estimates` the estimate of each series, by label, as the bootstraps, the sandwich and the conformal methods give them. Both are `None` for a number `η`, and `block_length_estimates` is `None` for an integer `block_length`.
+Both take a `block_length` that [you choose](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#choose-the-length), and `GibbsResult.block_length` gives it; it is `None` for a number `η`.
 
 Information matching is cheap and local; it needs a sum of smooth terms, so `"rmse"` (a square root of a sum), `"mae"` (no curvature) and a stochastic engine raise a `ValueError` that points to the other choices. `J` and `I` are the curvature and the meat of the [sandwich](https://munqu.github.io/commol/latest/guide/uncertainty/local/#sandwich): `I` sums the scores over blocks, so it holds when the noise depends on its neighbours inside a block, and `block_length` has no default: `block_length=1` gives the independent version, every observation its own block. `I` enters only through a trace, so `η` needs no inverse of `I`: it takes two blocks or more, also fewer blocks than parameters, and blocks can be long enough to hold the dependence.
 

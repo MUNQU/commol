@@ -183,7 +183,7 @@ Attributes:
 
 | Name           | Type          | Description                                              |
 | -------------- | ------------- | -------------------------------------------------------- |
-| `block_length` | \`int         | auto\`                                                   |
+| `block_length` | `int`         | Positions per block; it must leave at least two blocks.  |
 | `positions`    | `list[float]` | Where the intervals are, for each series of the problem. |
 | `starts`       | `int`         | Starts of the fit and of each refit (default 1).         |
 
@@ -202,7 +202,7 @@ class JackknifePlus(ConformalMethod, EngineChecked, RangeChecked):
 
     Attributes
     ----------
-    block_length : int | "auto"
+    block_length : int
         Positions per block; it must leave at least two blocks.
     positions : list[float]
         Where the intervals are, for each series of the problem.
@@ -212,7 +212,7 @@ class JackknifePlus(ConformalMethod, EngineChecked, RangeChecked):
 
     _runner = staticmethod(run_jackknife_plus)
 
-    block_length: int | Literal["auto"] = Field(description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     positions: list[float] = Field(description="Where the intervals are.")
     starts: int = Field(default=1, description="Starts per fit.")
 ```
@@ -232,7 +232,7 @@ Attributes:
 | Name           | Type          | Description                                              |
 | -------------- | ------------- | -------------------------------------------------------- |
 | `replicates`   | `int`         | Number of replicates, at least 2.                        |
-| `block_length` | \`int         | auto\`                                                   |
+| `block_length` | `int`         | Positions per block.                                     |
 | `positions`    | `list[float]` | Where the intervals are, for each series of the problem. |
 | `starts`       | `int`         | Starts of the fit and of each replicate (default 1).     |
 
@@ -254,7 +254,7 @@ class EnbPI(ConformalMethod, EngineChecked, RangeChecked):
     ----------
     replicates : int
         Number of replicates, at least 2.
-    block_length : int | "auto"
+    block_length : int
         Positions per block.
     positions : list[float]
         Where the intervals are, for each series of the problem.
@@ -265,7 +265,7 @@ class EnbPI(ConformalMethod, EngineChecked, RangeChecked):
     _runner = staticmethod(run_enbpi)
 
     replicates: int = Field(description="Number of replicates.")
-    block_length: int | Literal["auto"] = Field(description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     positions: list[float] = Field(description="Where the intervals are.")
     starts: int = Field(default=1, description="Starts per fit.")
 ```
@@ -336,15 +336,14 @@ The result of a conformal method.
 
 Attributes:
 
-| Name                     | Type                     | Description                                                                                                                                                                                                                                                                 |
-| ------------------------ | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `intervals`              | `PredictionIntervals`    | The intervals at the positions the method was given.                                                                                                                                                                                                                        |
-| `scores`                 | `dict[str, list[float]]` | The scores of each series, by label, in the order the method took them.                                                                                                                                                                                                     |
-| `guarantee`              | `str`                    | The coverage the method guarantees, and what the guarantee assumes.                                                                                                                                                                                                         |
-| `failed`                 | `list[str]`              | Each refit that failed, which gives no score: "Origin <index> failed: <reason>" for RollingConformal, "Block <index> failed: <reason>" for JackknifePlus, "Replicate <index> failed: <reason>" for EnbPI; also logged as a warning. Empty for a method that does not refit. |
-| `not_converged`          | `int`                    | Refits kept although their optimizer did not converge; 0 for a method that does not refit.                                                                                                                                                                                  |
-| `block_length`           | \`int                    | None\`                                                                                                                                                                                                                                                                      |
-| `block_length_estimates` | \`dict[str, float]       | None\`                                                                                                                                                                                                                                                                      |
+| Name            | Type                     | Description                                                                                                                                                                                                                                                                 |
+| --------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `intervals`     | `PredictionIntervals`    | The intervals at the positions the method was given.                                                                                                                                                                                                                        |
+| `scores`        | `dict[str, list[float]]` | The scores of each series, by label, in the order the method took them.                                                                                                                                                                                                     |
+| `guarantee`     | `str`                    | The coverage the method guarantees, and what the guarantee assumes.                                                                                                                                                                                                         |
+| `failed`        | `list[str]`              | Each refit that failed, which gives no score: "Origin <index> failed: <reason>" for RollingConformal, "Block <index> failed: <reason>" for JackknifePlus, "Replicate <index> failed: <reason>" for EnbPI; also logged as a warning. Empty for a method that does not refit. |
+| `not_converged` | `int`                    | Refits kept although their optimizer did not converge; 0 for a method that does not refit.                                                                                                                                                                                  |
+| `block_length`  | \`int                    | None\`                                                                                                                                                                                                                                                                      |
 
 Source code in `commol/conformal/results.py`
 
@@ -374,9 +373,6 @@ class ConformalResult(ResultModel):
     block_length : int | None
         With `JackknifePlus` and `EnbPI`, the positions per block they ran
         with; None for a method without blocks.
-    block_length_estimates : dict[str, float] | None
-        With ``block_length="auto"``, the estimate of each series, by label;
-        otherwise None.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -387,9 +383,6 @@ class ConformalResult(ResultModel):
     failed: list[str] = Field(description="Each refit that failed.")
     not_converged: int = Field(description="Refits that did not converge.")
     block_length: int | None = Field(description="The block length used.")
-    block_length_estimates: dict[str, float] | None = Field(
-        description="The estimate of each series with the automatic length."
-    )
 ```
 
 ## PredictionIntervals

@@ -4290,10 +4290,9 @@ A few methods read a series as one value per position, and they refuse such a la
 | Method                               | What it reads per position                                    |
 | ------------------------------------ | ------------------------------------------------------------- |
 | `ResidualNoise`, `ResidualBootstrap` | One residual of the series, drawn for every observation there |
-| `block_length="auto"` of any method  | The residuals of the series as consecutive values             |
 | `RollingConformal`                   | One observation per horizon                                   |
 
-The two observations also have different scales: a total over 40 steps is about 20 times an increment over 2. Give one of them a label of its own when a method needs one scale per series. With a `block_length` of a number, the Bayesian and wild bootstraps, the block jackknife and the sandwich keep both in one label, each in the block of its position.
+The two observations also have different scales: a total over 40 steps is about 20 times an increment over 2. Give one of them a label of its own when a method needs one scale per series. The Bayesian and wild bootstraps, the block jackknife and the sandwich keep both in one label, each in the block of its position.
 
 ### Parts of a window
 
@@ -5852,10 +5851,9 @@ problem = CalibrationProblem(
 )
 calibrator = Calibrator(Simulation(ab_model(None)), problem)
 
-result = calibrator.uncertainty(BayesianBootstrap(replicates=100, block_length="auto"))
+result = calibrator.uncertainty(BayesianBootstrap(replicates=100, block_length=1))
 lower, upper = result.sample.interval(0.9)["k"]
-print(round(lower, 4), round(upper, 4))  # 0.0486 0.0508
-print(result.diagnostics.block_length)  # 1
+print(round(lower, 4), round(upper, 4))  # 0.0483 0.0512
 ```
 
 `result.fit` is the fit, `result.sample` holds one draw per replicate that fitted, `result.failed` lists the replicates that failed, and `result.diagnostics` gives the block length.
@@ -5875,15 +5873,93 @@ None of them needs a noise model. The Bayesian bootstrap never changes the obser
 
 A block holds every observation, of every series, whose position falls in one window of `block_length` consecutive distinct positions (`BlockScheme`, `resampling/blocks.rs`). The dependence of the data across series and along the positions stays inside blocks, so the methods hold for noise that is correlated in time or between series.
 
-`block_length` has no default:
+`block_length` is a whole number of at least 1, with no default: it is your decision, about your data. `1` states that the noise of different positions is independent. A longer block states that the noise depends on its neighbours no further than the block holds. Every method that reads blocks, here and on the other pages, takes it so.
 
-| Value      | Use it when                                                                                                                                                                                                      |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `1`        | The noise of different positions is independent                                                                                                                                                                  |
-| An integer | You know how far the dependence of the noise reaches                                                                                                                                                             |
-| `"auto"`   | You do not know: the rule of Politis and White (2004), with the correction of Patton, Politis and White (2009), estimates a length for each series on the residuals of the fit, and the method takes the largest |
+commol does not choose it. The best length changes with the method and with the number of blocks, and one number has no single answer for several series of different dependence.
 
-With `"auto"`, `diagnostics.block_length_estimates` gives the estimate of each series and `diagnostics.block_length` the length used. The estimate depends on how a method draws its blocks: moving blocks get a length about 15 % longer than stationary or non-overlapping ones. `"auto"` reads the residuals of a series one per position, so it refuses a series with two observations at one position; a number does, except for `ResidualBootstrap`, which draws one residual per position ([One position, two observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#one-position-two-observations)).
+### The length counts positions
+
+- **Of all the series together.** A block holds consecutive distinct positions of the data, whichever series has an observation there. With a weekly series beside a daily one, the positions are days: a length of 7 holds one value of the weekly series, and 4 of its values need 28.
+- **Also where no observation carries information.** A series that the model holds at exactly 0 until a process starts says nothing about the parameters while it is observed at 0: those scores are 0 for the count models (Poisson, negative binomial, binomial), for a normal or Student t model whose `sd`, `scale` and `df` are numbers, and for a loss without `normalize_observations`. A model with a fitted `sd`, `scale` or `df` reads them, and so does the normalization of a series: there they change the result at any position. Where the scores are 0, at a position that another series also observes they change nothing in the `Sandwich` or in `InformationMatchingEta`. At a position that only such observations hold, it still counts: it takes a place in a window, so it shifts the windows after it, and a window of such positions alone is one more block.
+
+### Choose the length
+
+1. **Read the dependence of the residuals of the fit** with [`residual_dependence`](https://munqu.github.io/commol/latest/guide/uncertainty/dependence/index.md): for each series its autocorrelations, the integrated autocorrelation time `τ` with its band, and `cut_lag`, the largest lag in the sum of `τ`. They count steps of the grid of that series, so a lag of 3 of the weekly series is 21 days. A fit absorbs dependence and a short series hides it ([The bias of `τ`](https://munqu.github.io/commol/latest/guide/uncertainty/dependence/#the-bias-of)): a small `τ` does not show that the noise is independent.
+1. **Use what you know of the process**: a weekly pattern of the reports, an event that moves several positions, the time that a disturbance lasts. A cycle at a long lag does not reach `τ`.
+1. **Compare the result at several lengths**, with the number of blocks each leaves, for the method and the parameters you report.
+
+The same model with a noise that depends on its neighbours, an AR(1) of 0.7:
+
+```python
+from commol.dependence import Refitted, residual_dependence
+
+rng = np.random.default_rng(1)
+shock = np.zeros(61)
+for t in range(1, 61):
+    shock[t] = 0.7 * shock[t - 1] + rng.normal(0.0, 0.05)
+dependent = [
+    ObservedDataPoint(at=t, output="B", value=truth["B"][t] * float(np.exp(shock[t])))
+    for t in range(1, 61)
+]
+dependent_calibrator = Calibrator(
+    Simulation(ab_model(None)), problem.model_copy(update={"observed_data": dependent})
+)
+fit = dependent_calibrator.run()
+
+(series,) = residual_dependence(
+    Predictive(dependent_calibrator, dependent_calibrator.point_sample(fit), positions=[1]),
+    dependent,
+    NoNoise(),
+    max_lag=10,
+    randomizations=1,
+    reference=Refitted(replicates=99),
+    confidence_level=0.9,
+).series
+print([round(r, 2) for r in series.correlations[:4]])  # [0.6, 0.28, 0.16, 0.03]
+print(series.p_value, series.cut_lag)  # 0.01 3
+print(round(series.tau, 2), [round(b, 2) for b in series.tau_band])  # 3.09 [0.52, 2.05]
+
+for length in (1, 3, 6, 10, 15):
+    compared = dependent_calibrator.uncertainty(
+        BayesianBootstrap(replicates=300, block_length=length)
+    )
+    low, high = compared.sample.interval(0.9)["k"]
+    blocks = -(-len(dependent) // length)
+    print(length, blocks, round(high - low, 4))
+# 1 60 0.003
+# 3 20 0.0049
+# 6 10 0.0058
+# 10 6 0.0049
+# 15 4 0.003
+```
+
+The residuals depend on their neighbours: the test rejects independence, `τ` is above its band, and the autocorrelations fall to about 0 at lag 4. Blocks of one position give the narrowest interval, since they ignore that dependence. From 3 to 10 positions the interval keeps about one width, and blocks of 15 leave only 4, whose spread says little: the interval narrows again although the data did not change.
+
+A range of lengths with one width is not a range with the coverage of the level. Over 2000 data sets of this example, the 90 % interval of `k` covers its value in this share of them (300 replicates, or 4000 draws of the sandwich):
+
+| `block_length`      | 1    | 3    | 6    | 10   | 15   |
+| ------------------- | ---- | ---- | ---- | ---- | ---- |
+| Blocks              | 60   | 20   | 10   | 6    | 4    |
+| `BayesianBootstrap` | 46 % | 61 % | 66 % | 64 % | 62 % |
+| `Sandwich`          | 48 % | 67 % | 78 % | 84 % | 87 % |
+
+No length brings the bootstrap near 90 %: 60 values with this dependence leave few independent blocks, and its spread does not allow for that. The sandwich does, with a Student t of one degree of freedom less than its blocks, and its interval is also wider with few of them. Comparing lengths shows how far the choice moves the result, not which length is right: report the length with the result, say when the result changes with it, and, when the series is short, that the interval can cover less than its level ([Short series](#short-series)).
+
+A method also sets how few blocks it takes:
+
+| Method                                                      | Blocks it needs                                                       |
+| ----------------------------------------------------------- | --------------------------------------------------------------------- |
+| `BayesianBootstrap`, `WildBootstrap`, `ResidualBootstrap`   | None: they take one block, with no note                               |
+| `BootstrapCoverageEta`                                      | None, but with one block its replicates are equal and tell it nothing |
+| `BlockJackknife`, `JackknifePlus`, `InformationMatchingEta` | At least 2                                                            |
+| `Sandwich`                                                  | More than the parameters                                              |
+| `EnbPI`                                                     | Each left out by at least one replicate                               |
+
+[Information matching](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#what-means) gives the degrees of freedom that its blocks read, and warns when they are few; the [sandwich](https://munqu.github.io/commol/latest/guide/uncertainty/local/#sandwich) reads a Student t with one degree of freedom less than its blocks.
+
+With a length of all the positions, one block, the bootstraps draw nothing: each replicate of `BayesianBootstrap`, and of `ResidualBootstrap` with `"moving"`, has the data of the fit, so its interval has width 0; that of `WildBootstrap` is about 0 in this example, and `"stationary"` gives its narrowest. No note says so: read the number of blocks.
+
+A series with two observations at one position is refused by `ResidualBootstrap`, which draws one residual per position, whatever the length; the other block methods accept it ([One position, two observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#one-position-two-observations)).
 
 ## Bayesian bootstrap
 
@@ -5904,7 +5980,7 @@ Use the multiplicative scale for counts or amounts that span orders of magnitude
 residual = calibrator.uncertainty(
     ResidualBootstrap(
         replicates=100,
-        block_length="auto",
+        block_length=1,
         residual_scale="multiplicative",
         scheme="stationary",
     )
@@ -5958,12 +6034,12 @@ print(len(jackknife.influence["k"]))  # 6
 
 A bootstrap returns a `BootstrapResult(fit, sample, failed, not_converged, diagnostics)`. The sample has equal weights, and the group of each draw is its replicate.
 
-| Field                                                            | Meaning                                                                                                                    |
-| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `failed`                                                         | Each replicate that failed, `"Replicate <index> failed: <reason>"`; it is not in the sample, and it is logged as a warning |
-| `not_converged`                                                  | Replicates kept although their optimizer did not converge                                                                  |
-| `diagnostics.block_length`, `diagnostics.block_length_estimates` | The length used, and the estimate of each series with `"auto"`                                                             |
-| `diagnostics.negative_values`                                    | New observed values below zero, over every replicate                                                                       |
+| Field                         | Meaning                                                                                                                    |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `failed`                      | Each replicate that failed, `"Replicate <index> failed: <reason>"`; it is not in the sample, and it is logged as a warning |
+| `not_converged`               | Replicates kept although their optimizer did not converge                                                                  |
+| `diagnostics.block_length`    | The block length the method ran with; `None` for `ParametricBootstrap`                                                     |
+| `diagnostics.negative_values` | New observed values below zero, over every replicate                                                                       |
 
 Every result of a method that fits several times lists the fits that failed in `failed` and counts the fits kept without convergence in `not_converged`, in the same way: a bootstrap, the jackknife, a profile with a bootstrap threshold and the conformal methods that refit. When too few fits succeed, the method raises a `RuntimeError` that says how many of how many fitted, how many it needs, and the first reasons.
 
@@ -5990,11 +6066,11 @@ noise = ResidualNoise(
     residual_scale="multiplicative",
 )
 
-print(scores.coverage(predictive, held_out, NoNoise(), confidence_level=0.9).mean)  # 0.0
-print(scores.coverage(predictive, held_out, noise, confidence_level=0.9).mean)  # 0.9
+print(scores.coverage(predictive, held_out, NoNoise(), confidence_level=0.9).mean)  # 0.05
+print(scores.coverage(predictive, held_out, noise, confidence_level=0.9).mean)  # 0.85
 ```
 
-The band of the model is narrow and covers none of the held-out observations; the prediction interval covers them at its level.
+The band of the model is narrow and covers 1 of the 20 held-out observations; the prediction interval covers 17, near its level.
 
 ## Short series
 
@@ -6002,7 +6078,7 @@ A block bootstrap reads the dependence of the noise from few blocks. On a short 
 
 ## Checklist
 
-- [ ] You chose `block_length`, or read the estimates of `"auto"`.
+- [ ] You chose `block_length` from the dependence of the residuals and the scale of the process, read the result at several lengths, and report the length.
 - [ ] You chose the residual scale for the data: multiplicative for values that span orders of magnitude.
 - [ ] `failed` is empty, or you know why replicates failed.
 - [ ] `not_converged` is 0, or you raised `max_iterations`.
@@ -6150,7 +6226,7 @@ None of them has a default: each sets the cost and the accuracy of the run.
 
 ## Gibbs posterior
 
-`GibbsPosterior` samples `π(θ) ∝ prior(θ) · exp(−η · loss(θ))`, where `loss` is the problem's loss with its weights and normalization. It returns a `GibbsResult`: the sample at temperature 1, the temperatures, the log of `∫ prior(θ) exp(−η loss(θ)) dθ`, the diagnostics, the `η` it ran with, the fit a calibration of `η` read (`fit`), the coverage of a bootstrap calibration (`coverage`), each replicate of a bootstrap calibration whose sampler failed, `"Replicate <index> failed: <reason>"`, also logged as a warning (`failed`), the block length of a calibration with the estimate of each series of the automatic length (`block_length`, `block_length_estimates`), and the degrees of freedom of information matching (`degrees_of_freedom`).
+`GibbsPosterior` samples `π(θ) ∝ prior(θ) · exp(−η · loss(θ))`, where `loss` is the problem's loss with its weights and normalization. It returns a `GibbsResult`: the sample at temperature 1, the temperatures, the log of `∫ prior(θ) exp(−η loss(θ)) dθ`, the diagnostics, the `η` it ran with, the fit a calibration of `η` read (`fit`), the coverage of a bootstrap calibration (`coverage`), each replicate of a bootstrap calibration whose sampler failed, `"Replicate <index> failed: <reason>"`, also logged as a warning (`failed`), the block length of a calibration (`block_length`), and the degrees of freedom of information matching (`degrees_of_freedom`).
 
 ### What `η` means
 
@@ -6164,7 +6240,7 @@ None of them has a default: each sets the cost and the accuracy of the run.
 
 Both calibrations read the fit `Calibrator.run(starts)`, the best of [several starts](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts).
 
-Both take `block_length="auto"`, the automatic length of [Blocks and their length](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#blocks-and-their-length) for non-overlapping blocks. `GibbsResult.block_length` gives the length used, and `block_length_estimates` the estimate of each series, by label, as the bootstraps, the sandwich and the conformal methods give them. Both are `None` for a number `η`, and `block_length_estimates` is `None` for an integer `block_length`.
+Both take a `block_length` that [you choose](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#choose-the-length), and `GibbsResult.block_length` gives it; it is `None` for a number `η`.
 
 Information matching is cheap and local; it needs a sum of smooth terms, so `"rmse"` (a square root of a sum), `"mae"` (no curvature) and a stochastic engine raise a `ValueError` that points to the other choices. `J` and `I` are the curvature and the meat of the [sandwich](https://munqu.github.io/commol/latest/guide/uncertainty/local/#sandwich): `I` sums the scores over blocks, so it holds when the noise depends on its neighbours inside a block, and `block_length` has no default: `block_length=1` gives the independent version, every observation its own block. `I` enters only through a trace, so `η` needs no inverse of `I`: it takes two blocks or more, also fewer blocks than parameters, and blocks can be long enough to hold the dependence.
 
@@ -6375,7 +6451,7 @@ print(widths)  # [6.01, 12.01, 18.02]
 
 ## Sandwich
 
-`Sandwich(block_length, draws, curvature="gauss_newton", starts=1)` gives the covariance `H⁻¹ B H⁻¹`, where `B` sums the outer products of the **scores** of blocks of observations: `B = G/(G − 1) · Σ_b s_b s_bᵀ`, with `s_b` the sum of the gradients of the terms of block `b` (the clustered estimator CR1, Cameron and Miller 2015). The blocks hold every series in a window of `block_length` positions, as the [bootstraps](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#blocks-and-their-length) do; `"auto"` chooses the length of Politis and White (2004) from the residuals of the fit. It returns a `SandwichResult`: a `LaplaceResult` with `blocks` (`G`), `block_length` and the estimates of `"auto"`.
+`Sandwich(block_length, draws, curvature="gauss_newton", starts=1)` gives the covariance `H⁻¹ B H⁻¹`, where `B` sums the outer products of the **scores** of blocks of observations: `B = G/(G − 1) · Σ_b s_b s_bᵀ`, with `s_b` the sum of the gradients of the terms of block `b` (the clustered estimator CR1, Cameron and Miller 2015). The blocks hold every series in a window of `block_length` positions, as the [bootstraps](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#blocks-and-their-length) do, and you [choose the length](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#choose-the-length). It returns a `SandwichResult`: a `LaplaceResult` with `blocks` (`G`) and `block_length`.
 
 What the sandwich protects against depends on `H`:
 
@@ -6969,7 +7045,7 @@ print(holm({s.label: s.p_value for s in together.series}))  # {'south': 1.0, 'no
 
 | Method                                           | How it reads dependence                                                                                                                                                                                                                                                                                                                                                                |
 | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The bootstraps and the jackknife                 | `block_length`: dependence inside a block is kept ([Blocks and their length](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#blocks-and-their-length))                                                                                                                                                                                                             |
+| The bootstraps and the jackknife                 | `block_length`: dependence inside a block is kept. These statistics are where the choice of a length starts ([Choose the length](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#choose-the-length))                                                                                                                                                               |
 | `Sandwich`                                       | Scores summed over blocks ([Sandwich](https://munqu.github.io/commol/latest/guide/uncertainty/local/#sandwich))                                                                                                                                                                                                                                                                        |
 | `InformationMatchingEta`, `BootstrapCoverageEta` | The scale `η` of a Gibbs posterior from blocks of scores or of data. Information matching corrects `η` for blocks that share the curvature unevenly and for the degrees of freedom they read; with few its intervals of a high level still cover less than it, and a note says by how much ([What `η` means](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#what-means)) |
 | `EnbPI`                                          | Prediction intervals of a series with dependent errors ([EnbPI](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#enbpi))                                                                                                                                                                                                                                             |
@@ -7252,7 +7328,7 @@ print(round(sum(misses) / len(misses), 3))  # 0.125
 
 ## Results, plots and reports
 
-Every variant returns a `ConformalResult(intervals, scores, guarantee, failed, not_converged, block_length, block_length_estimates)`. A variant that refits lists each refit that failed in `failed`, named by its unit: `"Origin <index> failed: <reason>"` for `RollingConformal`, `"Block <index> failed: <reason>"` for `JackknifePlus`, and `"Replicate <index> failed: <reason>"` for `EnbPI`; each is also logged as a warning, and gives no score. `not_converged` counts the refits kept although their optimizer did not converge. Split and adaptive conformal do not refit, so their `failed` is empty and their `not_converged` is 0. `JackknifePlus` and `EnbPI` give the block length they ran with in `block_length`, and with `block_length="auto"` the estimate of each series, by label, in `block_length_estimates`, as the [bootstraps](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#blocks-and-their-length) give them; the other variants have no blocks, so both are `None`. `intervals` is a `PredictionIntervals`: its `confidence_level`, a `SeriesIntervals` per series (`positions`, `prediction`, `lower`, `upper`), and `unbounded`. `plot.series(prediction_intervals=...)` of a run, of replicates or of a predictive draws the band of each series on its panel. `SimulationResults.report`, `SimulationReplicates.report` and `Predictive.report` take `prediction_intervals=...` too, and add the intervals under the key `prediction_intervals`.
+Every variant returns a `ConformalResult(intervals, scores, guarantee, failed, not_converged, block_length)`. A variant that refits lists each refit that failed in `failed`, named by its unit: `"Origin <index> failed: <reason>"` for `RollingConformal`, `"Block <index> failed: <reason>"` for `JackknifePlus`, and `"Replicate <index> failed: <reason>"` for `EnbPI`; each is also logged as a warning, and gives no score. `not_converged` counts the refits kept although their optimizer did not converge. Split and adaptive conformal do not refit, so their `failed` is empty and their `not_converged` is 0. `JackknifePlus` and `EnbPI` give the block length they ran with, which [you choose](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#choose-the-length), in `block_length`; the other variants have no blocks, so it is `None`. `intervals` is a `PredictionIntervals`: its `confidence_level`, a `SeriesIntervals` per series (`positions`, `prediction`, `lower`, `upper`), and `unbounded`. `plot.series(prediction_intervals=...)` of a run, of replicates or of a predictive draws the band of each series on its panel. `SimulationResults.report`, `SimulationReplicates.report` and `Predictive.report` take `prediction_intervals=...` too, and add the intervals under the key `prediction_intervals`.
 
 ```python
 run = Simulation(ab_model(0.05)).run(num_steps=90)
@@ -13120,7 +13196,7 @@ Attributes:
 
 | Name           | Type          | Description                                              |
 | -------------- | ------------- | -------------------------------------------------------- |
-| `block_length` | \`int         | auto\`                                                   |
+| `block_length` | `int`         | Positions per block; it must leave at least two blocks.  |
 | `positions`    | `list[float]` | Where the intervals are, for each series of the problem. |
 | `starts`       | `int`         | Starts of the fit and of each refit (default 1).         |
 
@@ -13139,7 +13215,7 @@ class JackknifePlus(ConformalMethod, EngineChecked, RangeChecked):
 
     Attributes
     ----------
-    block_length : int | "auto"
+    block_length : int
         Positions per block; it must leave at least two blocks.
     positions : list[float]
         Where the intervals are, for each series of the problem.
@@ -13149,7 +13225,7 @@ class JackknifePlus(ConformalMethod, EngineChecked, RangeChecked):
 
     _runner = staticmethod(run_jackknife_plus)
 
-    block_length: int | Literal["auto"] = Field(description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     positions: list[float] = Field(description="Where the intervals are.")
     starts: int = Field(default=1, description="Starts per fit.")
 ```
@@ -13169,7 +13245,7 @@ Attributes:
 | Name           | Type          | Description                                              |
 | -------------- | ------------- | -------------------------------------------------------- |
 | `replicates`   | `int`         | Number of replicates, at least 2.                        |
-| `block_length` | \`int         | auto\`                                                   |
+| `block_length` | `int`         | Positions per block.                                     |
 | `positions`    | `list[float]` | Where the intervals are, for each series of the problem. |
 | `starts`       | `int`         | Starts of the fit and of each replicate (default 1).     |
 
@@ -13191,7 +13267,7 @@ class EnbPI(ConformalMethod, EngineChecked, RangeChecked):
     ----------
     replicates : int
         Number of replicates, at least 2.
-    block_length : int | "auto"
+    block_length : int
         Positions per block.
     positions : list[float]
         Where the intervals are, for each series of the problem.
@@ -13202,7 +13278,7 @@ class EnbPI(ConformalMethod, EngineChecked, RangeChecked):
     _runner = staticmethod(run_enbpi)
 
     replicates: int = Field(description="Number of replicates.")
-    block_length: int | Literal["auto"] = Field(description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     positions: list[float] = Field(description="Where the intervals are.")
     starts: int = Field(default=1, description="Starts per fit.")
 ```
@@ -13273,15 +13349,14 @@ The result of a conformal method.
 
 Attributes:
 
-| Name                     | Type                     | Description                                                                                                                                                                                                                                                                 |
-| ------------------------ | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `intervals`              | `PredictionIntervals`    | The intervals at the positions the method was given.                                                                                                                                                                                                                        |
-| `scores`                 | `dict[str, list[float]]` | The scores of each series, by label, in the order the method took them.                                                                                                                                                                                                     |
-| `guarantee`              | `str`                    | The coverage the method guarantees, and what the guarantee assumes.                                                                                                                                                                                                         |
-| `failed`                 | `list[str]`              | Each refit that failed, which gives no score: "Origin <index> failed: <reason>" for RollingConformal, "Block <index> failed: <reason>" for JackknifePlus, "Replicate <index> failed: <reason>" for EnbPI; also logged as a warning. Empty for a method that does not refit. |
-| `not_converged`          | `int`                    | Refits kept although their optimizer did not converge; 0 for a method that does not refit.                                                                                                                                                                                  |
-| `block_length`           | \`int                    | None\`                                                                                                                                                                                                                                                                      |
-| `block_length_estimates` | \`dict[str, float]       | None\`                                                                                                                                                                                                                                                                      |
+| Name            | Type                     | Description                                                                                                                                                                                                                                                                 |
+| --------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `intervals`     | `PredictionIntervals`    | The intervals at the positions the method was given.                                                                                                                                                                                                                        |
+| `scores`        | `dict[str, list[float]]` | The scores of each series, by label, in the order the method took them.                                                                                                                                                                                                     |
+| `guarantee`     | `str`                    | The coverage the method guarantees, and what the guarantee assumes.                                                                                                                                                                                                         |
+| `failed`        | `list[str]`              | Each refit that failed, which gives no score: "Origin <index> failed: <reason>" for RollingConformal, "Block <index> failed: <reason>" for JackknifePlus, "Replicate <index> failed: <reason>" for EnbPI; also logged as a warning. Empty for a method that does not refit. |
+| `not_converged` | `int`                    | Refits kept although their optimizer did not converge; 0 for a method that does not refit.                                                                                                                                                                                  |
+| `block_length`  | \`int                    | None\`                                                                                                                                                                                                                                                                      |
 
 Source code in `commol/conformal/results.py`
 
@@ -13311,9 +13386,6 @@ class ConformalResult(ResultModel):
     block_length : int | None
         With `JackknifePlus` and `EnbPI`, the positions per block they ran
         with; None for a method without blocks.
-    block_length_estimates : dict[str, float] | None
-        With ``block_length="auto"``, the estimate of each series, by label;
-        otherwise None.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -13324,9 +13396,6 @@ class ConformalResult(ResultModel):
     failed: list[str] = Field(description="Each refit that failed.")
     not_converged: int = Field(description="Refits that did not converge.")
     block_length: int | None = Field(description="The block length used.")
-    block_length_estimates: dict[str, float] | None = Field(
-        description="The estimate of each series with the automatic length."
-    )
 ```
 
 ## PredictionIntervals
@@ -17240,7 +17309,7 @@ Attributes:
 
 | Name           | Type                      | Description                                                                                                 |
 | -------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `block_length` | \`int                     | auto\`                                                                                                      |
+| `block_length` | `int`                     | Positions per block of the meat; they must make more blocks than parameters.                                |
 | `draws`        | `int`                     | Number of draws of the Student t, at least 1.                                                               |
 | `curvature`    | `{gauss_newton, hessian}` | The curvature H (default "gauss_newton"). With the Hessian, the sandwich also holds when the mean is wrong. |
 | `starts`       | `int`                     | Starts of the fit (default 1): the initial guess, then rows of a Latin hypercube over the bounds.           |
@@ -17266,9 +17335,9 @@ class Sandwich(UncertaintyMethod[SandwichResult], RangeChecked):
 
     Attributes
     ----------
-    block_length : int | "auto"
-        Positions per block; ``"auto"`` is the rule of Politis and White
-        (2004) for non-overlapping blocks on the residuals of the fit.
+    block_length : int
+        Positions per block of the meat; they must make more blocks than
+        parameters.
     draws : int
         Number of draws of the Student t, at least 1.
     curvature : {"gauss_newton", "hessian"}
@@ -17281,7 +17350,7 @@ class Sandwich(UncertaintyMethod[SandwichResult], RangeChecked):
 
     _runner = staticmethod(run_sandwich)
 
-    block_length: int | Literal["auto"] = Field(description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     draws: int = Field(description="Number of draws.")
     curvature: Literal["gauss_newton", "hessian"] = Field(
         default="gauss_newton", description="The curvature."
@@ -17698,15 +17767,14 @@ The result of a sandwich: a Student t on the unbounded scale of the parameters, 
 
 Attributes:
 
-| Name                     | Type                | Description                                                                          |
-| ------------------------ | ------------------- | ------------------------------------------------------------------------------------ |
-| `fit`                    | `CalibrationResult` | The fit the sandwich is centred on: Calibrator.run(starts).                          |
-| `covariance`             | `list[list[float]]` | H⁻¹ B H⁻¹ on the unbounded scale of the parameters.                                  |
-| `sample`                 | `ParameterSample`   | Draws of the Student t, mapped back to the parameters, with equal weights.           |
-| `notes`                  | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale. |
-| `blocks`                 | `int`               | The number of blocks G; intervals read a Student t with G − 1 degrees of freedom.    |
-| `block_length`           | `int`               | The positions per block.                                                             |
-| `block_length_estimates` | \`dict[str, float]  | None\`                                                                               |
+| Name           | Type                | Description                                                                          |
+| -------------- | ------------------- | ------------------------------------------------------------------------------------ |
+| `fit`          | `CalibrationResult` | The fit the sandwich is centred on: Calibrator.run(starts).                          |
+| `covariance`   | `list[list[float]]` | H⁻¹ B H⁻¹ on the unbounded scale of the parameters.                                  |
+| `sample`       | `ParameterSample`   | Draws of the Student t, mapped back to the parameters, with equal weights.           |
+| `notes`        | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale. |
+| `blocks`       | `int`               | The number of blocks G; intervals read a Student t with G − 1 degrees of freedom.    |
+| `block_length` | `int`               | The positions per block.                                                             |
 
 Source code in `commol/local/results.py`
 
@@ -17734,14 +17802,10 @@ class SandwichResult(LocalResult):
         ``G − 1`` degrees of freedom.
     block_length : int
         The positions per block.
-    block_length_estimates : dict[str, float] | None
-        With ``block_length="auto"``, the estimate of each series, by label;
-        otherwise None.
     """
 
     blocks: int
     block_length: int
-    block_length_estimates: dict[str, float] | None
 
     def degrees_of_freedom(self) -> float | None:
         """
@@ -28141,7 +28205,7 @@ Attributes:
 | -------------- | ---------- | ------------------------------------------------------------------------------------------------------------- |
 | `kind`         | `bayesian` | The bootstrap, which the engine reads.                                                                        |
 | `replicates`   | `int`      | Number of replicates, at least 1.                                                                             |
-| `block_length` | \`int      | auto\`                                                                                                        |
+| `block_length` | `int`      | Positions per block.                                                                                          |
 | `starts`       | `int`      | Starts of the fit and of each replicate (default 1): the fit, then rows of a Latin hypercube over the bounds. |
 
 Source code in `commol/resampling/methods.py`
@@ -28164,7 +28228,7 @@ class BayesianBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
         The bootstrap, which the engine reads.
     replicates : int
         Number of replicates, at least 1.
-    block_length : int | "auto"
+    block_length : int
         Positions per block.
     starts : int
         Starts of the fit and of each replicate (default 1): the fit, then
@@ -28175,7 +28239,7 @@ class BayesianBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
 
     kind: Literal["bayesian"] = Field(default="bayesian", description="The bootstrap.")
     replicates: int = Field(description="Number of replicates.")
-    block_length: int | Literal["auto"] = Field(description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     starts: int = Field(default=1, description="Starts per fit.")
 ```
 
@@ -28193,7 +28257,7 @@ Attributes:
 | ---------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `kind`           | `residual`                   | The bootstrap, which the engine reads.                                                                                                                                                   |
 | `replicates`     | `int`                        | Number of replicates, at least 1.                                                                                                                                                        |
-| `block_length`   | \`int                        | auto\`                                                                                                                                                                                   |
+| `block_length`   | `int`                        | Positions per block; with scheme="stationary" the mean length.                                                                                                                           |
 | `residual_scale` | `{additive, multiplicative}` | "additive": r = y − ŷ and ŷ + r\*. "multiplicative": r = log(y / ŷ) and ŷ · exp(r\*); it needs positive observed and fitted values and keeps synthetic values positive.                  |
 | `scheme`         | `{moving, stationary}`       | "moving": blocks of block_length consecutive positions (Künsch 1989). "stationary": blocks of geometric length with mean block_length, wrapped around the end (Politis and Romano 1994). |
 | `starts`         | `int`                        | Starts of the fit and of each replicate (default 1).                                                                                                                                     |
@@ -28215,7 +28279,7 @@ class ResidualBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
         The bootstrap, which the engine reads.
     replicates : int
         Number of replicates, at least 1.
-    block_length : int | "auto"
+    block_length : int
         Positions per block; with ``scheme="stationary"`` the mean length.
     residual_scale : {"additive", "multiplicative"}
         ``"additive"``: ``r = y − ŷ`` and ``ŷ + r*``. ``"multiplicative"``:
@@ -28233,7 +28297,7 @@ class ResidualBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
 
     kind: Literal["residual"] = Field(default="residual", description="The bootstrap.")
     replicates: int = Field(description="Number of replicates.")
-    block_length: int | Literal["auto"] = Field(description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     residual_scale: Literal["additive", "multiplicative"] = Field(
         description="The scale of the residuals."
     )
@@ -28257,7 +28321,7 @@ Attributes:
 | -------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `kind`         | `wild`                 | The bootstrap, which the engine reads.                                                                                                                           |
 | `replicates`   | `int`                  | Number of replicates, at least 1.                                                                                                                                |
-| `block_length` | \`int                  | auto\`                                                                                                                                                           |
+| `block_length` | `int`                  | Positions per block.                                                                                                                                             |
 | `multipliers`  | `{rademacher, mammen}` | "rademacher": ±1 with probability 1/2. "mammen": two values with mean 0, variance 1 and third moment 1 (Mammen 1993), which keeps the skewness of the residuals. |
 | `starts`       | `int`                  | Starts of the fit and of each replicate (default 1).                                                                                                             |
 
@@ -28279,7 +28343,7 @@ class WildBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
         The bootstrap, which the engine reads.
     replicates : int
         Number of replicates, at least 1.
-    block_length : int | "auto"
+    block_length : int
         Positions per block.
     multipliers : {"rademacher", "mammen"}
         ``"rademacher"``: ±1 with probability 1/2. ``"mammen"``: two values
@@ -28293,7 +28357,7 @@ class WildBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
 
     kind: Literal["wild"] = Field(default="wild", description="The bootstrap.")
     replicates: int = Field(description="Number of replicates.")
-    block_length: int | Literal["auto"] = Field(description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     multipliers: Literal["rademacher", "mammen"] = Field(
         description="The distribution of the multipliers."
     )
@@ -28312,7 +28376,7 @@ Attributes:
 
 | Name           | Type  | Description                                              |
 | -------------- | ----- | -------------------------------------------------------- |
-| `block_length` | \`int | auto\`                                                   |
+| `block_length` | `int` | Positions per block; it must leave at least two blocks.  |
 | `starts`       | `int` | Starts of the fit and of each leave-out fit (default 1). |
 
 Source code in `commol/resampling/methods.py`
@@ -28328,7 +28392,7 @@ class BlockJackknife(UncertaintyMethod[JackknifeResult], RangeChecked):
 
     Attributes
     ----------
-    block_length : int | "auto"
+    block_length : int
         Positions per block; it must leave at least two blocks.
     starts : int
         Starts of the fit and of each leave-out fit (default 1).
@@ -28336,7 +28400,7 @@ class BlockJackknife(UncertaintyMethod[JackknifeResult], RangeChecked):
 
     _runner = staticmethod(run_block_jackknife)
 
-    block_length: int | Literal["auto"] = Field(description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     starts: int = Field(default=1, description="Starts per fit.")
 ```
 
@@ -28622,11 +28686,10 @@ The blocks of a resampling method, and the synthetic values below zero.
 
 Attributes:
 
-| Name                     | Type               | Description                                                                                                                       |
-| ------------------------ | ------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| `block_length`           | \`int              | None\`                                                                                                                            |
-| `block_length_estimates` | \`dict[str, float] | None\`                                                                                                                            |
-| `negative_values`        | `int`              | Synthetic observed values below zero, over every replicate. They are kept; many of them point to residual_scale="multiplicative". |
+| Name              | Type  | Description                                                                                                                       |
+| ----------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `block_length`    | \`int | None\`                                                                                                                            |
+| `negative_values` | `int` | Synthetic observed values below zero, over every replicate. They are kept; many of them point to residual_scale="multiplicative". |
 
 Source code in `commol/resampling/results.py`
 
@@ -28640,9 +28703,6 @@ class ResamplingDiagnostics(ResultModel):
     block_length : int | None
         The block length the method ran with; None for the parametric
         bootstrap, which draws no blocks.
-    block_length_estimates : dict[str, float] | None
-        With ``block_length="auto"``, the estimate of each series, by label;
-        otherwise None.
     negative_values : int
         Synthetic observed values below zero, over every replicate. They are
         kept; many of them point to ``residual_scale="multiplicative"``.
@@ -28651,9 +28711,6 @@ class ResamplingDiagnostics(ResultModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     block_length: int | None = Field(description="The block length used.")
-    block_length_estimates: dict[str, float] | None = Field(
-        description="The estimate of each series with the automatic length."
-    )
     negative_values: int = Field(description="Synthetic values below zero.")
 ```
 
@@ -36045,7 +36102,7 @@ Attributes:
 
 | Name           | Type  | Description                                                                                       |
 | -------------- | ----- | ------------------------------------------------------------------------------------------------- |
-| `block_length` | \`int | auto\`                                                                                            |
+| `block_length` | `int` | Positions per block of the scores; they must make at least two blocks.                            |
 | `starts`       | `int` | Starts of the fit (default 1): the initial guess, then rows of a Latin hypercube over the bounds. |
 
 Source code in `commol/smc/methods.py`
@@ -36076,7 +36133,7 @@ class InformationMatchingEta(RangeChecked):
 
     Attributes
     ----------
-    block_length : int | "auto"
+    block_length : int
         Positions per block of the scores; they must make at least two
         blocks.
     starts : int
@@ -36087,7 +36144,7 @@ class InformationMatchingEta(RangeChecked):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     kind: Literal["information_matching"] = "information_matching"
-    block_length: int | Literal["auto"] = Field(description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     starts: int = Field(default=1, description="Starts of the fit.")
 ```
 
@@ -36104,7 +36161,7 @@ Attributes:
 | Name               | Type    | Description                                                                                       |
 | ------------------ | ------- | ------------------------------------------------------------------------------------------------- |
 | `replicates`       | `int`   | Number of Bayesian-bootstrap data sets, at least 1.                                               |
-| `block_length`     | \`int   | auto\`                                                                                            |
+| `block_length`     | `int`   | Positions per block of the bootstrap.                                                             |
 | `confidence_level` | `float` | The level of the intervals, strictly between 0 and 1.                                             |
 | `starts`           | `int`   | Starts of the fit (default 1): the initial guess, then rows of a Latin hypercube over the bounds. |
 
@@ -36124,7 +36181,7 @@ class BootstrapCoverageEta(RangeChecked):
     ----------
     replicates : int
         Number of Bayesian-bootstrap data sets, at least 1.
-    block_length : int | "auto"
+    block_length : int
         Positions per block of the bootstrap.
     confidence_level : float
         The level of the intervals, strictly between 0 and 1.
@@ -36137,7 +36194,7 @@ class BootstrapCoverageEta(RangeChecked):
 
     kind: Literal["bootstrap_coverage"] = "bootstrap_coverage"
     replicates: int = Field(description="Number of bootstrap data sets.")
-    block_length: int | Literal["auto"] = Field(description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     confidence_level: float = Field(description="The level of the intervals.")
     starts: int = Field(default=1, description="Starts of the fit.")
 ```
@@ -36370,15 +36427,14 @@ The result of a Gibbs posterior: the attributes of `SMCResult`, and these.
 
 Attributes:
 
-| Name                     | Type                | Description                                                                                                                                      |
-| ------------------------ | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `eta`                    | `float`             | The η the posterior ran with.                                                                                                                    |
-| `fit`                    | \`CalibrationResult | None\`                                                                                                                                           |
-| `coverage`               | \`float             | None\`                                                                                                                                           |
-| `failed`                 | `list[str]`         | With BootstrapCoverageEta, each replicate whose sampler failed: "Replicate <index> failed: <reason>", also logged as a warning. Empty otherwise. |
-| `block_length`           | \`int               | None\`                                                                                                                                           |
-| `block_length_estimates` | \`dict[str, float]  | None\`                                                                                                                                           |
-| `degrees_of_freedom`     | \`float             | None\`                                                                                                                                           |
+| Name                 | Type                | Description                                                                                                                                      |
+| -------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `eta`                | `float`             | The η the posterior ran with.                                                                                                                    |
+| `fit`                | \`CalibrationResult | None\`                                                                                                                                           |
+| `coverage`           | \`float             | None\`                                                                                                                                           |
+| `failed`             | `list[str]`         | With BootstrapCoverageEta, each replicate whose sampler failed: "Replicate <index> failed: <reason>", also logged as a warning. Empty otherwise. |
+| `block_length`       | \`int               | None\`                                                                                                                                           |
+| `degrees_of_freedom` | \`float             | None\`                                                                                                                                           |
 
 Source code in `commol/smc/results.py`
 
@@ -36404,9 +36460,6 @@ class GibbsResult(SMCResult):
     block_length : int | None
         With a calibration of `η`, the positions per block it ran with; None
         when `η` is a number.
-    block_length_estimates : dict[str, float] | None
-        With a calibration of `η` and ``block_length="auto"``, the estimate
-        of each series, by label; otherwise None.
     degrees_of_freedom : float | None
         With `InformationMatchingEta`, the degrees of freedom `ν` that `η`
         reads from its blocks, with the blocks and the parameters counted as
@@ -36419,7 +36472,6 @@ class GibbsResult(SMCResult):
     fit: CalibrationResult | None
     coverage: float | None
     block_length: int | None
-    block_length_estimates: dict[str, float] | None
     degrees_of_freedom: float | None
     failed: list[str] = Field(default_factory=list)
 ```
@@ -40765,7 +40817,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `ObservedDataPoint(scale=...)`: a known positive number, 1 by default, that multiplies the prediction of the observation, with its factor. A count model reads the mean `scale · model`, so a count observed on a known share of the model output stays whole. The loss, the likelihood, the predictive, the scores, the figures, the `observed` block of a report (`scales`) and a `PredictionSpec(scale=...)` of a prediction profile read it. See [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#known-shares-scales).
 - `ModelBuilder.add_matrix(id, stratification, values, unit, description)` adds a matrix between the categories of a stratification, and a transition rate reads it with `matrix_sum(M, e)`: in a compartment of category `i`, `Σ_j M[i, j] · e_j`, with each bin of `e` read as its amount in category `j` and `total` as the total of `j`. Every engine runs it. A rate or a formula parameter reads the entries as `M_<i>_<j>` and the spectral radius of the matrix as `M_radius`. The unit check, the equations and `Model.describe` read the matrix. See [Matrix sums](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#matrix-sums).
 - `ModelBuilder.add_matrix(row_scales=..., column_scales=...)`: a constant or a parameter to calibrate multiplies the row or the column of a category, so the model reads `diag(a) · values · diag(b)`. A calibration constraint reads `M_<i>_<j>` and `M_radius` of the scaled matrix at the values of each point, so a bound such as `2 - k * M_radius` is one constraint; a rate reads them at the values of its run. See [Constraints](https://munqu.github.io/commol/latest/guide/calibration-constraints/#a-bound-on-a-matrix).
-- `GibbsResult` and `ConformalResult` give `block_length` and `block_length_estimates`, as the bootstraps, the jackknife and the sandwich do: the length a method ran with, and with `block_length="auto"` the estimate of each series, by label. `GibbsResult` gives them for `InformationMatchingEta` and `BootstrapCoverageEta`, and `None` for a number `η`; `ConformalResult` for `JackknifePlus` and `EnbPI`, and `None` for the variants without blocks. See [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#what-means) and [Conformal Prediction Intervals](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#results-plots-and-reports).
+- `GibbsResult` and `ConformalResult` give `block_length`, as the bootstraps, the jackknife and the sandwich do: the length a method ran with. `GibbsResult` gives it for `InformationMatchingEta` and `BootstrapCoverageEta`, and `None` for a number `η`; `ConformalResult` for `JackknifePlus` and `EnbPI`, and `None` for the variants without blocks. See [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#what-means) and [Conformal Prediction Intervals](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#results-plots-and-reports).
 - `GibbsResult.degrees_of_freedom`: the degrees of freedom `ν` that `InformationMatchingEta` reads from its blocks, `None` for a number `η` and for `BootstrapCoverageEta`. Below 10, a note in `diagnostics.notes`, also logged as a warning, gives `ν` and the coverage to expect of 90 % intervals. In Rust, `InformationCalibration::few_coverage`, `smc::FEW_DEGREES_OF_FREEDOM`, `smc::FEW_COVERAGE_LEVEL` and `special::student_t_two_sided_tail` are new. See [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#what-means).
 - `ProfileIdentifiability(result=profiles)` in `commol.identifiability`: the identifiability report of the verdicts of a `ProfileResult`, run through `Calibrator.identifiability` as every identifiability method. It runs no model, and it refuses the profiles of another problem with a `ValueError` that names the parameters of both. See [Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/#verdicts-and-the-identifiability-report).
 - The fractions of a stratification can differ by the category of a stratification declared before it: `stratification_fractions={"type": {"by": "group", "g1": {"t1": 0.25, "t2": 0.75}, "g2": {"t1": 0.5, "t2": 0.5}}}`. The stratifications stay apart, so a rate reads `A_g1` and a condition names `g1`. The engine checks that `by` is declared before, that every compartment of the stratification has a category of it, and each split, with a message that names the stratification and the category. See [Building Models](https://munqu.github.io/commol/latest/guide/building-models/#fractions-that-differ-by-category).
@@ -40833,6 +40885,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Breaking:** `Model.get_uncalibrated_parameters`, `Aggregate.uncalibrated_values` (and `ModelStructure.uncalibrated_values`), `Aggregate.get_uncalibrated_bins` and `Aggregate.get_categories_with_fractions` are removed: no part of commol reads them, and the engine names every value a run lacks. Migration: read `parameter.value is None` and `structure.bin_amounts`, or run the model and read the message.
 - **Breaking:** the quantities of interest lose the methods that copied rules of the engine: `ValueAt.default_label()` and that of the other quantities, `Level.text`, `Increments.text`, `Increments.check_ends()` and `output_name`. `labels()` and `axes()` give what the engine names.
 - **Breaking:** `commol.utils.security` is removed, with `SecurityConfig`, `SecurityError`, `validate_expression_security` and the `config=` argument of `AxisPattern.combine` and `AxisPattern.from_formula`. The parser of the engine is the only check of a formula: a rate, a formula parameter, a calibration constraint or an axis pattern that it rejects raises `ValueError` with its message, and no setting changes its limits. Remove the `config=` argument, and catch `ValueError` instead of `SecurityError`. A formula of the language that the old text guards rejected is now valid: a name with letters outside ASCII (`α * β`), a name such as `__import__`, `os` or `my_key`, a number such as `1e400`, `nan` as the name of a variable, and a formula of more than 1000 nodes, 10 000 characters or 10 levels of nesting, within the limits of the parser. The build still rejects a variable that the model does not define. See [Limits of the parser](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#limits-of-the-parser).
+- **Breaking:** `block_length="auto"` is removed from every method that reads blocks (`BayesianBootstrap`, `ResidualBootstrap`, `WildBootstrap`, `BlockJackknife`, `Sandwich`, `InformationMatchingEta`, `BootstrapCoverageEta`, `JackknifePlus`, `EnbPI`): `block_length` is a whole number of at least 1, and `"auto"` raises `pydantic.ValidationError`, a `ValueError`, that names it, as any text that is not a whole number does. The field `block_length_estimates` is removed from `ResamplingDiagnostics` and `SandwichResult`; `block_length` stays. The removal changes no result of a given number. `"auto"` took the largest of the lengths its rule gave the series, whatever the use. Migration: read `residual_dependence` of the fit, choose the length, and compare the result at several lengths, as [Choose the length](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#choose-the-length) shows; to repeat a result, give the `block_length` it reports. A method saved with `"auto"` or a result saved with `block_length_estimates` no longer loads: set the number, and delete the field. In Rust, `BlockScheme::new` takes the place of `BlockScheme::resolve` and `BlockScheme::at_fit`; `sandwich_approximation` and `information_matching_eta` take a `usize`; `BayesianBootstrap::new` takes the problem and the fit, and refuses a fit with no run, as `block_jackknife`, `jackknife_plus`, `enbpi` and `bootstrap_coverage_eta` do; `automatic_length`, `automatic_block_length`, `AutomaticLength`, `BlockDrawing`, `Estimates`, `BlockScheme::estimates`, `blocks_at`, `Curvature::predictions` and the field `estimates` of `SandwichRun` are removed.
 
 ### Fixed
 
@@ -40842,11 +40895,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - An observation at `at=-0.0` beside an observation or a constraint at `0.0` is one position. Before, every method that builds blocks (the bootstraps, the block jackknife, `ResidualNoise` and the others) raised `PanicException: every position is listed`, and a constraint at `0.0` beside an observation at `-0.0` made `Calibrator` raise `PanicException: the schedule holds every constraint position`. The dense design of `StructuralRank` read an observation at `-0.0` as a second position 0, which changed its singular values.
 - The PIT and the quantile residuals of a total far above its mean under `NegativeBinomialObservations(sum="exact")` put it in its upper tail. Before, at about 15 times the mean for a mean of 100 and `overdispersion` 0, and closer for a larger mean, `P(Y < y)` read about 0 and `P(Y > y)` about 1: an extreme upper outlier had a PIT of about 0 and a quantile residual at the lower end. Just before that point the tails lost a part of the mass. `P(Y < y)`, `p(y)` and `P(Y > y)` now sum to 1.
 - `NegativeBinomialObservations(sum="exact")` reads an `overdispersion` between 0 and about `1e-60` as the limit it is near. Before, the log density of a total above 1 was `−∞` there, its scores were NaN, and its tails and its information were wrong.
-- An observation of value 0 at a predicted mean of exactly 0 of a `PoissonObservations`, `NegativeBinomialObservations` or `BinomialObservations` (and a binomial count of all its trials at a mean of all of them), such as a series that stays 0 until a process starts, has the limit of its score there. These observations add nothing to the log-likelihood. With a given `block_length`, and when other series observe their positions, `InformationMatchingEta` and the meat of `Sandwich` give the same result with and without them. With `block_length="auto"`, or at positions of their own, they can still change the blocks (#517). The floors of a `ProfileLikelihood` stay finite with them. Before, their score was NaN, information matching failed with a message that the scores were all 0, and the evaluation floor of a profile was NaN.
+- An observation of value 0 at a predicted mean of exactly 0 of a `PoissonObservations`, `NegativeBinomialObservations` or `BinomialObservations` (and a binomial count of all its trials at a mean of all of them), such as a series that stays 0 until a process starts, has the limit of its score there. These observations add nothing to the log-likelihood. When other series observe their positions, `InformationMatchingEta` and the meat of `Sandwich` give the same result with and without these counts. At positions of their own they count in the windows of the blocks. The floors of a `ProfileLikelihood` stay finite with them. Before, their score was NaN, information matching failed with a message that the scores were all 0, and the evaluation floor of a profile was NaN.
 - A score that is not finite at the fit, such as that of a count above 0 at a mean of 0, raises a `ValueError` from the local methods, the sandwich and information matching. The error names the observation and says whether the fit is outside the support of its observation model. Before, it reached them as a NaN. `InformationMatchingEta` reports a curvature that is singular to working precision as singular. Before, it reported that the scores were all 0.
 - A prediction or a derivative that is not finite at the fit, such as a difference of finite runs that overflows, raises a `RuntimeError` from `Laplace`, `Sandwich` and `InformationMatchingEta`, and a derivative also from `LaplaceMixture`, at an end inside the support. The error names the observation and, for a derivative, the parameter. Before, the error gave another cause. It was a `RuntimeError` of a mean on the edge of its observation model, or a `ValueError`: with observation models, of a value with no probability at the fit or a score that is not finite; with `loss_function="rmse"`, of a curvature that is not positive definite; from `InformationMatchingEta`, of scores that are all 0. Or there was no error: a term with no curvature (an `sd` whose square overflows, a weight of 0 in Rust) gave `Sandwich` an infinite covariance and, in Rust, a source of derivatives whose prediction is not finite gave a loss a finite curvature, with any weight, and gradients that are not finite. `loss_function="mae"` keeps its `ValueError`, that it has no curvature. A `Laplace` or a `LaplaceMixture` whose matrix was right is refused too: one with `curvature="hessian"` or, in Rust, one with the entry in a term of weight 0. The error of a curvature that is not finite with finite derivatives says that a derivative may be too large for its square. In Rust, `Curvature::gauss_newton` and `Curvature::hessian` return `MethodError::Failed`, also where they returned `MethodError::Invalid` at a prediction or a derivative that is not finite, and `Discrepancy::check_curvature` is new.
 - The curvature of a `NegativeBinomialObservations` of `overdispersion` 0, which the Laplace approximation, the sandwich and the noise floor of a profile read, is the limit of the Poisson, `μ²/2` for `φ`. Before, it ran with no end.
-- A series with two observations at one position, such as an increment over 2 steps and a total over 40 steps that both end at 40, is refused by the methods that read one residual per position of a series, with a message that names the series and the position: `ResidualNoise`, `ResidualBootstrap`, `block_length="auto"` of every method, and `RollingConformal`, which counts a horizon in observations. Before, the residual noise and the residual bootstrap gave both observations the residual of one of them, and the automatic block length read them as consecutive positions, with no message. A calibration, the likelihood, the scores, and the Bayesian and wild bootstraps, the block jackknife, the sandwich and the other conformal methods with a `block_length` of a number read each observation with its own residual, and accept such a series. Give one of the two observations a label of its own for the methods that refuse it. See [One position, two observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#one-position-two-observations).
+- A series with two observations at one position, such as an increment over 2 steps and a total over 40 steps that both end at 40, is refused by the methods that read one residual per position of a series, with a message that names the series and the position: `ResidualNoise`, `ResidualBootstrap`, and `RollingConformal`, which counts a horizon in observations. Before, the residual noise and the residual bootstrap gave both observations the residual of one of them, with no message. A calibration, the likelihood, the scores, and the Bayesian and wild bootstraps, the block jackknife, the sandwich and the other conformal methods read each observation with its own residual, and accept such a series. Give one of the two observations a label of its own for the methods that refuse it. See [One position, two observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#one-position-two-observations).
 - `InformationMatchingEta` gave an `η` far too large, so a posterior far too narrow, with few blocks per parameter: with 10 parameters, 35 positions, noise of sd 1 and `loss_function="sse"`, `block_length=3` gave `η = 8.0` and `block_length=1` gave `0.77` where `1/(2σ²) = 0.5`, since `tr(J I⁻¹ J) / tr(J)` inverts the estimate of `I`. It now gives `η = p / tr(J⁻¹ I)`, which reads `I` only through a trace: 0.51, 0.47 and, with 5 blocks of 7, 0.52. It takes two blocks or more, also fewer than the parameters, where a `ValueError` asked for more blocks than parameters, and raises a `ValueError` when every block score is 0 because the scores of each parameter fall inside one block. See [What `η` means](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#what-means).
 - `InformationMatchingEta` gave an `η` too large, so a posterior too narrow, when the blocks share the curvature unevenly or read few degrees of freedom: with noise of sd 1 and `loss_function="sse"`, the median `η` over data sets was 2.2 times `1/(2σ²)` for one constant flow at 24 positions with `block_length=12`, and 3.7 times for a line at 24 positions with `block_length=8`. It now corrects the trace by the share of the curvature in each block, `p / (p − Σ_b tr((J⁻¹ J_b)²))` in place of `G/(G − 1)`, and `η` by `median(χ²_ν)/ν` for the degrees of freedom `ν` of the blocks: medians of 1.00 and 1.02 times. With many degrees of freedom `η` changes less: `block_length=1` of one constant at `n` positions gives `median(χ²_{n−1}) / (2 Σ r²)` where it gave `(n − 1) / (2 Σ r²)`, 0.98 times as large at `n = 30`, and of a line at 24 positions a median `η` 0.91 times as large, which was 1.11 times its value. See [What `η` means](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#what-means).
 - A calibrated value of a bin, and the initial-condition remainder, split by the proportions of amounts below the smallest normal `float`, about `2.2e-308`, which hold fewer digits the smaller they are: with `B = 1e-310` split `0.3, 0.7`, `B = 1.5` gave `B_x = 0.44999999999997775`, so `Model.apply_calibration_parameters` wrote both compartments as overrides, and after `update_bin_amounts({"B": 20})` `B` still started from 1.5. Where such amounts hold the split of the fractions up to their rounding, a value now splits by the fractions, so the write-back writes the bin and its split with no override. Amounts further from the fractions, such as an override, keep their proportions. See [What an id can name](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/#what-an-id-can-name).

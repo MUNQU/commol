@@ -112,7 +112,7 @@ print(widths)  # [6.01, 12.01, 18.02]
 
 ## Sandwich
 
-`Sandwich(block_length, draws, curvature="gauss_newton", starts=1)` gives the covariance `H⁻¹ B H⁻¹`, where `B` sums the outer products of the **scores** of blocks of observations: `B = G/(G − 1) · Σ_b s_b s_bᵀ`, with `s_b` the sum of the gradients of the terms of block `b` (the clustered estimator CR1, Cameron and Miller 2015). The blocks hold every series in a window of `block_length` positions, as the [bootstraps](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#blocks-and-their-length) do; `"auto"` chooses the length of Politis and White (2004) from the residuals of the fit. It returns a `SandwichResult`: a `LaplaceResult` with `blocks` (`G`), `block_length` and the estimates of `"auto"`.
+`Sandwich(block_length, draws, curvature="gauss_newton", starts=1)` gives the covariance `H⁻¹ B H⁻¹`, where `B` sums the outer products of the **scores** of blocks of observations: `B = G/(G − 1) · Σ_b s_b s_bᵀ`, with `s_b` the sum of the gradients of the terms of block `b` (the clustered estimator CR1, Cameron and Miller 2015). The blocks hold every series in a window of `block_length` positions, as the [bootstraps](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#blocks-and-their-length) do, and you [choose the length](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#choose-the-length). It returns a `SandwichResult`: a `LaplaceResult` with `blocks` (`G`) and `block_length`.
 
 What the sandwich protects against depends on `H`:
 

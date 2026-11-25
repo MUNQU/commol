@@ -146,7 +146,7 @@ Attributes:
 
 | Name           | Type  | Description                                                                                       |
 | -------------- | ----- | ------------------------------------------------------------------------------------------------- |
-| `block_length` | \`int | auto\`                                                                                            |
+| `block_length` | `int` | Positions per block of the scores; they must make at least two blocks.                            |
 | `starts`       | `int` | Starts of the fit (default 1): the initial guess, then rows of a Latin hypercube over the bounds. |
 
 Source code in `commol/smc/methods.py`
@@ -177,7 +177,7 @@ class InformationMatchingEta(RangeChecked):
 
     Attributes
     ----------
-    block_length : int | "auto"
+    block_length : int
         Positions per block of the scores; they must make at least two
         blocks.
     starts : int
@@ -188,7 +188,7 @@ class InformationMatchingEta(RangeChecked):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     kind: Literal["information_matching"] = "information_matching"
-    block_length: int | Literal["auto"] = Field(description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     starts: int = Field(default=1, description="Starts of the fit.")
 ```
 
@@ -205,7 +205,7 @@ Attributes:
 | Name               | Type    | Description                                                                                       |
 | ------------------ | ------- | ------------------------------------------------------------------------------------------------- |
 | `replicates`       | `int`   | Number of Bayesian-bootstrap data sets, at least 1.                                               |
-| `block_length`     | \`int   | auto\`                                                                                            |
+| `block_length`     | `int`   | Positions per block of the bootstrap.                                                             |
 | `confidence_level` | `float` | The level of the intervals, strictly between 0 and 1.                                             |
 | `starts`           | `int`   | Starts of the fit (default 1): the initial guess, then rows of a Latin hypercube over the bounds. |
 
@@ -225,7 +225,7 @@ class BootstrapCoverageEta(RangeChecked):
     ----------
     replicates : int
         Number of Bayesian-bootstrap data sets, at least 1.
-    block_length : int | "auto"
+    block_length : int
         Positions per block of the bootstrap.
     confidence_level : float
         The level of the intervals, strictly between 0 and 1.
@@ -238,7 +238,7 @@ class BootstrapCoverageEta(RangeChecked):
 
     kind: Literal["bootstrap_coverage"] = "bootstrap_coverage"
     replicates: int = Field(description="Number of bootstrap data sets.")
-    block_length: int | Literal["auto"] = Field(description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     confidence_level: float = Field(description="The level of the intervals.")
     starts: int = Field(default=1, description="Starts of the fit.")
 ```
@@ -471,15 +471,14 @@ The result of a Gibbs posterior: the attributes of `SMCResult`, and these.
 
 Attributes:
 
-| Name                     | Type                | Description                                                                                                                                      |
-| ------------------------ | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `eta`                    | `float`             | The η the posterior ran with.                                                                                                                    |
-| `fit`                    | \`CalibrationResult | None\`                                                                                                                                           |
-| `coverage`               | \`float             | None\`                                                                                                                                           |
-| `failed`                 | `list[str]`         | With BootstrapCoverageEta, each replicate whose sampler failed: "Replicate <index> failed: <reason>", also logged as a warning. Empty otherwise. |
-| `block_length`           | \`int               | None\`                                                                                                                                           |
-| `block_length_estimates` | \`dict[str, float]  | None\`                                                                                                                                           |
-| `degrees_of_freedom`     | \`float             | None\`                                                                                                                                           |
+| Name                 | Type                | Description                                                                                                                                      |
+| -------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `eta`                | `float`             | The η the posterior ran with.                                                                                                                    |
+| `fit`                | \`CalibrationResult | None\`                                                                                                                                           |
+| `coverage`           | \`float             | None\`                                                                                                                                           |
+| `failed`             | `list[str]`         | With BootstrapCoverageEta, each replicate whose sampler failed: "Replicate <index> failed: <reason>", also logged as a warning. Empty otherwise. |
+| `block_length`       | \`int               | None\`                                                                                                                                           |
+| `degrees_of_freedom` | \`float             | None\`                                                                                                                                           |
 
 Source code in `commol/smc/results.py`
 
@@ -505,9 +504,6 @@ class GibbsResult(SMCResult):
     block_length : int | None
         With a calibration of `η`, the positions per block it ran with; None
         when `η` is a number.
-    block_length_estimates : dict[str, float] | None
-        With a calibration of `η` and ``block_length="auto"``, the estimate
-        of each series, by label; otherwise None.
     degrees_of_freedom : float | None
         With `InformationMatchingEta`, the degrees of freedom `ν` that `η`
         reads from its blocks, with the blocks and the parameters counted as
@@ -520,7 +516,6 @@ class GibbsResult(SMCResult):
     fit: CalibrationResult | None
     coverage: float | None
     block_length: int | None
-    block_length_estimates: dict[str, float] | None
     degrees_of_freedom: float | None
     failed: list[str] = Field(default_factory=list)
 ```
