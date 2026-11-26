@@ -224,14 +224,15 @@ impl PyCalibrationProblem {
     ///
     /// # Errors
     ///
-    /// As [`ReplicateRunner::new`].
+    /// As [`ReplicateRunner::new`], which runs the model at the fit: a
+    /// method builds it inside [`crate::parallelism::parallel_logged`], so
+    /// that a Ctrl-C during the run is read.
     pub(crate) fn runner(
         &self,
         fit: &[f64],
         starts: usize,
-    ) -> PyResult<ReplicateRunner<'_, Engine>> {
+    ) -> Result<ReplicateRunner<'_, Engine>, MethodError> {
         ReplicateRunner::new(&self.inner, &self.optimizer, fit, starts, self.seed)
-            .map_err(method_error)
     }
 
     /// The resampler of `spec` around the fit `fit`, and its blocks, if it
@@ -628,11 +629,15 @@ fn bootstrap(
     let settings: Bootstrap = crate::json::read(settings)?;
     let log = StepLog::new(logger);
     let starts = problem.fit_logged(py, settings.starts(), &log)?;
-    let runner = problem.runner(&best_values(&starts), settings.starts())?;
-    let (resampler, scheme) = problem.resampler(&ResamplerSpec::of(&settings), runner.fit())?;
+    let fit = problem
+        .inner
+        .applied_parameter_values(&best_values(&starts));
+    // The resampler checks the length of its blocks before the runner checks
+    // the fit.
+    let (resampler, scheme) = problem.resampler(&ResamplerSpec::of(&settings), &fit)?;
     let run = parallel_logged(py, &log, |steps| {
         run_replicates(
-            &runner.with_steps(steps),
+            &problem.runner(&fit, settings.starts())?.with_steps(steps),
             resampler.as_ref(),
             settings.replicates(),
         )
@@ -682,9 +687,10 @@ fn block_jackknife(
         .map_err(method_error)?;
     let log = StepLog::new(logger).with_unit(FitUnit::Block);
     let starts = problem.fit_logged(py, settings.starts, &log)?;
-    let runner = problem.runner(&best_values(&starts), settings.starts)?;
+    let fit = best_values(&starts);
     let jackknife = parallel_logged(py, &log, |steps| {
-        commol_inference::resampling::block_jackknife(&runner.with_steps(steps), &scheme)
+        let runner = problem.runner(&fit, settings.starts)?.with_steps(steps);
+        commol_inference::resampling::block_jackknife(&runner, &scheme)
     })?
     .map_err(method_error)?;
     let spans = scheme.spans();

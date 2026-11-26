@@ -28,6 +28,8 @@ pub enum Violation {
     Constraint {
         /// Sum of weight × violation.
         amount: f64,
+        /// The id of each violated constraint, once, in problem order.
+        ids: Vec<String>,
     },
     /// The values make the starting state infeasible; `excess` is how far
     /// the state is from feasible, as the engine measures it.
@@ -60,10 +62,40 @@ impl Violation {
     pub fn amount(&self) -> f64 {
         match *self {
             Self::OutOfBounds { amount }
-            | Self::Constraint { amount }
+            | Self::Constraint { amount, .. }
             | Self::MeanOutsideModel { amount } => amount,
             Self::InfeasibleStart { excess, .. } => 100.0 * excess,
             Self::InfeasibleRun { .. } | Self::NonFinite => 0.0,
+        }
+    }
+}
+
+impl std::fmt::Display for Violation {
+    /// What is not feasible, in words: the ids of the violated constraints,
+    /// the message of the engine for an infeasible start or run, and the
+    /// amount of a bound or a mean.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::OutOfBounds { amount } => {
+                write!(f, "the values are outside their bounds by {amount}")
+            }
+            Self::Constraint { ids, .. } => {
+                let quoted: Vec<String> = ids.iter().map(|id| format!("'{id}'")).collect();
+                match quoted.as_slice() {
+                    [one] => write!(f, "the constraint {one} is below zero"),
+                    many => write!(f, "the constraints {} are below zero", many.join(", ")),
+                }
+            }
+            Self::InfeasibleStart { message, .. } | Self::InfeasibleRun { message } => {
+                f.write_str(message)
+            }
+            Self::NonFinite => {
+                f.write_str("the run, the loss or the likelihood is not a finite number")
+            }
+            Self::MeanOutsideModel { amount } => write!(
+                f,
+                "a predicted mean is outside the means its observation model allows, by {amount}"
+            ),
         }
     }
 }
@@ -90,7 +122,7 @@ impl From<Violation> for EvaluationError {
 impl std::fmt::Display for EvaluationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Violation(violation) => write!(f, "Infeasible point: {violation:?}"),
+            Self::Violation(violation) => write!(f, "Infeasible point: {violation}"),
             Self::Failed(message) => f.write_str(message),
         }
     }
@@ -127,6 +159,7 @@ struct ReadMatrix {
 
 #[derive(Debug, Clone)]
 struct CompiledConstraint {
+    id: String,
     weight: f64,
     expression: MathExpression,
     /// `(position, row)` pairs of a constraint at positions.
@@ -228,6 +261,7 @@ impl Feasibility {
                 }
             }
             let compiled = CompiledConstraint {
+                id: constraint.id.clone(),
                 weight: constraint.weight,
                 expression,
                 rows: constraint
@@ -335,13 +369,14 @@ impl Feasibility {
     ///
     /// # Errors
     ///
-    /// A [`Violation::Constraint`] when one evaluates below zero, or a
-    /// failure when one cannot be evaluated.
+    /// A [`Violation::Constraint`] that names each constraint that
+    /// evaluates below zero.
     pub fn check_parameters(
         &self,
         context: &mut MathExpressionContext,
     ) -> Result<(), EvaluationError> {
         let mut amount = 0.0;
+        let mut ids = Vec::new();
         for constraint in &self.parameter_constraints {
             let value = constraint
                 .expression
@@ -349,24 +384,58 @@ impl Feasibility {
                 .expect("Feasibility::new checks that a constraint compiles and reads parameters");
             if value < 0.0 {
                 amount += constraint.weight * -value;
+                ids.push(constraint.id.clone());
             }
         }
-        violation(amount)
+        violation(amount, ids)
+    }
+
+    /// Check the constraints at positions on the rows of each of `runs`, in
+    /// the `context` of their point ([`Self::context`]).
+    ///
+    /// # Errors
+    ///
+    /// A [`Violation::Constraint`] whose amount sums every run, and that
+    /// names each constraint that evaluates below zero in some run.
+    pub(crate) fn check_rows(
+        &self,
+        context: &mut MathExpressionContext,
+        runs: &[Vec<Vec<f64>>],
+    ) -> Result<(), EvaluationError> {
+        let mut amount = 0.0;
+        // A feasible point allocates nothing: the marks exist from the first
+        // constraint below zero.
+        let mut violated = None;
+        for rows in runs {
+            amount += self.row_violation(context, rows, &mut violated);
+        }
+        let ids = violated.map_or_else(Vec::new, |violated: Vec<bool>| {
+            self.position_constraints
+                .iter()
+                .zip(violated)
+                .filter(|(_, violated)| *violated)
+                .map(|(constraint, _)| constraint.id.clone())
+                .collect()
+        });
+        violation(amount, ids)
     }
 
     /// The constraint amount of the rows of one run, in the `context` of
     /// its point ([`Self::context`]): 0 when every constraint at positions
-    /// holds.
-    pub(crate) fn row_violation(
+    /// holds. Each constraint that evaluates below zero is marked in
+    /// `violated`, which holds one mark per constraint once one is marked.
+    fn row_violation(
         &self,
         context: &mut MathExpressionContext,
         rows: &[Vec<f64>],
+        violated: &mut Option<Vec<bool>>,
     ) -> f64 {
         // Only the state outputs are registered, so `total` stays the sum of
         // the state. Outputs after it are injected by name, with the sums.
         context.init_compartments(self.state_names.clone());
         let mut amount = 0.0;
-        for constraint in &self.position_constraints {
+        let count = self.position_constraints.len();
+        for (index, constraint) in self.position_constraints.iter().enumerate() {
             for &(position, row) in &constraint.rows {
                 // The rows are those of the schedule, which holds every
                 // constraint position.
@@ -385,6 +454,7 @@ impl Feasibility {
                 );
                 if value < 0.0 {
                     amount += constraint.weight * -value;
+                    violated.get_or_insert_with(|| vec![false; count])[index] = true;
                 }
             }
         }
@@ -392,9 +462,9 @@ impl Feasibility {
     }
 }
 
-fn violation(amount: f64) -> Result<(), EvaluationError> {
+fn violation(amount: f64, ids: Vec<String>) -> Result<(), EvaluationError> {
     if amount > 0.0 {
-        Err(Violation::Constraint { amount }.into())
+        Err(Violation::Constraint { amount, ids }.into())
     } else {
         Ok(())
     }
@@ -433,23 +503,79 @@ mod tests {
     }
 
     #[test]
-    fn a_violated_constraint_reports_its_weighted_amount() {
+    fn a_violated_constraint_reports_its_weighted_amount_and_its_id() {
         let constraints = [
             CalibrationConstraint::new("order".to_string(), "k1 - k2".to_string()).with_weight(2.0),
             CalibrationConstraint::new("cap".to_string(), "3 - B".to_string())
                 .with_positions(vec![2.0]),
+            CalibrationConstraint::new("floor".to_string(), "B - 2".to_string())
+                .with_positions(vec![1.0, 2.0]),
         ];
         let feasibility = feasibility(&constraints);
+        let violated = |amount: f64, ids: &[&str]| {
+            Err(Violation::Constraint {
+                amount,
+                ids: ids.iter().map(|id| id.to_string()).collect(),
+            }
+            .into())
+        };
 
         let check = |values: &[f64]| feasibility.check_parameters(&mut feasibility.context(values));
         assert_eq!(check(&[0.75, 0.5]), Ok(()));
-        assert_eq!(
-            check(&[0.25, 0.5]),
-            Err(Violation::Constraint { amount: 0.5 }.into())
-        );
-        let rows = vec![vec![0.0, 9.0], vec![1.0, 4.0]];
+        assert_eq!(check(&[0.25, 0.5]), violated(0.5, &["order"]));
+        // B is 9 and then 4 in the first run, and 2.5 at both positions in
+        // the second: `cap` is violated in the first, `floor` in neither.
+        let first = vec![vec![0.0, 9.0], vec![1.0, 4.0]];
+        let second = vec![vec![0.0, 2.5], vec![1.0, 2.5]];
         let mut context = feasibility.context(&[0.25, 0.5]);
-        assert_eq!(feasibility.row_violation(&mut context, &rows), 1.0);
+        assert_eq!(
+            feasibility.check_rows(&mut context, &[first.clone(), second.clone()]),
+            violated(1.0, &["cap"])
+        );
+        assert_eq!(feasibility.check_rows(&mut context, &[second]), Ok(()));
+        // Below 2 at the first position too.
+        let low = vec![vec![0.0, 1.0], vec![1.0, 4.0]];
+        assert_eq!(
+            feasibility.check_rows(&mut context, &[first, low]),
+            violated(3.0, &["cap", "floor"])
+        );
+    }
+
+    #[test]
+    fn a_violation_says_why_the_point_is_not_feasible() {
+        let constraint = |ids: &[&str]| Violation::Constraint {
+            amount: 1.0,
+            ids: ids.iter().map(|id| id.to_string()).collect(),
+        };
+        let infeasible = |violation: Violation| EvaluationError::from(violation).to_string();
+
+        assert_eq!(
+            infeasible(constraint(&["cap"])),
+            "Infeasible point: the constraint 'cap' is below zero"
+        );
+        assert_eq!(
+            infeasible(constraint(&["cap", "floor"])),
+            "Infeasible point: the constraints 'cap', 'floor' are below zero"
+        );
+        assert_eq!(
+            infeasible(Violation::OutOfBounds { amount: 1.5 }),
+            "Infeasible point: the values are outside their bounds by 1.5"
+        );
+        assert_eq!(
+            infeasible(Violation::MeanOutsideModel { amount: 2.0 }),
+            "Infeasible point: a predicted mean is outside the means its observation model \
+             allows, by 2"
+        );
+        assert_eq!(
+            infeasible(Violation::NonFinite),
+            "Infeasible point: the run, the loss or the likelihood is not a finite number"
+        );
+        assert_eq!(
+            infeasible(Violation::InfeasibleRun {
+                message: "A is below zero".to_string()
+            }),
+            "Infeasible point: A is below zero"
+        );
     }
 
     #[test]

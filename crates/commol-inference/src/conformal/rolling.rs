@@ -9,7 +9,7 @@
 
 use std::collections::HashMap;
 
-use commol_calibration::SeriesIndex;
+use commol_calibration::{ObservedDataPoint, SeriesIndex};
 use commol_core::SimulationEngine;
 
 use crate::conformal::intervals::{ConformalRun, PredictionIntervals};
@@ -20,8 +20,18 @@ use crate::error::MethodError;
 use crate::resampling::blocks::one_per_position;
 use crate::resampling::{FitUnit, Perturbation, ReplicateRunner};
 
-fn check<E: SimulationEngine + Send + Sync>(
-    runner: &ReplicateRunner<'_, E>,
+/// Check the settings of rolling-origin conformal intervals of the
+/// observations `observed`, with no run. The binding checks them before it
+/// builds the runner, so the settings are checked before the check of the
+/// fit.
+///
+/// # Errors
+///
+/// [`MethodError::Invalid`] when the score is `"spread"`, a series has two
+/// observations at one position, a position is not after the data, or an
+/// origin has no observation before or after it.
+pub fn check_rolling_settings(
+    observed: &[ObservedDataPoint],
     origins: &[f64],
     positions: &[f64],
     settings: ConformalSettings,
@@ -31,7 +41,6 @@ fn check<E: SimulationEngine + Send + Sync>(
         .score
         .check_rolling()
         .map_err(MethodError::Invalid)?;
-    let observed = runner.problem().observed_data();
     one_per_position(
         observed,
         "RollingConformal counts a horizon in observations of a series",
@@ -82,7 +91,12 @@ pub fn rolling_conformal<E>(
 where
     E: SimulationEngine + Send + Sync,
 {
-    check(runner, origins, positions, settings)?;
+    check_rolling_settings(
+        runner.problem().observed_data(),
+        origins,
+        positions,
+        settings,
+    )?;
     let problem = runner.problem();
     let observed = problem.observed_data();
     let perturbations: Vec<Perturbation> = origins

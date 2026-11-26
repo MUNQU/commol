@@ -157,7 +157,7 @@ fn every_point_infeasible_raises_with_the_count() {
     let message = error.to_string();
     assert!(message.contains("4 points"), "{message}");
     assert!(
-        message.contains("leaves the values the model allows"),
+        message.contains("The flows of step 0 leave compartment 'A'"),
         "{message}"
     );
 }

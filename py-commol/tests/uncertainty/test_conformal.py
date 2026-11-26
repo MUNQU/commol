@@ -6,6 +6,7 @@ observation of B is ``c·t``, or ``c`` with a window of one step.
 """
 
 import math
+from collections.abc import Callable
 
 import numpy as np
 import pytest
@@ -26,11 +27,13 @@ from commol.conformal import (
 )
 from commol.uncertainty import ParameterSample, SampleMethod
 from tests.support import (
+    INFEASIBLE_FITS,
     a_to_b_builder,
     bounded,
     build,
     flow_calibrator,
     flow_observations,
+    no_run_calibrator,
     rate_calibrator,
 )
 
@@ -432,6 +435,90 @@ class TestFailures:
                     positions=[41.0],
                 )
             )
+
+    @pytest.mark.parametrize("kind", INFEASIBLE_FITS)
+    @pytest.mark.parametrize("variant", [RollingConformal, JackknifePlus, EnbPI])
+    def test_a_variant_that_refits_refuses_a_fit_that_is_not_feasible(
+        self, variant: type, kind: str
+    ) -> None:
+        calibrator, message = INFEASIBLE_FITS[kind]
+        settings = {
+            RollingConformal: {"origins": [6.0, 8.0]},
+            JackknifePlus: {"block_length": 2},
+            EnbPI: {"replicates": 10, "block_length": 2},
+        }[variant]
+
+        with pytest.raises(ValueError, match=message):
+            calibrator().uncertainty(
+                variant(
+                    **settings,
+                    score="absolute",
+                    by="series",
+                    confidence_level=0.5,
+                    positions=[13.0],
+                )
+            )
+
+    def test_rolling_origins_refuse_a_fit_with_no_run(self) -> None:
+        with pytest.raises(ValueError, match="^The fit has no run: .*compartment 'A'"):
+            no_run_calibrator().uncertainty(
+                RollingConformal(
+                    origins=[10.0],
+                    score="absolute",
+                    by="series",
+                    confidence_level=0.5,
+                    positions=[21.0],
+                )
+            )
+
+    @pytest.mark.parametrize(
+        ("calibrator", "origins", "positions", "message"),
+        [
+            (no_run_calibrator, [10.0], [5.0], "^RollingConformal gives intervals"),
+            (INFEASIBLE_FITS["constraint"][0], [12.0], [13.0], "^The origin 12 needs"),
+        ],
+        ids=["position_and_no_run", "origin_and_constraint"],
+    )
+    def test_rolling_settings_come_before_the_check_of_the_fit(
+        self,
+        calibrator: Callable[[], Calibrator],
+        origins: list[float],
+        positions: list[float],
+        message: str,
+    ) -> None:
+        with pytest.raises(ValueError, match=message):
+            calibrator().uncertainty(
+                RollingConformal(
+                    origins=origins,
+                    score="absolute",
+                    by="series",
+                    confidence_level=0.5,
+                    positions=positions,
+                )
+            )
+
+    @pytest.mark.parametrize(
+        "kind", ["constraint", "constraint_at_positions", "mean_outside_model"]
+    )
+    @pytest.mark.parametrize("variant", [SplitConformal, AdaptiveConformal])
+    def test_a_variant_that_reads_the_fit_takes_one_that_is_not_feasible(
+        self, variant: type, kind: str
+    ) -> None:
+        calibrator = INFEASIBLE_FITS[kind][0]()
+        held_out = flow_observations([2.0, 3.0, 4.0, 1.0], windowed=True, start=13)
+        settings = {
+            SplitConformal: {"calibration_data": held_out, "positions": [17.0]},
+            AdaptiveConformal: {"stream": held_out, "step": 0.01},
+        }[variant]
+
+        result = calibrator.uncertainty(
+            variant(**settings, score="absolute", by="series", confidence_level=0.5)
+        )
+
+        # The prediction of a flow is the flow c of the fit.
+        fit = calibrator.run().best_parameters["c"]
+        prediction = result.intervals.series["B"].prediction
+        assert prediction == pytest.approx([fit] * len(prediction))
 
 
 def test_a_conformal_method_takes_a_confidence_level() -> None:

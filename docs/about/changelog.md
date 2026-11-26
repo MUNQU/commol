@@ -846,13 +846,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   takes the place of `BlockScheme::resolve` and `BlockScheme::at_fit`;
   `sandwich_approximation` and `information_matching_eta` take a `usize`;
   `BayesianBootstrap::new` takes the problem and the fit, and refuses a fit
-  with no run, as `block_jackknife`, `jackknife_plus`, `enbpi` and
-  `bootstrap_coverage_eta` do; `automatic_length`, `automatic_block_length`,
+  with no run, as `ReplicateRunner::new` (the runner of `block_jackknife`,
+  `jackknife_plus` and `enbpi`) and `bootstrap_coverage_eta` do;
+  `automatic_length`, `automatic_block_length`,
   `AutomaticLength`, `BlockDrawing`, `Estimates`, `BlockScheme::estimates`,
   `blocks_at`, `Curvature::predictions` and the field `estimates` of
   `SandwichRun` are removed.
 
 ### Fixed
+
+- Every method that refits around a fit refuses a fit that is not feasible,
+  with a `ValueError` that says why: `BayesianBootstrap`, `ResidualBootstrap`,
+  `WildBootstrap`, `BlockJackknife`, `RollingConformal`, `JackknifePlus`,
+  `EnbPI`, and `residual_dependence` with `Refitted` and `NoNoise()`. A fit is
+  not feasible when it violates a constraint, which the message names by its
+  `id`, when a predicted mean lies outside the means its observation model
+  allows, or when its loss or likelihood is not a finite number. Before, when
+  no point of the bounds met the constraints, the fit ended on the penalty
+  with `converged=True`, and every refit started and ended there: the
+  bootstraps gave an interval of width 0 and the jackknife a standard error of
+  0, with no message. Before its refits, `RollingConformal` refuses a fit with
+  no run. When the run leaves the values its model allows, the error is a
+  `ValueError`. Before, a refit raised `InfeasibleStateError` ("Parameter set
+  0 is not feasible: ..."), so code that catches `InfeasibleStateError` no
+  longer catches it. `Refitted` with `DistributionNoise` already refused such
+  a draw, and now says why as the other methods do, in place of "The fit has
+  no likelihood". `ResidualNoise`, `SplitConformal` and `AdaptiveConformal`
+  read the residuals of the fit and do not refit, so they still take it. The
+  message of an infeasible point says in words what is not feasible, as does
+  the error of a sensitivity at such a point. Before, it gave the Rust value,
+  such as `Infeasible point: Constraint { amount: 0.5 }`, and a sensitivity
+  gave words of its own. In Rust, `ReplicateRunner::new` refuses such a fit,
+  `Violation::Constraint` has the `ids` of the violated constraints, and
+  `check_rolling_settings` checks the settings of `rolling_conformal` before
+  its runner exists. See
+  [How replicates run](../guide/uncertainty/resampling.md#how-replicates-run).
 
 - A `"pulse"` series acts on step 0 with a point at `-0.0`, in every engine,
   as `"step_function"` and `"linear"` do. Before, the point was accepted and

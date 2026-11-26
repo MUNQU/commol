@@ -195,8 +195,9 @@ fn series_dependence(
 ///     TypeError: If the noise is `ResidualNoise`
 ///     ValueError: If a setting is outside its range, the sample's
 ///         parameters are not the problem's, the residuals do not fit the
-///         problem or the reference does not fit the sample or the
-///         observations
+///         problem, the reference does not fit the sample or the
+///         observations, or the draw that `Refitted` refits from is not
+///         feasible
 ///     InfeasibleStateError: If a draw leaves the values its model allows
 ///     RuntimeError: If every refit fails
 #[pyfunction]

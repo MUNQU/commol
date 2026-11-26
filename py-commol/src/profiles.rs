@@ -229,12 +229,16 @@ fn trace(
                 .map(|quantity| tracer.center(quantity))
                 .collect::<Result<Vec<f64>, _>>()
                 .map_err(method_error)?;
-            let runner = problem.runner(&fit, bootstrap.starts())?;
-            let (resampler, _) = problem.resampler(&ResamplerSpec::of(bootstrap), runner.fit())?;
+            // The resampler checks the length of its blocks before the runner
+            // checks the fit.
+            let applied = problem_ref.applied_parameter_values(&fit);
+            let (resampler, _) = problem.resampler(&ResamplerSpec::of(bootstrap), &applied)?;
             let count = bootstrap.replicates();
             let run = parallel_logged(py, log, |steps| {
                 bootstrap_thresholds(
-                    &runner.with_steps(steps),
+                    &problem
+                        .runner(&applied, bootstrap.starts())?
+                        .with_steps(steps),
                     resampler.as_ref(),
                     count,
                     &quantities,

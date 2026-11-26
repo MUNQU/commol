@@ -3,7 +3,7 @@
 //! shares.
 
 use commol_calibration::{
-    CalibrationProblem, CalibrationResult, NoObserver, OptimizationConfig, StartEvent,
+    CalibrationProblem, CalibrationResult, NoObserver, OptimizationConfig, StartEvent, Workspace,
     optimize_starts_with_observer, start_points,
 };
 use commol_core::{NoSteps, STOPPED, SimulationEngine, Steps};
@@ -12,6 +12,7 @@ use rayon::prelude::*;
 
 use crate::error::MethodError;
 use crate::resampling::resamplers::{Perturbation, Resampler};
+use crate::resampling::residuals::fitted_values;
 use crate::sample::ParameterSample;
 use commol_random::Stream;
 
@@ -204,13 +205,24 @@ impl<'a, E> ReplicateRunner<'a, E>
 where
     E: SimulationEngine + Send + Sync,
 {
-    /// A runner of `problem` from the parameter values `fit`, with
-    /// `starts` starts per replicate.
+    /// A runner of `problem` from the parameter values `fit`, clamped to
+    /// their bounds, with `starts` starts per replicate.
+    ///
+    /// Every refit starts from the fit, so the fit has a run and is
+    /// feasible ([`CalibrationProblem::evaluate`]). At a point that violates
+    /// the problem the optimizer reads a penalty, and refits that start on
+    /// it end there, all at one point and converged. The check is one
+    /// evaluation of the fit, which runs each replicate of a stochastic
+    /// engine. A fit that fails it runs once more, to say whether it has no
+    /// run.
     ///
     /// # Errors
     ///
     /// [`MethodError::Invalid`] when `starts` is 0 or `fit` has the wrong
-    /// length.
+    /// length; as [`MethodError::of_point`] when the fit has no run, or is
+    /// not feasible: it violates a constraint, which the message names, a
+    /// predicted mean lies outside its observation model, or its loss or
+    /// likelihood is not finite.
     pub fn new(
         problem: &'a CalibrationProblem<E>,
         config: &'a OptimizationConfig,
@@ -228,10 +240,18 @@ where
                 problem.num_parameters()
             )));
         }
+        let fit = problem.applied_parameter_values(fit);
+        if let Err(error) = problem.evaluate(&fit, &mut Workspace::default()) {
+            fitted_values(problem, &fit)?;
+            return Err(MethodError::of_point(
+                "The refits cannot start from the fit",
+                error,
+            ));
+        }
         Ok(Self {
             problem,
             config,
-            fit: problem.applied_parameter_values(fit),
+            fit,
             starts,
             seed,
             values: problem.observed_data().iter().map(|o| o.value).collect(),

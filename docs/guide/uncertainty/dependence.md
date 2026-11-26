@@ -373,6 +373,7 @@ print(holm({s.label: s.p_value for s in together.series}))  # {'south': 1.0, 'no
 | `NoNoise()` with more than one randomization | `ValueError` |
 | `DistributionNoise()` with a loss, or an observed value outside the support of its model | `ValueError` |
 | `Refitted` with a sample of many draws, or observations other than the problem's | `ValueError` that points to `point_sample` or to `AtParameters` |
+| `Refitted` with a draw that is not feasible, since each refit starts from it | `ValueError` that says why, as for every method that refits ([How replicates run](resampling.md#how-replicates-run)) |
 | A predictive of a `SensitivityAnalysis` | `ValueError`: an analysis has no data |
 | Every refit fails | `RuntimeError` |
 

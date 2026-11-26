@@ -41,6 +41,7 @@ from commol.sensitivity import InputSpace, SensitivityAnalysis
 from commol.resampling import BayesianBootstrap
 from commol.uncertainty import ParameterSample, Predictive
 from tests.support import (
+    INFEASIBLE_FITS,
     a_to_b_builder,
     bounded,
     build_stochastic,
@@ -494,6 +495,19 @@ class TestReferences:
                 calibrator.problem.observed_data,
                 NoNoise(),
                 Refitted(replicates=3),
+            )
+
+    @pytest.mark.parametrize("kind", INFEASIBLE_FITS)
+    def test_refits_refuse_a_fit_that_is_not_feasible(self, kind: str) -> None:
+        build, message = INFEASIBLE_FITS[kind]
+        calibrator = build()
+
+        with pytest.raises(ValueError, match=message):
+            _residuals(
+                _at_fit(calibrator),
+                calibrator.problem.observed_data,
+                NoNoise(),
+                Refitted(replicates=5),
             )
 
     def test_a_sensitivity_analysis_has_no_residuals(self) -> None:

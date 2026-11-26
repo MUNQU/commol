@@ -44,12 +44,7 @@ pub struct Residuals {
 
 /// The fitted values of `problem` at the parameter values `fit`: the
 /// prediction of each observation; with a stochastic engine, the mean of the
-/// predictions of the replicates.
-///
-/// A method that refits reweighted or fewer observations around a fit runs it
-/// here first: at a point with no run the optimizer reads a penalty, and
-/// refits that start on a plateau of it end there, all at one point and
-/// converged.
+/// predictions of the replicates. A fit that is not feasible has them too.
 ///
 /// # Errors
 ///

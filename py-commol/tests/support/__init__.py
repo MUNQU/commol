@@ -8,6 +8,7 @@ from .assertions import (
     assert_total_conserved,
 )
 from .flows import Flow, flow_model, increments
+from .infeasible import INFEASIBLE_FITS, no_run_calibrator
 from .models import (
     MEAN_FIELD,
     STOCHASTIC_ENGINES,
@@ -106,9 +107,11 @@ __all__ = [
     "flow_model",
     "growth_ratio",
     "increments",
+    "INFEASIBLE_FITS",
     "initial_condition_problem",
     "initial_state",
     "line_calibrator",
+    "no_run_calibrator",
     "observed",
     "overdispersed_calibrator",
     "rate_calibrator",

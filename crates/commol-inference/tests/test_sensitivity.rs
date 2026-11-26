@@ -579,7 +579,9 @@ fn a_center_that_cannot_be_run_says_why() {
     let k = || CalibrationParameter::new("k".to_string(), 0.0, 1.0);
     assert_eq!(
         jacobian(infinite, k(), 0.5),
-        SensitivityError::InfeasiblePoint("a value of the run is not finite".to_string())
+        SensitivityError::InfeasiblePoint(
+            "the run, the loss or the likelihood is not a finite number".to_string()
+        )
     );
     assert!(
         matches!(jacobian(not_a_number, k(), 0.4), SensitivityError::Failed(message)
@@ -591,7 +593,9 @@ fn a_center_that_cannot_be_run_says_why() {
             .jacobian(&[2000.0])
             .unwrap_err(),
         SensitivityError::InfeasiblePoint(
-            "the starting state is infeasible (excess 0.5)".to_string()
+            "Invalid initial conditions: the calibrated amounts exceed the sum the remainder 'B' \
+             keeps by 0.500000 of them"
+                .to_string()
         )
     );
 }

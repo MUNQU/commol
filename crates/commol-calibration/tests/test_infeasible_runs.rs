@@ -63,7 +63,10 @@ fn an_infeasible_run_gets_the_base_penalty_and_is_not_feasible() {
     assert_eq!(infeasible, 1e10);
     assert!(!objective.score(&[2.0]).unwrap().feasible);
     assert_eq!(
-        objective.penalty(&Violation::Constraint { amount: 2.0 }),
+        objective.penalty(&Violation::Constraint {
+            amount: 2.0,
+            ids: vec!["c".to_string()]
+        }),
         3e10
     );
 }
