@@ -3342,6 +3342,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-portmanteau-reads-permutations-of-the-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The portmanteau reads permutations of the values
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#a-lag-of-few-pairs-leaves-the-portmanteau" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3979,6 +3990,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-portmanteau-reads-permutations-of-the-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The portmanteau reads permutations of the values
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#a-lag-of-few-pairs-leaves-the-portmanteau" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4095,6 +4117,171 @@ its sets.</p>
 <p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_dependence.rs</code>,
 <code>tests/uncertainty/test_dependence.py</code>, the studies of
 <code>tests/uncertainty/test_dependence_coverage.py</code>.</p>
+<h2 id="the-portmanteau-reads-permutations-of-the-values">The portmanteau reads permutations of the values<a class="headerlink" href="#the-portmanteau-reads-permutations-of-the-values" title="Permanent link">&para;</a></h2>
+<p><code>Q̃</code> of <code>series_dependence</code>, and of <code>AtParameters</code> with <code>NoNoise()</code>, is read
+against <code>replicates</code> permutations of the values of each series over its
+positions (<code>permuted_portmanteaus</code> in
+<code>crates/commol-inference/src/dependence/of_values.rs</code>, the stream
+<code>Stream::DependencePermutations</code>). Every reference reads <code>Q̃</code> against its
+replicates through one Monte Carlo p-value, <code>(1 + #{Q_b ≥ Q}) / (B + 1)</code>
+(<code>monte_carlo</code> in <code>law.rs</code>), and a replicate within <code>TIE = 1e-10</code> of <code>Q</code>,
+relative to <code>1 + |Q|</code>, counts as reaching it: a reversed series gives the
+same <code>Q̃</code> up to rounding. Exact ties of equal values count too, so counts and
+values 0 or 1 reject less than the level, with no random tie-break. The
+tie also reads the wild sets of the information factor. Those of all signs
++1 or all −1 give the observed factor up to rounding, 2 of the <code>2ⁿ</code> sets of
+signs, and they count as reaching it, as in the exact law of the signs. The
+permutations do not read <code>max_lag</code>, so one seed gives the same sets at every
+number of lags. The p-value depends on <code>replicates</code> and <code>seed</code>, and is at
+least <code>1 / (B + 1)</code>.</p>
+<p>Each series draws its permutations from its own generator in each
+replicate, seeded by <code>label_seed(replicate_seed(seed, b), label)</code>
+(<code>crates/commol-random/src/generator.rs</code>), which mixes the FNV-1a hash of
+the label into the seed. So the p-value of <code>Q̃</code> of a series does not depend
+on the other series of the call or on their order. The wild band keeps one
+generator for all series in a replicate, so the band of <code>τ</code> still depends
+on the other series. Its signs are those of the seeds users already hold,
+and a follow-up treats it. With <code>DistributionNoise()</code> and with <code>Refitted</code>,
+a replicate draws or refits all observations together, so the test of a
+series depends on the others by design.</p>
+<p>Under independent values of one law every order of a series is equally
+likely, so the permutations are the exact law of <code>Q̃</code> whatever that law is.
+Their miss is narrow and can be stated: a spread that changes along the
+series, the more so for skewed values. The study of
+<a href="https://github.com/MUNQU/commol/issues/530">#530</a> read each candidate at
+5 % on every <code>max_lag</code> from 1 to the last lag of 4 pairs, with 199
+replicates. The columns come from these sources:</p>
+<ul>
+<li>Normal and <code>t₃</code>, and spread × 30: 5 to 200 values, with 0, 30 or 50 %
+  gaps, 50 000 to 100 000 sets per design. The cell of the permutations of
+  normal and <code>t₃</code> values also holds the engine at the cells of the guide,
+  6000 sets each.</li>
+<li>Skewed, 100 values: <code>χ²</code> and the permutations are the engine at the cells
+  of the guide, 4000 sets each. The signs come from 20 000 sets per design,
+  5 to 100 values with no gaps.</li>
+<li>Exponential, spread × 30: 20 000 sets per design, 5 to 100 values with no
+  gaps.</li>
+<li>Values 0 or 1: the engine at the cell of the guide, 4000 sets.</li>
+<li>Mammen multipliers: 10 000 sets per design.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Law</th>
+<th>Normal and <code>t₃</code></th>
+<th>Skewed, 100 values</th>
+<th>Values 0 or 1, 35</th>
+<th>Spread × 30, 12 values or more</th>
+<th>Exponential, spread × 30, 12 values or more</th>
+<th>Cost</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>χ²(h)</code></td>
+<td>0.1–10.5 %</td>
+<td>11.1 % (<code>χ²(1)</code>, 17 lags)</td>
+<td>11.5 %</td>
+<td>0.6–9.2 %</td>
+<td>3.1–11.3 %</td>
+<td>None</td>
+</tr>
+<tr>
+<td><code>χ²</code> scaled to the moments of each lag, from the pairs</td>
+<td>2.2–10.7 %</td>
+<td>—</td>
+<td>—</td>
+<td>1.2–9.6 %</td>
+<td>—</td>
+<td>None</td>
+</tr>
+<tr>
+<td><code>χ²</code> scaled to the moments of each lag, from the observed products</td>
+<td>2.4–11.3 %</td>
+<td>—</td>
+<td>—</td>
+<td>4.9–15.3 %</td>
+<td>—</td>
+<td>None</td>
+</tr>
+<tr>
+<td>Signs ±1 (the wild sets of the band)</td>
+<td>2.6–6.4 %, 2.6–2.8 % with 5 values</td>
+<td>7–12 % (<code>χ²(1)</code>), 6.5–10.5 % (lognormal)</td>
+<td>—</td>
+<td>3.5–12.0 %</td>
+<td>5.0–10.4 %</td>
+<td>None: the sets of the band</td>
+</tr>
+<tr>
+<td>Mammen multipliers</td>
+<td>3.1 % with 12 normal values</td>
+<td>6.6–12.5 % (<code>χ²(1)</code>)</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>None</td>
+</tr>
+<tr>
+<td><strong>Permutations</strong></td>
+<td><strong>4.2–6.0 %, about 4 % with 5 values</strong></td>
+<td><strong>4.7–5.4 %</strong></td>
+<td><strong>5.0 %</strong></td>
+<td><strong>4.2–14.2 % with 12 to 50 values, 4.2–8.0 % from 75</strong></td>
+<td><strong>5.2–13.1 %, 13.1 % with 12 values, 11.2 % at the last lag of 100</strong></td>
+<td><code>B</code> more <code>Q̃</code> per series, no <code>τ</code></td>
+</tr>
+</tbody>
+</table>
+<p>Against an AR(1) of 0.5 the permutations reject as often as <code>χ²</code> at few
+lags, or more (one lag: 15.0 % against 11.5 % with 12 values, 70.0 % against
+69.7 % with 35), and less at many, where <code>χ²</code> rejects too often (33 lags of
+100 values: 75.5 % against 82.4 %). The signs keep the scale of each value,
+which a spread that grows needs, but the products of skewed values are not
+symmetric, and their miss grows with the series.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>χ²(h)</code></td>
+<td>It is the law of a long series: conservative with few pairs, liberal with many lags, and liberal for skewed values and values 0 or 1</td>
+</tr>
+<tr>
+<td><code>χ²</code> scaled to the moments of each lag</td>
+<td>The terms of the lags are correlated, so a sum of their moments misses as <code>χ²</code> does</td>
+</tr>
+<tr>
+<td>Signs ±1</td>
+<td>The products of skewed values are not symmetric: 7–12 % for <code>χ²(1)</code> at 100 values, and more the longer the series</td>
+</tr>
+<tr>
+<td>Mammen multipliers</td>
+<td>Their third moment does not fix the skew of the products: 6.6–12.5 % for <code>χ²(1)</code> at 100 values, and 3.1 % for 12 normal values</td>
+</tr>
+<tr>
+<td>A random tie-break</td>
+<td>A p-value that moves with a second draw. Ties are of equal values, where a conservative test says what it can</td>
+</tr>
+<tr>
+<td>One generator for the series of a replicate</td>
+<td>The p-value of a series moves when another series is added, removed or put first</td>
+</tr>
+<tr>
+<td>Generators keyed by the order of the series, sorted by position</td>
+<td>The keys still move when a series is added or removed</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_dependence.rs</code>
+(<code>the_reference_of_the_portmanteau_holds_its_level_on_a_short_series</code>, a
+study run with <code>--release -- --ignored</code>), the tie of <code>law.rs</code>
+(<code>a_replicate_within_the_tie_reaches_the_observed_statistic</code>),
+<code>tests/uncertainty/test_dependence_coverage.py::TestValues</code>.</p>
 <h2 id="a-lag-of-few-pairs-leaves-the-portmanteau">A lag of few pairs leaves the portmanteau<a class="headerlink" href="#a-lag-of-few-pairs-leaves-the-portmanteau" title="Permanent link">&para;</a></h2>
 <p><code>robust_portmanteau</code> (<code>crates/commol-statistics/src/dependence.rs</code>) sums
 only the lags of <code>PORTMANTEAU_PAIRS = 4</code> pairs or more, and counts only
@@ -4107,7 +4294,8 @@ the draw p-values are <code>None</code>, <code>degrees_of_freedom</code> is 0 an
 <code>portmanteau_reason</code> says why; <code>τ</code> and the correlations still read the
 series.</p>
 <p>The minimum comes from a study of the rejection rate at 5 % of <code>Q̃</code> against
-<code>χ²</code> for independent values, with <code>max_lag</code> at the last lag of the grid:
+<code>χ²</code>, the law of <code>Q̃</code> before the permutations, for independent values, with
+<code>max_lag</code> at the last lag of the grid:
 series of 8 to 50 values, normal and <code>t₃</code>, one whose spread grows 30 times,
 and 12 patterns of 30 % or 50 % gaps on grids of 20 to 60 (27 designs,
 200 000 sets each). The table gives the mean of <code>|rate − 5 %|</code>
@@ -4175,11 +4363,10 @@ of these; minimum 1 is no minimum.</p>
 </table>
 <p>Minima 3 and 4 tie on the mean distance, and 4 keeps the lowest rate
 higher (2.2 % against 2.0 %); 8 keeps it higher still, far from 5 % on
-the mean. Above 4, each lag left out is one that would carry the test. A
-lag of 4 to about 20 pairs still pulls the rate down (one lag of 4 pairs
-alone rejects in 0.2 %, of 10 in 3.1 %), so a short series stays
-conservative, and many lags make <code>Q̃</code> liberal (7.5 % at <code>max_lag=17</code> of
-35 values); the guide gives both. The designs and every rate are in
+the mean. Above 4, each lag left out is one that would carry the test. The
+permutations hold the level with any minimum, and 4 stays: a lag of one
+pair adds 1 to <code>Q̃</code> whatever the values, and so takes its power. The designs
+and every rate are in
 <a href="https://github.com/MUNQU/commol/issues/511#issuecomment-7009198279">M1</a>.</p>
 <table>
 <thead>
@@ -4191,15 +4378,15 @@ conservative, and many lags make <code>Q̃</code> liberal (7.5 % at <code>max_la
 <tbody>
 <tr>
 <td>Every lag with a pair in <code>Q̃</code></td>
-<td>Each lag of few pairs pulls the rate down: 3.1 % in the study of the guide, where the minimum gives 4.3 %</td>
+<td>Each lag of few pairs adds a term of little spread: against <code>χ²</code>, 3.1 % in the study of the minimum, where 4 pairs give 4.3 %</td>
 </tr>
 <tr>
 <td>A minimum that grows with the values, as <code>n / 4</code></td>
 <td>It leaves out more lags the longer the series, where a fixed minimum already reaches the level; from 5 pairs on the rates move away from 5 % again</td>
 </tr>
 <tr>
-<td>Every lag, read against replicates in place of <code>χ²</code></td>
-<td>The replicates would hold the level, but a lag of one pair would still add a constant to <code>Q̃</code> and take its power; one set reads <code>Q̃</code> against <code>χ²</code> with no replicate</td>
+<td>Every lag, since the replicates hold the level</td>
+<td>A lag of one pair would still add a constant to <code>Q̃</code> and take its power</td>
 </tr>
 <tr>
 <td>No <code>Q̃</code> for a series with any lag of few pairs</td>
@@ -4220,19 +4407,12 @@ the number of values, as the smaller of 10 and a fifth of them, reads at most
 10 days of a daily series whatever the period of its process, and a cycle of 7
 days only from 35 values on.</p>
 <p>One number serves series of different lengths, because a lag of fewer than 4
-pairs leaves <code>Q̃</code>. At 5 %, that rule rejects 2.6 % of independent normal series
-of 12 values, 4.4 % of 20 and 5.4 % of 35, and 10 lags reject 4.9, 6.2 and
-6.2 %. So one number is nearer 5 % with 12 values, and up to 1.8 points above
-the rule from 20 values on. The law of <code>Q̃</code> is
-<a href="https://github.com/MUNQU/commol/issues/530">#530</a>.</p>
-<p>These rates, and those of 4, 7 and 10 lags in
-<a href="../../../guide/uncertainty/dependence/#choose-the-largest-lag">Choose the largest lag</a>,
-are from <a href="https://github.com/MUNQU/commol/issues/561">#561</a>. Those of 17 and 33
-lags are from
-<a href="https://github.com/MUNQU/commol/issues/511#issuecomment-7009198279">M1 of #511</a>.
-The smallest p-value of 4, 7 and 10 lags rejects 8.4 % of independent normal
-series of 20 values, 9.1 % of those of 35 and 9.2 % of those of 100 (40 000 sets
-each of <code>series_dependence</code>).</p>
+pairs leaves <code>Q̃</code>, and the permutations hold the level at every number of lags:
+at 5 %, 4, 7, 10, 17 and 33 lags reject about 4.6 to 5.2 % of independent
+normal series of 8 to 100 values (10 000 sets each of <code>series_dependence</code>).
+The smallest p-value of 4, 7 and 10 lags rejects 7.6 % of independent normal
+series of 20 values, 8.4 % of those of 35 and 8.8 % of those of 100, so the
+number is chosen before the p-value is read.</p>
 <p><code>τ</code>, its band, <code>cut_lag</code> and the statistics of the problem do not read
 <code>max_lag</code>, so two analyses of one seed share them.</p>
 <table>

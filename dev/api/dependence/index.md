@@ -12,18 +12,18 @@ series_dependence(values: Sequence[float], observations: Sequence[ObservedDataPo
 
 The dependence of one value per observation, series by series.
 
-The values of each label, in position order, are read on the grid of the smallest spacing of the series, and each lag over the pairs of values that exist at that distance (Parzen 1963; Stoffer and Toloi 1992). For each series: the autocorrelation up to `max_lag`; the robust portmanteau `Q̃ = Σ_k (Σ e_t e_{t−k})² / Σ e_t² e_{t−k}²` of the values centered per series (Dalla, Giraitis and Phillips 2022), which holds under heteroscedasticity, over the `h` lags of 4 pairs or more with a product other than 0, with its p-value against `χ²(h)`; and the integrated autocorrelation time `τ` by the initial monotone sequence of Geyer (1992), with its band under independence from `replicates` sets of the centered values with signs ±1 (a wild band). For the series together: their correlations at lag 0, and over the standardized series `z` the factors `Var(Σz) / ΣVar(z)` and `τ` of `Σz`, whose product `LRV(Σz) / ΣVar(z)` is the factor by which the dependence multiplies the information, with its p-value against the wild sets.
+The values of each label, in position order, are read on the grid of the smallest spacing of the series, and each lag over the pairs of values that exist at that distance (Parzen 1963; Stoffer and Toloi 1992). For each series: the autocorrelation up to `max_lag`; the robust portmanteau `Q̃ = Σ_k (Σ e_t e_{t−k})² / Σ e_t² e_{t−k}²` of the values centered per series (Dalla, Giraitis and Phillips 2022), over the `h` lags of 4 pairs or more with a product other than 0, with its Monte Carlo p-value `(1 + #{Q_b ≥ Q}) / (replicates + 1)` against `replicates` permutations of the values of each series over its positions, the exact law of `Q̃` for independent values of one law; and the integrated autocorrelation time `τ` by the initial monotone sequence of Geyer (1992), with its band under independence from `replicates` sets of the centered values with signs ±1 (a wild band). For the series together: their correlations at lag 0, and over the standardized series `z` the factors `Var(Σz) / ΣVar(z)` and `τ` of `Σz`, whose product `LRV(Σz) / ΣVar(z)` is the factor by which the dependence multiplies the information, with its p-value against the wild sets.
 
 Parameters:
 
-| Name               | Type                          | Description                                                                                                                            | Default    |
-| ------------------ | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| `values`           | `Sequence[float]`             | One finite value per observation, in the order of observations: a quantile residual of held-out data, an additive residual, any score. | *required* |
-| `observations`     | `Sequence[ObservedDataPoint]` | The observations the values belong to.                                                                                                 | *required* |
-| `max_lag`          | `int`                         | The largest lag of the autocorrelations and of Q̃, in steps of the grid of each series, at least 1.                                     | *required* |
-| `replicates`       | `int`                         | The wild sets of the band and of the test of the factor, at least 1.                                                                   | *required* |
-| `confidence_level` | `float`                       | The level of the band of τ.                                                                                                            | *required* |
-| `seed`             | `int`                         | The seed of the signs, such as Calibrator.seed.                                                                                        | *required* |
+| Name               | Type                          | Description                                                                                                                                                                                                                                                                                                                                                                                                                       | Default    |
+| ------------------ | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `values`           | `Sequence[float]`             | One finite value per observation, in the order of observations: a quantile residual of held-out data, an additive residual, any score.                                                                                                                                                                                                                                                                                            | *required* |
+| `observations`     | `Sequence[ObservedDataPoint]` | The observations the values belong to.                                                                                                                                                                                                                                                                                                                                                                                            | *required* |
+| `max_lag`          | `int`                         | The largest lag of the autocorrelations and of Q̃, in steps of the grid of each series, at least 1.                                                                                                                                                                                                                                                                                                                                | *required* |
+| `replicates`       | `int`                         | The permutations of the test of Q̃, and the wild sets of the band and of the test of the factor, at least 1. A p-value is at least 1 / (replicates + 1), so fewer than 19 never reject at 5 %. The p-values depend on replicates and seed. Each series draws its permutations from its own label, so the p-value of its Q̃ does not depend on the other series. The band of τ does: the signs of all series come from one sequence. | *required* |
+| `confidence_level` | `float`                       | The level of the band of τ.                                                                                                                                                                                                                                                                                                                                                                                                       | *required* |
+| `seed`             | `int`                         | The seed of the permutations and of the signs, such as Calibrator.seed.                                                                                                                                                                                                                                                                                                                                                           | *required* |
 
 Returns:
 
@@ -63,9 +63,11 @@ def series_dependence(
     that exist at that distance (Parzen 1963; Stoffer and Toloi 1992). For
     each series: the autocorrelation up to `max_lag`; the robust portmanteau
     ``Q̃ = Σ_k (Σ e_t e_{t−k})² / Σ e_t² e_{t−k}²`` of the values centered
-    per series (Dalla, Giraitis and Phillips 2022), which holds under
-    heteroscedasticity, over the ``h`` lags of 4 pairs or more with a
-    product other than 0, with its p-value against ``χ²(h)``; and the
+    per series (Dalla, Giraitis and Phillips 2022), over the ``h`` lags of 4
+    pairs or more with a product other than 0, with its Monte Carlo p-value
+    ``(1 + #{Q_b ≥ Q}) / (replicates + 1)`` against `replicates`
+    permutations of the values of each series over its positions, the
+    exact law of ``Q̃`` for independent values of one law; and the
     integrated autocorrelation time ``τ`` by the initial monotone sequence
     of Geyer (1992), with its band under independence from `replicates`
     sets of the centered values with signs ±1 (a wild band). For the series
@@ -85,11 +87,18 @@ def series_dependence(
         The largest lag of the autocorrelations and of ``Q̃``, in steps of the
         grid of each series, at least 1.
     replicates : int
-        The wild sets of the band and of the test of the factor, at least 1.
+        The permutations of the test of ``Q̃``, and the wild sets of the band
+        and of the test of the factor, at least 1. A p-value is at least
+        ``1 / (replicates + 1)``, so fewer than 19 never reject at 5 %. The
+        p-values depend on `replicates` and `seed`. Each series draws its
+        permutations from its own label, so the p-value of its ``Q̃`` does
+        not depend on the other series. The band of ``τ`` does: the signs
+        of all series come from one sequence.
     confidence_level : float
         The level of the band of ``τ``.
     seed : int
-        The seed of the signs, such as ``Calibrator.seed``.
+        The seed of the permutations and of the signs, such as
+        ``Calibrator.seed``.
 
     Returns
     -------
@@ -293,7 +302,7 @@ Bases: `RangeChecked`
 
 A reference at the parameters of each draw, with no refit.
 
-With `DistributionNoise`, `replicates` data sets drawn from the observation models at the predictions of the draw give the law of the integrated statistics: the p-values of `Q̃` and of the information factor, and the band of `τ`. No model runs again. With `NoNoise`, `Q̃` is read against `χ²(h)` and the band comes from `replicates` sets of the residuals with signs ±1. A fit leaves its residuals correlated with each other, the more so the more parameters it has, so with the data of the fit this reference rejects more often than its level (8 % at 5 % with 3 parameters and 24 to 26 % with 10, at 35 positions); `Refitted` holds there. It is the reference of held-out data.
+With `DistributionNoise`, `replicates` data sets drawn from the observation models at the predictions of the draw give the law of the integrated statistics: the p-values of `Q̃` and of the information factor, and the band of `τ`. No model runs again. With `NoNoise`, `Q̃` is read against `replicates` permutations of the residuals of each series, and the band comes from `replicates` sets of the residuals with signs ±1. A p-value is at least `1 / (replicates + 1)`, so fewer than 19 replicates never reject at 5 %. Each series draws its permutations from its own label, so its p-value does not depend on the other series. With a noise model, the replicates draw all observations together, so the test of a series depends on the others. A fit leaves its residuals correlated with each other, the more so the more parameters it has, so with the data of the fit this reference rejects more often than its level (8 % at 5 % with 3 parameters and 24 to 26 % with 10, at 35 positions); `Refitted` holds there. It is the reference of held-out data.
 
 Attributes:
 
@@ -313,12 +322,18 @@ class AtParameters(RangeChecked):
     observation models at the predictions of the draw give the law of the
     integrated statistics: the p-values of ``Q̃`` and of the information
     factor, and the band of ``τ``. No model runs again. With `NoNoise`,
-    ``Q̃`` is read against ``χ²(h)`` and the band comes from `replicates`
-    sets of the residuals with signs ±1. A fit leaves its residuals
-    correlated with each other, the more so the more parameters it has, so
-    with the data of the fit this reference rejects more often than its
-    level (8 % at 5 % with 3 parameters and 24 to 26 % with 10, at 35
-    positions); `Refitted` holds there. It is the reference of held-out data.
+    ``Q̃`` is read against `replicates` permutations of the residuals of
+    each series, and the band comes from `replicates` sets of the residuals
+    with signs ±1. A p-value is at least ``1 / (replicates + 1)``, so fewer
+    than 19 replicates never reject at 5 %. Each series draws its
+    permutations from its own label, so its p-value does not depend on the
+    other series. With a noise model, the replicates draw all observations
+    together, so the test of a series depends on the others. A fit leaves
+    its residuals correlated with each other, the more so the more
+    parameters it has, so with the data of the fit this reference rejects
+    more often than its level (8 % at 5 % with 3 parameters and 24 to 26 %
+    with 10, at 35 positions); `Refitted` holds there. It is the reference
+    of held-out data.
 
     Attributes
     ----------
@@ -342,7 +357,7 @@ Bases: `RangeChecked`
 
 A reference of data sets drawn at the fit and fitted again.
 
-Each of `replicates` data sets is drawn from the observation models at the fit (`DistributionNoise`), or is the fit plus its residuals with signs ±1 (`NoNoise`), and is fitted again by the optimizer of the problem from `starts` starts. The statistics of the residuals of the refits are the law of the statistics of the fit, so the test holds at a fit whatever its number of parameters: the p-value of `Q̃` and of the information factor is `(1 + #{Q_b ≥ Q}) / (B + 1)`. It needs the sample of one point and the observations of the problem; the refits run in parallel and log a record of each.
+Each of `replicates` data sets is drawn from the observation models at the fit (`DistributionNoise`), or is the fit plus its residuals with signs ±1 (`NoNoise`), and is fitted again by the optimizer of the problem from `starts` starts. The statistics of the residuals of the refits are the law of the statistics of the fit, so the test holds at a fit whatever its number of parameters: the p-value of `Q̃` and of the information factor is `(1 + #{Q_b ≥ Q}) / (B + 1)`. A refit reads all observations together, so the test of a series depends on the other series. It needs the sample of one point and the observations of the problem; the refits run in parallel and log a record of each.
 
 Attributes:
 
@@ -365,9 +380,10 @@ class Refitted(RangeChecked):
     problem from `starts` starts. The statistics of the residuals of the
     refits are the law of the statistics of the fit, so the test holds at a
     fit whatever its number of parameters: the p-value of ``Q̃`` and of the
-    information factor is ``(1 + #{Q_b ≥ Q}) / (B + 1)``. It needs the sample
-    of one point and the observations of the problem; the refits run in
-    parallel and log a record of each.
+    information factor is ``(1 + #{Q_b ≥ Q}) / (B + 1)``. A refit reads
+    all observations together, so the test of a series depends on the
+    other series. It needs the sample of one point and the observations of
+    the problem; the refits run in parallel and log a record of each.
 
     Attributes
     ----------
@@ -477,24 +493,24 @@ The series reads its values in position order, on the grid of its smallest spaci
 
 Attributes:
 
-| Name                 | Type                    | Description                                                                                                                   |
-| -------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `label`              | `str`                   | The label of the series.                                                                                                      |
-| `values`             | `int`                   | The values it reads.                                                                                                          |
-| `reason`             | \`str                   | None\`                                                                                                                        |
-| `max_lag`            | `int`                   | The largest lag, in steps of the grid.                                                                                        |
-| `correlations`       | \`list\[float           | None\]\`                                                                                                                      |
-| `pairs`              | `list[int]`             | The pairs of values each lag reads.                                                                                           |
-| `few_pairs`          | `list[tuple[int, int]]` | Each lag of fewer than 4 pairs, as (lag, pairs): it keeps its correlation and is left out of Q̃ and of its degrees of freedom. |
-| `portmanteau`        | \`float                 | None\`                                                                                                                        |
-| `portmanteau_reason` | \`str                   | None\`                                                                                                                        |
-| `degrees_of_freedom` | `int`                   | The lags in the sum of Q̃: those of 4 pairs or more with a product other than 0.                                               |
-| `p_value`            | \`float                 | None\`                                                                                                                        |
-| `draw_p_values`      | \`DrawPValues           | None\`                                                                                                                        |
-| `tau`                | \`float                 | None\`                                                                                                                        |
-| `tau_reason`         | \`str                   | None\`                                                                                                                        |
-| `tau_band`           | \`tuple[float, float]   | None\`                                                                                                                        |
-| `cut_lag`            | \`int                   | None\`                                                                                                                        |
+| Name                 | Type                    | Description                                                                                                                                                                 |
+| -------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `label`              | `str`                   | The label of the series.                                                                                                                                                    |
+| `values`             | `int`                   | The values it reads.                                                                                                                                                        |
+| `reason`             | \`str                   | None\`                                                                                                                                                                      |
+| `max_lag`            | `int`                   | The largest lag, in steps of the grid.                                                                                                                                      |
+| `correlations`       | \`list\[float           | None\]\`                                                                                                                                                                    |
+| `pairs`              | `list[int]`             | The pairs of values each lag reads.                                                                                                                                         |
+| `few_pairs`          | `list[tuple[int, int]]` | Each lag of fewer than 4 pairs, as (lag, pairs): it keeps its correlation and is left out of Q̃ and of its degrees of freedom.                                               |
+| `portmanteau`        | \`float                 | None\`                                                                                                                                                                      |
+| `portmanteau_reason` | \`str                   | None\`                                                                                                                                                                      |
+| `degrees_of_freedom` | `int`                   | The lags in the sum of Q̃: those of 4 pairs or more with a product other than 0. They are the degrees of freedom of χ², the law of Q̃ of a long series of independent values. |
+| `p_value`            | \`float                 | None\`                                                                                                                                                                      |
+| `draw_p_values`      | \`DrawPValues           | None\`                                                                                                                                                                      |
+| `tau`                | \`float                 | None\`                                                                                                                                                                      |
+| `tau_reason`         | \`str                   | None\`                                                                                                                                                                      |
+| `tau_band`           | \`tuple[float, float]   | None\`                                                                                                                                                                      |
+| `cut_lag`            | \`int                   | None\`                                                                                                                                                                      |
 
 Source code in `commol/dependence/results.py`
 
@@ -534,7 +550,8 @@ class SeriesStatistics(ResultModel):
         product other than 0, as of constant values.
     degrees_of_freedom : int
         The lags in the sum of ``Q̃``: those of 4 pairs or more with a
-        product other than 0.
+        product other than 0. They are the degrees of freedom of ``χ²``, the
+        law of ``Q̃`` of a long series of independent values.
     p_value : float | None
         The p-value of ``Q̃`` under the reference, with one draw.
     draw_p_values : DrawPValues | None
@@ -756,7 +773,7 @@ class DependenceSettings(ResultModel):
     seed : int
         The seed of its random numbers.
     replicates : int | None
-        The wild sets of `series_dependence`.
+        The permutations and the wild sets of `series_dependence`.
     noise : NoNoise | DistributionNoise | None
         The residuals of `residual_dependence`.
     randomizations : int | None

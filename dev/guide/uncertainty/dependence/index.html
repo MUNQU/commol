@@ -1474,6 +1474,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#the-law-of-q" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The law of Q̃
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#choose-the-largest-lag" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4109,6 +4120,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#the-law-of-q" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The law of Q̃
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#choose-the-largest-lag" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4373,7 +4395,11 @@ lag.</p>
 </tr>
 <tr>
 <td><code>portmanteau</code></td>
-<td>The robust portmanteau <code>Q̃ = Σ_k (Σ e_t e_{t−k})² / Σ e_t² e_{t−k}²</code> of the values centered per series, the diagonal form of the statistic of Dalla, Giraitis and Phillips (2022): <code>χ²</code> of <code>degrees_of_freedom</code> lags under independence, also when the size of the noise varies along the series; <code>None</code>, with the <code>portmanteau_reason</code>, when no lag enters its sum</td>
+<td>The robust portmanteau <code>Q̃ = Σ_k (Σ e_t e_{t−k})² / Σ e_t² e_{t−k}²</code> of the values centered per series, the diagonal form of the statistic of Dalla, Giraitis and Phillips (2022), which each lag scales by its own products, so that the size of the noise may vary along the series; <code>None</code>, with the <code>portmanteau_reason</code>, when no lag enters its sum</td>
+</tr>
+<tr>
+<td><code>degrees_of_freedom</code></td>
+<td>The lags in the sum of <code>Q̃</code>: its degrees of freedom in the large-sample law <code>χ²</code></td>
 </tr>
 <tr>
 <td><code>few_pairs</code></td>
@@ -4381,7 +4407,7 @@ lag.</p>
 </tr>
 <tr>
 <td><code>p_value</code></td>
-<td>The p-value of <code>Q̃</code> under the reference</td>
+<td>The p-value of <code>Q̃</code> under the reference: <code>(1 + #{Q_b ≥ Q}) / (B + 1)</code> over its <code>B</code> replicates</td>
 </tr>
 <tr>
 <td><code>tau</code></td>
@@ -4407,24 +4433,91 @@ value, as when one position lies close to another. <code>τ</code> is undefined,
 the <code>tau_reason</code>, for fewer than 4 values, constant values, or an estimate
 not above 0, which comes from a negative correlation at the first lags; an
 undefined <code>τ</code> reads as below its band.</p>
-<p>A lag of few pairs adds a term bounded by its pairs, of mean near 1 but
-with less spread than the <code>χ²(1)</code> it counts as: a lag of one pair adds 1
+<p>A lag of few pairs adds a term bounded by its pairs: a lag of one pair adds 1
 whatever the values. So <code>Q̃</code> sums only the lags of 4 pairs or more, and
 <code>few_pairs</code> names the others: a <code>max_lag</code> near the length of the series
-leaves out its last lags, and a gap the lags it breaks. Over 3000 sets of
-independent values each, with <code>max_lag</code> at the last lag of 12 positions,
-of 19 positions on a grid of 35 and of 14 on a grid of 24, <code>Q̃</code> rejects at
-5 % in 4.3 % of them, and in 3.1 % with every lag in its sum
-(<code>tests/uncertainty/test_dependence_coverage.py</code>).</p>
-<p>A lag of 4 pairs or more still pulls the rate down, less the more pairs
-it reads: one lag of 4 independent pairs alone rejects at 5 % in 0.2 % of
-the sets, of 6 in 1.2 %, of 10 in 3.1 % and of 20 in 4.4 %. So a series of
-a few values, or one whose gaps leave few pairs at every lag, stays
-conservative whatever its <code>max_lag</code>: 5 values have one lag of 4 pairs
-(0.2 %), and 8 values at most four lags, of 4 to 7 pairs (2.4 %). A series
-whose every lag reads fewer than 4 pairs, such as one of 4 values, has no
-<code>Q̃</code>: <code>portmanteau</code> and <code>p_value</code> are <code>None</code>, and the <code>portmanteau_reason</code>
-says so.</p>
+leaves out its last lags, and a gap the lags it breaks. A series whose every
+lag reads fewer than 4 pairs, such as one of 4 values, has no <code>Q̃</code>:
+<code>portmanteau</code> and <code>p_value</code> are <code>None</code>, and the <code>portmanteau_reason</code> says so.</p>
+<h3 id="the-law-of-q">The law of <code>Q̃</code><a class="headerlink" href="#the-law-of-q" title="Permanent link">&para;</a></h3>
+<p><code>Q̃</code> is read against replicates of the values under independence, not
+against <code>χ²</code>. <code>χ²</code> is its law only for long series: at 5 % it rejects
+independent normal values in 0.2 % of series of 5 values and 2 % of 8, and
+in 7.5 % of 35 values at <code>max_lag=17</code>. Each reference draws its own
+replicates (<a href="#the-reference">The reference</a>). <code>series_dependence</code>, and
+<code>AtParameters</code> with <code>NoNoise()</code>, permute the values of each series over its
+positions: under independent values of one law every order is equally
+likely, so the permutations are the exact law of <code>Q̃</code>, whatever that law is.
+The p-value is <code>(1 + #{Q_b ≥ Q}) / (B + 1)</code>, and a replicate within a
+relative <code>10⁻¹⁰</code> of <code>Q</code> counts as reaching it, since a reversed series gives
+the same <code>Q̃</code> up to rounding.</p>
+<p>Each series draws its permutations from the <code>seed</code> and its own label. The
+p-value of its <code>Q̃</code> does not depend on the other series of the call, or on
+their order. The band of <code>τ</code> still depends on them, since the signs of all
+series come from one sequence. A later change treats it. With
+<code>DistributionNoise()</code> and with <code>Refitted</code>, each replicate draws or refits
+all observations together, so there the test of a series depends on the
+others by design.</p>
+<p>At 5 %, over 2000 to 10 000 simulated series per design and 199
+permutations, the test rejects (<code>tests/uncertainty/test_dependence_coverage.py</code>,
+<code>crates/commol-inference/tests/test_dependence.rs</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Values</th>
+<th>Rate at 5 %</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Independent normal and <code>t₃</code>, 6 to 100 values, with 0, 30 or 50 % gaps, <code>max_lag</code> 1, 4 and the last lag</td>
+<td>4.2 to 6.0 %</td>
+</tr>
+<tr>
+<td>Independent normal, 5 values</td>
+<td>about 4 %</td>
+</tr>
+<tr>
+<td>Skewed, <code>χ²(1)</code> and lognormal, 35 and 100 values</td>
+<td>4.4 to 5.4 %</td>
+</tr>
+<tr>
+<td>An ARCH(1), uncorrelated values whose spread follows the last value</td>
+<td>5.0 %</td>
+</tr>
+</tbody>
+</table>
+<p>It holds its level less well in these cases:</p>
+<ul>
+<li><strong>A spread that changes along the series.</strong> Permutations move a large
+  value to a quiet stretch, so they assume one spread. With a standard
+  deviation that grows 30 times along the series, the test rejects up to
+  10.4 % with fewer than 20 values (10.0 % with 12 values at <code>max_lag</code> 2)
+  and up to about 8 % from 20 on. Gaps make it worse: up to about 18 % with
+  fewer than 12 values, 14 % with 12 to 15, 9 % with 20 to 50 and 8 % from
+  75 on. Skewed values whose spread grows strongly reject more. Exponential
+  values whose standard deviation grows 30 times reject up to about 13 %
+  with 12 values, 7 to 10.5 % with 20 and up to about 9.4 % with 50. With
+  100 values they reject 6 to 7.5 % up to 17 lags, and 11 % at the last
+  lag. When the spread is known to change, read
+  the residuals of a fit with a reference that models the noise:
+  <code>DistributionNoise()</code> with <code>AtParameters</code>, or <code>Refitted</code>.</li>
+<li><strong>Many equal values</strong>, as counts or values 0 and 1. Many permutations give
+  the observed <code>Q̃</code>, and each counts as reaching it, so the test can reject
+  less than the level: 5.0 % for values 0 or 1 of share 0.3 on 35
+  positions, 3.1 % of share 0.1.</li>
+<li><strong>Few values.</strong> 5 values have 120 orders, which give 60 distinct values
+  of <code>Q̃</code>, so the test rejects about 4 % at 5 %.</li>
+<li><strong>A trend.</strong> <code>Q̃</code> centers each series on one mean, so a trend reads as
+  dependence. Read the residuals of a model of the trend.</li>
+</ul>
+<p>A Monte Carlo p-value depends on <code>replicates</code> and <code>seed</code>. It is at least
+<code>1 / (B + 1)</code>, so fewer than 19 replicates never reject at 5 %. Choose <code>B</code>
+so that <code>α (B + 1)</code> is a whole number, such as 199 or 999. Fewer replicates
+also cost power. Against an AR(1) of 0.5 on 100 values at <code>max_lag=7</code>, 19
+replicates reject 88.8 % and 199 reject 93.4 %. Against an AR(1) of 0.3 on
+35 values at <code>max_lag=4</code>, they reject 16.1 % and 17.5 % (10 000 simulated
+sets each).</p>
 <h3 id="choose-the-largest-lag">Choose the largest lag<a class="headerlink" href="#choose-the-largest-lag" title="Permanent link">&para;</a></h3>
 <p><code>max_lag</code> says which dependence the autocorrelations and <code>Q̃</code> can show, and
 the p-value of <code>Q̃</code> depends on it. commol does not choose it.</p>
@@ -4435,55 +4528,15 @@ the p-value of <code>Q̃</code> depends on it. commol does not choose it.</p>
   shows at lag 7, so a smaller number can miss it.</li>
 <li><strong>More lags cost power.</strong> Each lag that enters <code>Q̃</code> is one more degree of
   freedom, and a lag with no dependence dilutes those that hold it.</li>
-<li><strong>Many lags for the length of the series make <code>Q̃</code> liberal</strong>, from about 20
-  values on. The table below gives the rates.</li>
 <li><strong>A common bound is 10 and a fifth of the values, the smaller of the two.</strong>
   Hyndman and Athanasopoulos (2021, section 5.4) suggest 10 lags for data with
   no season, <code>2m</code> for data with a season of <code>m</code> steps, and a fifth of the
   values when that is fewer. It is a reference, not a rule of commol. The
   bound of 10 does not know the period of your data.</li>
 </ul>
-<p>How often <code>Q̃</code> rejects independent normal values at 5 %, by the length of the
-series (40 000 simulated sets each, <code>Q̃</code> against <code>χ²</code>, each rate within about
-±0.2 points):</p>
-<table>
-<thead>
-<tr>
-<th>Values</th>
-<th><code>max_lag=4</code></th>
-<th><code>max_lag=7</code></th>
-<th><code>max_lag=10</code></th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>12</td>
-<td>3.7 %</td>
-<td>4.9 %</td>
-<td>4.9 %</td>
-</tr>
-<tr>
-<td>20</td>
-<td>4.4 %</td>
-<td>5.5 %</td>
-<td>6.2 %</td>
-</tr>
-<tr>
-<td>35</td>
-<td>4.6 %</td>
-<td>5.4 %</td>
-<td>6.2 %</td>
-</tr>
-<tr>
-<td>100</td>
-<td>4.8 %</td>
-<td>5.3 %</td>
-<td>5.6 %</td>
-</tr>
-</tbody>
-</table>
-<p>Many lags can reject too often: 7.5 % at <code>max_lag=17</code> with 35 values, and
-8.1 % at 33 with 100.</p>
+<p>Every number of lags holds the level: independent normal values of 8 to
+100 positions reject at 5 % in about 4.6 to 5.2 % of them at <code>max_lag</code> 4,
+7, 10, 17 and 33 (10 000 simulated sets each, 199 permutations).</p>
 <p>One number serves series of different lengths. The last lags of a short
 series leave its <code>Q̃</code> and are in its <code>few_pairs</code>, and the longer series read
 all of theirs. To read one series up to another lag, repeat the analysis with
@@ -4491,8 +4544,8 @@ that number. <code>τ</code>, its band and the <code>problem</code> do not chang
 of <code>series_dependence</code>, or with the same predictive of <code>residual_dependence</code>.</p>
 <p>Choose each number before you read a p-value. The smallest p-value of several
 numbers rejects more often than its level. At 5 %, that of 4, 7 and 10 lags
-rejects 8 to 9 % of independent normal series of 20 to 100 values (40 000
-simulated sets each).</p>
+rejects 7.6 to 8.8 % of independent normal series of 20 to 100 values
+(10 000 simulated sets each).</p>
 <h2 id="the-series-together">The series together<a class="headerlink" href="#the-series-together" title="Permanent link">&para;</a></h2>
 <p>Two series can share a shock at the same position, which no series shows
 alone. Over the series standardized by their own spread, <code>z</code>, the <code>problem</code>
@@ -4528,14 +4581,14 @@ positions they share.</p>
 <h2 id="any-values">Any values<a class="headerlink" href="#any-values" title="Permanent link">&para;</a></h2>
 <p><code>series_dependence(values, observations, max_lag, replicates,
 confidence_level, seed)</code> reads one finite value per observation: a residual
-of held-out data, a score, any number. <code>Q̃</code> is read against <code>χ²</code>, and the
-band of <code>τ</code> and the test of the factor come from <code>replicates</code> sets of the
-values centered per series with independent signs ±1 (a wild band), from the
-<code>seed</code>. A band from independent normal series would leave 12 to 39 % of
-heteroscedastic values outside it; the wild band keeps the size of each
-value. In a study of 1000 sets of 35 independent values whose spread grows
-30 times along the series, <code>Q̃</code> at <code>max_lag=7</code> rejects at 5 % in 5.1 % of
-them, and an AR(1) of 0.5 on 100 positions in 98 %.</p>
+of held-out data, a score, any number. <code>Q̃</code> is read against <code>replicates</code>
+permutations of the values of each series (<a href="#the-law-of-q">The law of <code>Q̃</code></a>).
+The band of <code>τ</code> and the test of the factor come from <code>replicates</code> sets of the
+values centered per series with independent signs ±1 (a wild band). Both come
+from the <code>seed</code>. A band from independent normal series would leave 12 to 39 %
+of heteroscedastic values outside it; the wild band keeps the size of each
+value. <code>Q̃</code> at <code>max_lag=7</code> rejects an AR(1) of 0.5 on 100 positions in 93.4 % of
+10 000 simulated sets, with 199 replicates.</p>
 <p>Two series with a shared AR(1) shock of 0.7: each series alone is near
 independent, and the factor of the problem says the observations count about
 twice.</p>
@@ -4615,7 +4668,7 @@ residuals come from.</p>
 <tbody>
 <tr>
 <td><code>AtParameters(replicates)</code></td>
-<td>With <code>DistributionNoise()</code>, <code>replicates</code> data sets from the observation models at the predictions of the draw, with no refit and no run of the model; with <code>NoNoise()</code>, <code>Q̃</code> against <code>χ²</code> and the wild band</td>
+<td>With <code>DistributionNoise()</code>, <code>replicates</code> data sets from the observation models at the predictions of the draw, with no refit and no run of the model; with <code>NoNoise()</code>, <code>Q̃</code> against permutations of the residuals and the wild band</td>
 <td>Held-out data, or data drawn at the parameters</td>
 </tr>
 <tr>

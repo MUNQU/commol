@@ -6344,8 +6344,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
-<li>
-<p><code>curvature="hessian"</code> gives the covariance of a parameter whose curvature is
+<li><code>curvature="hessian"</code> gives the covariance of a parameter whose curvature is
   so large that its steps moved the objective above the largest number: for a
   parameter in <code>[0, 100]</code> read by an observation of scale <code>1e156</code>, a variance
   of <code>4.0e-318</code>, as Gauss–Newton gives, where it raised a <code>RuntimeError</code> of an
@@ -6362,8 +6361,35 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   the fit, the <code>RuntimeError</code> names the parameter and says that its curvature
   is too large for the Hessian, and which rounding hides the step. See <a href="../../guide/uncertainty/local/#the-curvature-and-the-unbounded-scale">The
   curvature and the unbounded
-  scale</a>.</p>
-</li>
+  scale</a>.</li>
+<li>The robust portmanteau <code>Q̃</code> of <code>series_dependence</code>, and of
+  <code>residual_dependence</code> with <code>AtParameters</code> and <code>NoNoise()</code>, holds its level
+  at every <code>max_lag</code>. Its p-value is <code>(1 + #{Q_b ≥ Q}) / (replicates + 1)</code>
+  over <code>replicates</code> permutations of the values of each series over its
+  positions, the exact law of <code>Q̃</code> for independent values of one law. A
+  replicate within a relative <code>10⁻¹⁰</code> of <code>Q</code> counts as reaching it. This tie
+  also changes the p-values of the information factor, of <code>Refitted</code> and of
+  <code>DistributionNoise()</code>. The sets of signs all +1 or all −1 give the observed
+  statistic up to rounding, and they now count as reaching it. At 5 %,
+  independent normal and <code>t₃</code> values of 6 to 100 positions, with or without
+  gaps, reject in 4.2 to 6.0 %, and skewed values in 4.4 to 5.4 %. Before,
+  <code>Q̃</code> was read against <code>χ²</code>, which rejected 0.2 % of series of 5 values, 2 %
+  of 8, 7.5 % of 35 at <code>max_lag=17</code>, 11 % of skewed values at 100 positions
+  and 11 % of values 0 or 1. The p-value now depends on <code>replicates</code> and
+  <code>seed</code>, and fewer than 19 replicates never reject at 5 %. A spread that
+  grows 30 times along a series still rejects up to 10.4 % below 20 values,
+  and more with gaps or skewed values. The guide gives the cases in <a href="../../guide/uncertainty/dependence/#the-law-of-q">The law
+  of <code>Q̃</code></a>. In Rust, the
+  stream <code>Stream::DependencePermutations</code> draws the permutations, and each
+  series draws from a generator of its own label
+  (<code>commol_random::label_seed</code>). So the p-value of a series does not change
+  when other series join the call or change order.</li>
+<li><code>robust_portmanteau</code> divides the values of a series by the largest of them
+  before it reads their products. <code>Q̃</code> does not change with the scale, and
+  values above about <code>10⁷⁷</code> or below about <code>10⁻⁸¹</code> read the <code>Q̃</code> of any
+  other scale. Before, their products passed the largest number, which made
+  <code>Q̃</code> and its p-value NaN, or fell to 0, which left <code>Q̃</code> with no lag. A
+  statistic that is NaN has no p-value.</li>
 <li>
 <p>Every method that refits around a fit refuses a fit that is not feasible,
   with a <code>ValueError</code> that says why: <code>BayesianBootstrap</code>, <code>ResidualBootstrap</code>,
