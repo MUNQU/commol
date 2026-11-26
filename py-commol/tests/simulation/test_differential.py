@@ -5,10 +5,12 @@ import math
 import pytest
 from pydantic import ValidationError
 
-from commol import AxisPattern, Simulation
+from commol import Aggregate, AxisPattern, Simulation
 from commol._model.model import Model
 from commol.engines import ODESolver
 from tests.support import (
+    ODE_REL,
+    FactoryBuilder,
     a_to_b_builder,
     abc_builder,
     assert_close,
@@ -18,6 +20,13 @@ from tests.support import (
 
 K = 0.1
 """Proportional rate of the default A → B model."""
+
+NEXT_TO_THREE = [0.3 / 0.1, 2.999999999, 3.0000000000000004, 3.000000001]
+"""Positions on either side of 3 that the engine calls 3. 0.3 / 0.1 is
+2.9999999999999996."""
+
+STEP_THREE = "if(step == 3, 0.5, 0)"
+"""A rate of 0.5 on step 3 alone."""
 
 
 def _decay(**kwargs) -> Model:
@@ -129,6 +138,79 @@ class TestTimeInsideAStep:
         results = Simulation(model).run(40)
 
         assert_close(results["A"][40], 1000 * math.exp(-0.75), rel=1e-7)
+
+    @pytest.mark.parametrize("on", NEXT_TO_THREE)
+    @pytest.mark.parametrize("stop", ["threshold", "series"])
+    def test_a_stop_next_to_a_step_keeps_the_step(self, stop: str, on: float) -> None:
+        # The rate of step 3 acts on [3, 4) on either side of the stop. The
+        # term of 1e-12 from the stop on moves about 1e-9 into B.
+        if stop == "threshold":
+            builder = a_to_b_builder(
+                rate=f"{STEP_THREE} + if(t >= {on!r}, 1e-12, 0)", parameters={}
+            )
+        else:
+            builder = a_to_b_builder(rate=f"{STEP_THREE} + s", parameters={})
+            builder.add_parameter("s", [(on, 1e-12)], mode="step_function")
+
+        results = Simulation(build_ode(builder)).run(5)
+
+        assert_close(results["B"][4], 1000 * (1 - math.exp(-0.5)), rel=ODE_REL)
+
+    @pytest.mark.parametrize("on", NEXT_TO_THREE)
+    def test_an_impulse_next_to_a_step_reads_that_step_and_acts_once(
+        self, on: float
+    ) -> None:
+        builder = FactoryBuilder(name="impulse", version="1.0")
+        builder.add_bin("A", "A").add_bin("B", "B")
+        builder.add_transition("jump", ["A"], ["B"], rate=STEP_THREE, impulse_at=[on])
+        builder.set_structure(Aggregate(bin_amounts={"A": 1000, "B": 0}))
+
+        results = Simulation(build_ode(builder)).run(5)
+
+        assert results["B"] == pytest.approx([0, 0, 0, 500, 500, 500])
+
+    def test_a_run_that_goes_on_from_just_below_a_step_reads_that_step(
+        self,
+    ) -> None:
+        simulation = Simulation(
+            build_ode(a_to_b_builder(rate=STEP_THREE, parameters={}))
+        )
+        simulation.run_at([0.3 / 0.1])
+
+        simulation.engine.step()
+
+        moved = 1000 * (1 - math.exp(-0.5))
+        assert_close(simulation.engine.state, [1000 - moved, moved], rel=ODE_REL)
+
+    def test_a_run_that_ends_next_to_a_point_of_a_step_goes_on_from_that_step(
+        self,
+    ) -> None:
+        # The end of the run is not the same position as 3, but it is the same
+        # as the threshold, which is in the stop 3: the run ends at 3.
+        rate = f"{STEP_THREE} + if(t >= {3 - 2.7e-9!r}, 1e-12, 0)"
+        simulation = Simulation(build_ode(a_to_b_builder(rate=rate, parameters={})))
+        simulation.run_at([3 - 5.4e-9])
+
+        simulation.engine.step()
+        simulation.engine.step()
+
+        assert simulation.engine.current_position() == 3 - 5.4e-9 + 1 + 1
+        assert_close(
+            simulation.engine.state[1], 1000 * (1 - math.exp(-0.5)), rel=ODE_REL
+        )
+
+    def test_a_model_that_reads_the_step_runs_below_5e8(self) -> None:
+        # From 5e8 a relative 1e-9 is half a step.
+        simulation = Simulation(
+            build_ode(a_to_b_builder(rate=STEP_THREE, parameters={}))
+        )
+
+        with pytest.raises(ValueError) as error:
+            simulation.run_at([5e8])
+        assert str(error.value).startswith(
+            "The DifferentialEquations engine cannot run to 500000000: a model "
+            "that reads `step` runs only below position 5e8"
+        )
 
 
 class TestSolverSettings:

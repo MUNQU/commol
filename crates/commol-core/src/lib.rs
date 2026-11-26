@@ -47,7 +47,7 @@ pub use math_expression::{
 
 pub use parallelism::{Levels, Parallelism, inner_levels_in_parallel};
 
-pub use position::{POSITION_TOLERANCE, same_position};
+pub use position::{POSITION_TOLERANCE, STEP_POSITION_LIMIT, same_position};
 
 pub use progress::{NoSteps, STOPPED, Steps};
 
@@ -56,7 +56,8 @@ pub use range::{Bound, CONFIDENCE_LEVEL, Count, Ranges, Real, Rule, Setting, che
 // Re-export simulation engine trait
 pub use simulation_engine::{
     Accuracy, AccuracySettings, ModelValue, NUM_STEPS, REPLICATE_COUNT, SEED, SimulationEngine,
-    SimulationError, Trajectory, ValuePlan, check_missing_values, check_positions, run_replicates,
+    SimulationError, Trajectory, ValuePlan, check_missing_values, check_positions,
+    check_positions_in_continuous_time, run_replicates,
 };
 
 // The matrix an engine reads, and the public types of the types module.

@@ -963,6 +963,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Structure::non_identifiable` is gone.
   See
   [Verdicts](../guide/uncertainty/profiles.md#verdicts-and-the-identifiability-report).
+- A `DifferentialEquations` or `StochasticEvents` model that reads `step`
+  changes its rates at every integer step, also when an impulse, a value that
+  a rate compares `t` with or a point of a series is within a relative `1e-9`
+  of that step, on either side of it. Before, such a position just below an
+  integer, such as `t >= 0.3 / 0.1` (2.9999999999999996) for step 3, took the
+  place of the integer, and the rate of the step before acted on the whole
+  step, with no message: a rate of step 3 never acted. Now the points that the
+  engine calls one position are one stop, and an integer holds the points next
+  to it. A position next to an integer goes to that integer before any other
+  stop. A run that ends next to a stop ends at the stop, and the next run
+  goes on from there, also after `set_seed` or `set_parameter`, so a run split
+  at any position stops where the whole run does. `current_position` is still
+  the position that the run asked for. The rates before a stop see `t` below
+  its earliest point, and an impulse acts once, also when it is the same
+  position as two points that are not. In `StochasticEvents`, a row at a
+  position next to an impulse now shows the state after the impulse, as in
+  `DifferentialEquations`. A model that reads `step` refuses a position at
+  `5e8` or past it, where that tolerance is half a step, with a `ValueError`
+  wherever the engine receives the position: a run, an observation of a
+  calibration or a predictive. In Rust, `CompiledModel::breakpoints` gives the
+  stops of a run (`Breakpoints`, `Stop`), the impulse methods take the
+  impulses that act, and `CompiledModel::impulse_positions` is removed, since
+  the stops hold the impulses. See [Time inside a
+  step](../guide/simulations.md#time-inside-a-step).
 - Every method that refits around a fit refuses a fit that is not feasible,
   with a `ValueError` that says why: `BayesianBootstrap`, `ResidualBootstrap`,
   `WildBootstrap`, `BlockJackknife`, `RollingConformal`, `JackknifePlus`,

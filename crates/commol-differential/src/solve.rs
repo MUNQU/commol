@@ -11,8 +11,8 @@
 
 use std::cell::{Cell, RefCell};
 
-use commol_core::{OdeMethod, OdeSolver, same_position};
-use commol_model::CompiledModel;
+use commol_core::{OdeMethod, OdeSolver};
+use commol_model::{Breakpoints, CompiledModel};
 use diffsol::{
     FaerSparseLU, FaerSparseMat, NalgebraLU, NalgebraMat, OdeBuilder, OdeEquations,
     OdeSolverMethod, OdeSolverStopReason, Vector,
@@ -96,12 +96,14 @@ impl RightHandSide<'_> {
     }
 }
 
-/// Integrate `model` from `(t0, state)` to the last of `positions`, recording
-/// the state at each of them.
+/// Integrate `model` from `(t0, state)` to the stop of the last of
+/// `positions` ([`CompiledModel::breakpoints`]), recording the state at each
+/// of them, and return that stop.
 ///
-/// `state` is the state at `t0` after its impulses. `positions` are sorted,
-/// unique and greater than `t0`. On return `state` holds the state at the last
-/// position, after its impulses, and `rows[i]` the state at `positions[i]`.
+/// `t0` is a stop, and `state` the state there after its impulses.
+/// `positions` are sorted and unique. On return `state` holds the state at
+/// the last stop, after its impulses, and `rows[i]` the state where
+/// `positions[i]` is reported ([`Breakpoints::place`]).
 pub(crate) fn integrate(
     model: &mut CompiledModel,
     settings: &OdeSolver,
@@ -109,7 +111,7 @@ pub(crate) fn integrate(
     state: &mut Vec<f64>,
     positions: &[f64],
     rows: &mut [Vec<f64>],
-) -> Result<(), String> {
+) -> Result<f64, String> {
     let sparse = state.len() >= SPARSE_THRESHOLD;
     integrate_with(model, settings, sparse, t0, state, positions, rows)
 }
@@ -123,11 +125,15 @@ pub(crate) fn integrate_with(
     state: &mut Vec<f64>,
     positions: &[f64],
     rows: &mut [Vec<f64>],
-) -> Result<(), String> {
-    let end = *positions
+) -> Result<f64, String> {
+    let to = *positions
         .last()
         .expect("the engine integrates to at least one position");
-    let breakpoints = model.breakpoints(t0, end)?;
+    let breakpoints = model.breakpoints(t0, to)?;
+    let places: Vec<f64> = positions
+        .iter()
+        .map(|&position| breakpoints.place(position))
+        .collect();
     let len = state.len();
     let rhs = RightHandSide {
         model: RefCell::new(model),
@@ -139,7 +145,7 @@ pub(crate) fn integrate_with(
     let plan = Plan {
         t0,
         breakpoints: &breakpoints,
-        positions,
+        places: &places,
     };
     let initial = state.clone();
     macro_rules! problem {
@@ -175,27 +181,29 @@ pub(crate) fn integrate_with(
                 &plan,
                 state,
                 rows,
-            )
+            )?;
         }
         OdeMethod::Bdf if !sparse => {
             let problem = problem!(NalgebraMat<f64>);
             let solver = problem.bdf::<NalgebraLU<f64>>().map_err(solver_error)?;
-            drive(solver, &rhs, &plan, state, rows)
+            drive(solver, &rhs, &plan, state, rows)?;
         }
         OdeMethod::Bdf => {
             let problem = problem!(FaerSparseMat<f64>);
             let solver = problem.bdf::<FaerSparseLU<f64>>().map_err(solver_error)?;
-            drive(solver, &rhs, &plan, state, rows)
+            drive(solver, &rhs, &plan, state, rows)?;
         }
     }
+    Ok(breakpoints.end)
 }
 
 /// Where the pieces of an integration end, and where it records.
 struct Plan<'p> {
     t0: f64,
-    /// Ends of the pieces, ascending; the last one is the last position.
-    breakpoints: &'p [f64],
-    positions: &'p [f64],
+    /// The stops of the run, where the pieces end.
+    breakpoints: &'p Breakpoints,
+    /// Where each position is reported, ascending.
+    places: &'p [f64],
 }
 
 /// Whether every component of `y` is finite.
@@ -216,17 +224,32 @@ where
     Eqn: OdeEquations<T = f64> + 'a,
     S: OdeSolverMethod<'a, Eqn>,
 {
-    let positions = plan.positions;
+    let places = plan.places;
     let ctx = solver.state().y.context().clone();
     let mut y = state.clone();
     let mut dy = vec![0.0; y.len()];
     let mut start = plan.t0;
     let mut next = 0;
+    // A position that the start holds shows the state there.
+    while next < places.len() && places[next] <= start {
+        rows[next].clone_from(&y);
+        next += 1;
+    }
 
-    for &end in plan.breakpoints {
+    // Each piece ends at a stop, and the last one, when no stop holds the
+    // end of the run, at that end.
+    let stops = &plan.breakpoints.stops;
+    let run_end = plan.breakpoints.end;
+    let last_stop = stops.last().map_or(start, |stop| stop.at);
+    let pieces = stops
+        .iter()
+        .map(|stop| (stop.at, stop.cut, stop.impulses.as_slice()))
+        .chain((run_end > last_stop).then_some((run_end, run_end, &[][..])));
+    for (end, cut, impulses) in pieces {
         // `step` is constant on the piece: the step that holds its start.
+        // Rates see `t` below the earliest point of the stop it ends at.
         rhs.step.set(start.floor());
-        rhs.last_t.set(end.next_down());
+        rhs.last_t.set(cut.next_down());
         // A cached `f(t, x)` of the previous piece saw another `t` at its end.
         rhs.cache.borrow_mut().0 = f64::NAN;
         rhs.eval(&y, start, &mut dy);
@@ -261,13 +284,10 @@ where
                     "The ODE solver failed after t = {before}: the state is not finite"
                 ));
             }
-            while next < positions.len()
-                && positions[next] <= reached
-                && !same_position(positions[next], end)
-            {
-                let row = solver.interpolate(positions[next]).map_err(|error| {
+            while next < places.len() && places[next] <= reached && places[next] < end {
+                let row = solver.interpolate(places[next]).map_err(|error| {
                     // coverage: an error that only diffsol returns, an interpolation it cannot take
-                    format!("Cannot interpolate at {}: {error}", positions[next])
+                    format!("Cannot interpolate at {}: {error}", places[next])
                 })?;
                 rows[next] = row.clone_as_vec();
                 next += 1;
@@ -277,8 +297,10 @@ where
             }
         }
         y = solver.state().y.clone_as_vec();
-        rhs.model.borrow_mut().apply_impulses(end, &mut y)?;
-        while next < positions.len() && same_position(positions[next], end) {
+        rhs.model
+            .borrow_mut()
+            .apply_impulses(end, impulses, &mut y)?;
+        while next < places.len() && places[next] <= end {
             rows[next].clone_from(&y);
             next += 1;
         }

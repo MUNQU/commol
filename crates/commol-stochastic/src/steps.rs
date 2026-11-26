@@ -93,7 +93,8 @@ impl StochasticSteps {
     fn settle(&mut self) -> Result<(), SimulationError> {
         self.units.begin();
         if !self.settled {
-            self.units.apply_impulses(self.current_step)?;
+            let impulses = self.units.model.impulses_at(self.current_step);
+            self.units.apply_impulses(self.current_step, &impulses)?;
             self.settled = true;
         }
         Ok(())

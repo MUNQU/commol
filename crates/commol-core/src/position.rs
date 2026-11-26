@@ -14,3 +14,8 @@ pub const POSITION_TOLERANCE: f64 = 1e-9;
 pub fn same_position(a: f64, b: f64) -> bool {
     (a - b).abs() <= POSITION_TOLERANCE * a.abs().max(b.abs()).max(1.0)
 }
+
+/// The position from which [`same_position`] cannot tell two steps apart:
+/// there [`POSITION_TOLERANCE`] times the position is half a step. A model
+/// that reads `step` runs below it.
+pub const STEP_POSITION_LIMIT: f64 = 5e8;

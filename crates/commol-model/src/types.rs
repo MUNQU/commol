@@ -196,13 +196,13 @@ impl SeriesParameter {
         self.mode == SeriesMode::Pulse
     }
 
-    /// Positions in `(from, to)` where the series jumps or bends, for a
+    /// Positions in `[from, to)` where the series jumps or bends, for a
     /// series read at `t`.
     pub(crate) fn points_in(&self, from: f64, to: f64) -> impl Iterator<Item = f64> + '_ {
         self.data
             .iter()
             .map(|&(position, _)| position)
-            .filter(move |&position| position > from && position < to)
+            .filter(move |&position| position >= from && position < to)
     }
 
     /// The value of the series at `step` (pulse) or at `t` (step function,

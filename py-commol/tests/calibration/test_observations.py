@@ -234,6 +234,20 @@ class TestPositionsAndEngines:
         with pytest.raises(ValueError, match="Constraint 'cap': .*1.5 is not one"):
             Calibrator(Simulation(model), problem)
 
+    def test_a_model_that_reads_the_step_rejects_an_observation_from_5e8(
+        self,
+    ) -> None:
+        problem = CalibrationProblem(
+            observed_data=[ObservedDataPoint(at=6e8, output="A", value=1.0)],
+            parameters=[bounded("k")],
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(max_iterations=1),
+        )
+        model = build_ode(a_to_b_builder(parameters={"k": None}, rate="k * step"))
+
+        with pytest.raises(ValueError, match="Observation 'A': .*below position 5e8"):
+            Calibrator(Simulation(model), problem)
+
 
 def _count_calibrator(scale: float) -> Calibrator:
     """

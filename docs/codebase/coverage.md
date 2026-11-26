@@ -99,13 +99,13 @@ cargo install --locked cargo-mutants
 cargo mutants -j 2 --timeout 120 -p commol-model --test-package commol-model \
   --test-package commol-difference --test-package commol-differential \
   --test-package commol-stochastic \
-  --exclude-re 'replace \+= with .* in CompiledModel::breakpoints'
+  --exclude-re 'replace \+= with .* in Breakpoints::new'
 ```
 
-A mutant can loop without end and fill the memory: the loop of
-`CompiledModel::breakpoints` never ends when its step does not grow, so the
-command leaves those mutants out, and `--timeout` stops the others. Run
-`cargo-mutants` and `mutmut` one at a time.
+A mutant can loop without end and fill the memory: the loop over the
+integers in `Breakpoints::new` (`crates/commol-model/src/stops.rs`) never ends
+when its step does not grow, so the command leaves those mutants out, and
+`--timeout` stops the others. Run `cargo-mutants` and `mutmut` one at a time.
 
 For Python, `mutmut` (`uv pip install mutmut`) with `[tool.mutmut]`
 `paths_to_mutate = ["commol/"]` in a copy of

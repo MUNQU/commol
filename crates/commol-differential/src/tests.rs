@@ -381,6 +381,203 @@ fn a_rate_reads_the_step_of_its_unit_interval() {
     }
 }
 
+/// Positions on either side of 3 that `same_position` calls 3: the float
+/// just below it (`0.3 / 0.1`), the float just above it, and 1e-9 from it.
+fn next_to_three() -> [f64; 4] {
+    [0.3 / 0.1, 3.0 - 1e-9, 3.0_f64.next_up(), 3.0 + 1e-9]
+}
+
+#[test]
+fn test_a_threshold_just_below_a_step_keeps_the_step() {
+    // The rate 0.5 of step 3 acts on [3, 4) on either side of the threshold;
+    // its term of 1e-12 moves about 1e-9.
+    for on in next_to_three() {
+        let rate = format!("if(step == 3, 0.5, 0) + if(t >= {on:?}, 1e-12, 0)");
+        let rows = engine(&rate_model(&rate)).run(5).unwrap().rows;
+        let moved = 1000.0 * (1.0 - (-0.5_f64).exp());
+        assert_close(rows[4][1], moved, 1e-7, &format!("B(4) with t >= {on:?}"));
+    }
+}
+
+#[test]
+fn a_rate_before_a_stop_sees_t_below_its_earliest_point() {
+    // The threshold is in the stop 3, and the rate of the piece before it
+    // sees `t` below the threshold, so it is 0 up to 3.
+    for on in [0.3 / 0.1, 3.0 - 2e-9] {
+        let rate = format!("if(t >= {on:?}, 1, 0) + 0 * step");
+        let rows = engine(&rate_model(&rate)).run_at(&[2.5, 3.0, 3.5]).unwrap();
+        assert_eq!(rows[1][1], 0.0, "B(3) with t >= {on:?}");
+        let moved = 1000.0 * (1.0 - (-0.5_f64).exp());
+        assert_close(rows[2][1], moved, 1e-7, &format!("B(3.5) with t >= {on:?}"));
+    }
+}
+
+#[test]
+fn a_run_split_next_to_a_stop_far_out_is_the_run_split_at_the_stop() {
+    // At 1e6 the tolerance of a position is 1e-3, so `n + 1 - 5e-4` is the
+    // stop `n + 1`: the first run ends there and the second resumes from it.
+    let n = 1e6;
+    let model = rate_model(&format!("if(t >= {:?}, 0.5, 0)", n + 1.0));
+    let split = |at: f64| {
+        let mut engine = engine(&model);
+        let first = engine.run_at(&[at]).unwrap();
+        (first, engine.run_at(&[n + 2.0]).unwrap())
+    };
+    let at_the_stop = split(n + 1.0);
+    assert_eq!(split(n + 1.0 - 5e-4), at_the_stop);
+    // A new run starts a new solver, so the run that is not split is the
+    // same within the tolerance of the solver, not to the bit.
+    let whole = engine(&model).run_at(&[n + 2.0]).unwrap();
+    let moved = 1000.0 * (1.0 - (-0.5_f64).exp());
+    assert_close(whole[0][1], moved, 1e-7, "B(n + 2), not split");
+    assert_close(at_the_stop.1[0][1], moved, 1e-7, "B(n + 2), split");
+}
+
+#[test]
+fn a_position_the_same_as_the_end_of_the_last_run_shows_the_state_there() {
+    // 3 - 1e-10 and 3 + 1e-10 are the position 3 where the first run ended.
+    let mut engine = engine(&rate_model("k * step"));
+    let at_three = engine.run_at(&[3.0]).unwrap().remove(0);
+    let rows = engine.run_at(&[3.0 - 1e-10, 3.0 + 1e-10]).unwrap();
+    assert_eq!(rows, [at_three.clone(), at_three]);
+}
+
+/// A → B with no flow, a rate with the thresholds 2.5 and `second`, and an
+/// impulse that moves half of A at `impulse`.
+fn chain_model(second: f64, impulse: f64) -> Model {
+    let rate = format!("k * if(t >= 2.5, 1, 0) + k * if(t >= {second:?}, 1, 0)");
+    let at = format!(r#","impulse_at":[{impulse:?}]"#);
+    model(
+        "DifferentialEquations",
+        &[("A", 1000.0), ("B", 0.0)],
+        &[("k", "0.0")],
+        &[],
+        &[
+            transition("move", &["A"], &["B"], &rate, ""),
+            transition("half", &["A"], &["B"], "0.5", &at),
+        ],
+        TIGHT,
+    )
+}
+
+#[test]
+fn an_impulse_in_a_chain_of_points_acts_once() {
+    // 2.5 and 2.500000004 are not the same position, and the impulse is the
+    // same position as both: it is in the stop 2.5 alone.
+    let rows = engine(&chain_model(2.500000004, 2.500000002))
+        .run_at(&[4.0])
+        .unwrap();
+    assert_eq!(rows[0], [500.0, 500.0]);
+}
+
+#[test]
+fn a_row_at_an_impulse_next_to_a_stop_shows_the_state_after_it() {
+    // The stop 2.5 holds 2.500000002, which is the same position as the
+    // impulse. The impulse is a stop of its own, where its row is.
+    for impulse in [2.500000004, 2.5000000035] {
+        let rows = engine(&chain_model(2.500000002, impulse))
+            .run_at(&[impulse, 4.0])
+            .unwrap();
+        assert_eq!(rows[0], [500.0, 500.0], "{impulse:?}");
+    }
+}
+
+#[test]
+fn a_row_next_to_a_step_and_another_stop_shows_the_state_after_the_impulse_of_the_step() {
+    // 2.9999999985 is the same position as the stop 2.999999996 and as the
+    // step 3, where the impulse acts. Its row is at the step.
+    let next = 2.999_999_998_5;
+    let built = model(
+        "DifferentialEquations",
+        &[("A", 1000.0), ("B", 0.0)],
+        &[("k", "0.0")],
+        &[],
+        &[
+            transition(
+                "move",
+                &["A"],
+                &["B"],
+                "k * if(t >= 2.999999996, 1, 0) + k * step",
+                "",
+            ),
+            transition("half", &["A"], &["B"], "0.5", r#","impulse_at":[3]"#),
+        ],
+        TIGHT,
+    );
+    let whole = engine(&built).run_at(&[next, 4.0]).unwrap();
+    assert_eq!(whole[0], [500.0, 500.0]);
+    let mut split = engine(&built);
+    assert_eq!(split.run_at(&[next]).unwrap(), whole[..1]);
+    assert_eq!(split.run_at(&[4.0]).unwrap(), whole[1..]);
+}
+
+#[test]
+fn a_run_from_a_point_reports_a_position_next_to_it_as_the_whole_run_does() {
+    // The first run ends at the point 2.5, of a threshold or of a series. The
+    // second asks for a position next to it, which the whole run reports at
+    // 2.5. No impulse and no step make the start a stop.
+    let next = 2.5 + 1e-9;
+    let held = r#"{"data":[[2.5,0.5]],"mode":"step_function"}"#;
+    for built in [
+        rate_model("0.3 + k * if(t >= 2.5, 1, 0)"),
+        series_model("DifferentialEquations", held),
+    ] {
+        let whole = engine(&built).run_at(&[2.5, next]).unwrap();
+        assert_eq!(whole[0], whole[1]);
+        let mut split = engine(&built);
+        assert_eq!(split.run_at(&[2.5]).unwrap(), whole[..1]);
+        assert_eq!(split.run_at(&[next]).unwrap(), whole[1..]);
+    }
+}
+
+#[test]
+fn two_runs_that_end_next_to_each_other_and_to_an_impulse_are_the_whole_run() {
+    // The first run ends at 3.5 - 5e-9, which no stop holds. The second asks
+    // for 3.5 - 2.5e-9, the same position as that end and as the impulse:
+    // it ends at the impulse, as the whole run does.
+    let (first, second) = (3.5 - 5e-9, 3.5 - 2.5e-9);
+    for rate in ["k", "k * step"] {
+        let built = model(
+            "DifferentialEquations",
+            &[("A", 1000.0), ("B", 0.0)],
+            &[("k", "0.0")],
+            &[],
+            &[
+                transition("move", &["A"], &["B"], rate, ""),
+                transition("half", &["A"], &["B"], "0.5", r#","impulse_at":[3.5]"#),
+            ],
+            TIGHT,
+        );
+        let whole = engine(&built).run_at(&[first, second, 5.0]).unwrap();
+        assert_eq!(whole[1], [500.0, 500.0], "{rate}");
+        let mut split = engine(&built);
+        assert_eq!(split.run_at(&[first]).unwrap(), whole[..1], "{rate}");
+        assert_eq!(split.run_at(&[second]).unwrap(), whole[1..2], "{rate}");
+        assert_eq!(split.run_at(&[5.0]).unwrap(), whole[2..], "{rate}");
+    }
+}
+
+#[test]
+fn a_model_that_reads_the_step_runs_below_5e8() {
+    // From 5e8 the tolerance of a position is half a step. The engine
+    // refuses the position where it receives it, before a run.
+    let mut steps = engine(&rate_model("k * step"));
+    let error = steps.run_at(&[5e8]).unwrap_err().to_string();
+    let rule = "a model that reads `step` runs only below position 5e8";
+    let start = format!("The DifferentialEquations engine cannot run to 500000000: {rule}");
+    assert!(error.starts_with(&start), "{error}");
+    assert!(error.contains("origin of the axis"), "{error}");
+    assert_eq!(
+        steps.check_position(6e8).unwrap_err(),
+        error.replace("500000000", "600000000")
+    );
+    assert!(steps.check_position(5e8 - 1.0).is_ok());
+    let rows = engine(&rate_model("if(t >= 6e8, k, 0)"))
+        .run_at(&[6e8])
+        .unwrap();
+    assert_eq!(rows[0], [1000.0, 0.0]);
+}
+
 #[test]
 fn a_rate_that_switches_on_the_step_acts_only_on_its_window() {
     let rows = engine(&rate_model("if(step >= 2, if(step < 4, 0.5, 0), 0)"))
@@ -837,6 +1034,9 @@ fn a_run_continues_where_the_last_one_stopped_and_reports_at_its_start() {
         assert_close(*a, *b, 1e-9, "continued run");
     }
     assert!(first[0][0] < 1000.0);
+    // A run at no position reports nothing and stays where it is.
+    assert_eq!(parts.run_at(&[]).unwrap(), Vec::<Vec<f64>>::new());
+    assert_eq!(parts.current_position(), 2.0);
 }
 
 #[test]

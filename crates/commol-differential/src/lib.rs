@@ -58,7 +58,11 @@ pub struct DifferentialEquations {
     settings: OdeSolver,
     /// Current state: compartments, then accumulators.
     state: Vec<f64>,
+    /// Where `state` is: the stop where the last run ended
+    /// ([`CompiledModel::breakpoints`]), from which the next run starts.
     current_time: f64,
+    /// Where the engine reports: the end of the last run.
+    position: f64,
     /// Whether the impulses at `current_time` are already in `state`.
     settled: bool,
 }
@@ -96,6 +100,7 @@ impl DifferentialEquations {
             settings,
             state,
             current_time: 0.0,
+            position: 0.0,
             settled: false,
         })
     }
@@ -108,19 +113,20 @@ impl DifferentialEquations {
     /// Apply the impulses at the current time, once.
     fn settle(&mut self) -> Result<(), String> {
         if !self.settled {
+            let impulses = self.model.impulses_at(self.current_time);
             self.model
-                .apply_impulses(self.current_time, &mut self.state)?;
+                .apply_impulses(self.current_time, &impulses, &mut self.state)?;
             self.settled = true;
         }
         Ok(())
     }
 
-    /// Integrate from the current time through the last of `positions`,
-    /// writing the state at each of them into `buffer`.
+    /// Integrate from the current time through the stop of the last of
+    /// `positions`, writing the state at each of them into `buffer`.
     ///
-    /// `positions` must be sorted, unique and not before the current time.
-    /// The output at a position where an impulse acts shows the state after
-    /// the jump.
+    /// `positions` must be sorted, unique and not before the current
+    /// position. The output at a position where an impulse acts shows the
+    /// state after the jump.
     ///
     /// # Errors
     ///
@@ -134,8 +140,8 @@ impl DifferentialEquations {
         buffer: &mut Vec<Vec<f64>>,
     ) -> Result<(), String> {
         self.model.check_values()?;
-        commol_core::check_positions(positions, self.current_time, |position| {
-            EngineType::DifferentialEquations.check_position(position)
+        commol_core::check_positions_in_continuous_time(positions, self.position, |position| {
+            commol_core::SimulationEngine::check_position(self, position)
         })?;
         let output_len = self.state.len();
         buffer.resize_with(positions.len(), Vec::new);
@@ -151,21 +157,22 @@ impl DifferentialEquations {
         for row in &mut buffer[..first_later] {
             row.copy_from_slice(&self.state);
         }
-        let later = &positions[first_later..];
-        let Some(&end) = later.last() else {
+        let Some(&end) = positions.last() else {
             return Ok(());
         };
-        solve::integrate(
-            &mut self.model,
-            &self.settings,
-            self.current_time,
-            &mut self.state,
-            later,
-            &mut buffer[first_later..],
-        )?;
-        self.current_time = end;
-        // `integrate` applied the impulses at `end`.
-        self.settled = true;
+        let later = &positions[first_later..];
+        if !later.is_empty() {
+            // `integrate` applies the impulses at the stop where it ends.
+            self.current_time = solve::integrate(
+                &mut self.model,
+                &self.settings,
+                self.current_time,
+                &mut self.state,
+                later,
+                &mut buffer[first_later..],
+            )?;
+        }
+        self.position = end;
         Ok(())
     }
 }
@@ -179,7 +186,14 @@ impl commol_core::SimulationEngine for DifferentialEquations {
     commol_model::delegate_to_compiled_model!();
 
     fn check_position(&self, position: f64) -> Result<(), String> {
-        EngineType::DifferentialEquations.check_position(position)
+        let engine = EngineType::DifferentialEquations;
+        engine.check_position(position)?;
+        self.model.check_reach(position).map_err(|reason| {
+            format!(
+                "The {} engine cannot run to {position}: {reason}",
+                engine.name()
+            )
+        })
     }
 
     fn engine_type(&self) -> Option<EngineType> {
@@ -187,7 +201,7 @@ impl commol_core::SimulationEngine for DifferentialEquations {
     }
 
     fn step(&mut self) -> Result<(), SimulationError> {
-        let end = self.current_time + 1.0;
+        let end = self.position + 1.0;
         let mut buffer = Vec::with_capacity(1);
         Ok(self.integrate_to(&[end], &mut buffer)?)
     }
@@ -230,11 +244,12 @@ impl commol_core::SimulationEngine for DifferentialEquations {
     fn reset(&mut self) {
         self.state.copy_from_slice(self.model.initial_state());
         self.current_time = 0.0;
+        self.position = 0.0;
         self.settled = false;
     }
 
     fn current_position(&self) -> f64 {
-        self.current_time
+        self.position
     }
 }
 

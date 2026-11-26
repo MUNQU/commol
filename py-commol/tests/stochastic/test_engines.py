@@ -11,7 +11,7 @@ import math
 
 import pytest
 
-from commol import InfeasibleStateError, Simulation
+from commol import Aggregate, InfeasibleStateError, Simulation
 from commol._simulation.results import SimulationReplicates, SimulationResults
 from commol.engines.engine import EngineName
 from commol.sensitivity import InputSpace, SensitivityAnalysis
@@ -19,6 +19,7 @@ from tests.support import (
     MEAN_FIELD,
     STOCHASTIC_ENGINES,
     TIGHT,
+    FactoryBuilder,
     a_to_b_builder,
     bounded,
     build_stochastic,
@@ -35,6 +36,22 @@ def _mean_field(engine: EngineName) -> list[float]:
         builder.structure, engine=MEAN_FIELD[engine], settings=settings
     )
     return Simulation(model).run_at(POSITIONS)["A"]
+
+
+def _step_three(stop: str, on: float) -> list[float]:
+    """B of a ``StochasticEvents`` run whose rate is 0.5 on step 3 alone, with
+    a threshold of ``t`` or the impulse at ``on``."""
+    builder = FactoryBuilder(name="step three", version="1.0")
+    builder.add_bin("A", "A").add_bin("B", "B")
+    rate = "if(step == 3, 0.5, 0)"
+    if stop == "threshold":
+        builder.add_transition(
+            "ab", ["A"], ["B"], rate=f"{rate} + if(t >= {on!r}, 1e-12, 0)"
+        )
+    else:
+        builder.add_transition("ab", ["A"], ["B"], rate=rate, impulse_at=[on])
+    builder.set_structure(Aggregate(bin_amounts={"A": 1000, "B": 0}))
+    return Simulation(build_stochastic(builder)).run(5, seed=1)["B"]
 
 
 @pytest.mark.parametrize("engine", STOCHASTIC_ENGINES)
@@ -101,6 +118,17 @@ class TestPositions:
         assert len(events.run_at([0.5, 2.25], seed=1)["A"]) == 2
         with pytest.raises(ValueError, match="integer steps"):
             steps.run_at([0.5], seed=1)
+
+    @pytest.mark.parametrize(
+        "on", [0.3 / 0.1, 2.999999999, 3.0000000000000004, 3.000000001]
+    )
+    @pytest.mark.parametrize("stop", ["threshold", "impulse"])
+    def test_a_stop_next_to_a_step_keeps_the_step(self, stop: str, on: float) -> None:
+        # 0.3 / 0.1 is 2.9999999999999996: the engine calls each position 3.
+        at_three = _step_three(stop, 3.0)
+
+        assert _step_three(stop, on) == at_three
+        assert at_three[4] > 0
 
 
 class TestProbabilities:

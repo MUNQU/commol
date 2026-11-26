@@ -425,6 +425,13 @@ only numbers, `pi`, `e` and parameters with a constant or calibrated value, and
 `t` is one side of the comparison: write `t >= 10`, not `t - 10 >= 0`. A jump
 that depends on the state, such as `if(t >= A, ...)`, is not found.
 
+In a model that reads `step`, a position within a relative `1e-9` of an
+integer is that integer. So a threshold, an impulse or a point of a series just
+below step `n`, such as `0.3 / 0.1` for 3, acts at `n`: the rate of step `n`
+acts on the whole step, and an impulse there acts once. A run that ends at
+such a position ends at `n`, and the next run goes on from `n`. Such a model
+runs below `5e8`, where that tolerance is half a step.
+
 A rate of a differential model is continuous, not a fraction per step; see
 [What a rate means](core-concepts.md#what-a-rate-means).
 `Model.axis_units()` gives the rate that the engine of a model reads from a mean

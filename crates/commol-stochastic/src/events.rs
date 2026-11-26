@@ -66,24 +66,30 @@ struct Leap {
 /// - Tau-leaping: a Poisson number of events of each flow in a leap, of the
 ///   fixed length `tau` or chosen as Cao, Gillespie and Petzold (2006) do.
 ///
-/// The engine stops at every breakpoint of the model
+/// The engine stops at every stop of the model
 /// ([`CompiledModel::breakpoints`]), where the impulses act; no wait and no
 /// leap crosses one. A run does not depend on the positions it reports at:
-/// the output at a position is the state after the last event before it.
-/// A parameter or a seed changed between two runs acts from the position
-/// where the first run stopped: the pending wait is drawn again from there,
-/// and a pending leap keeps, by binomial thinning, only its events up to
-/// there.
+/// the output at a position is the state after the last event before it, or
+/// after the impulses of the stop that holds it. A run ends at the stop that
+/// holds its last position. A parameter or a seed changed between two runs
+/// acts from there: the pending wait is drawn again from there, and a
+/// pending leap keeps, by binomial thinning, only its events up to there.
 #[derive(Clone)]
 pub struct StochasticEvents {
     units: Units,
     settings: StochasticEventsSettings,
     /// Where the engine reports: the end of the last run.
     position: f64,
-    /// The last change of the state: an event, a leap, a breakpoint, or the
-    /// position where a parameter or the seed changed. Waits are measured
-    /// from it.
+    /// Where the last run ended: the stop that holds `position`
+    /// ([`CompiledModel::breakpoints`]), from which the next run starts.
+    run_end: f64,
+    /// The last change of the state: an event, a leap, a stop, or the stop
+    /// where a parameter or the seed changed. Waits are measured from it.
     clock: f64,
+    /// The earliest point of the next stop, or infinity past the last one.
+    /// The rates see `t` below it, so a value that jumps at a point of the
+    /// stop acts only from the stop.
+    cut: f64,
     /// The integrated propensity left before the next event, an exponential
     /// draw; `None` until the engine draws it.
     remaining: Option<f64>,
@@ -121,7 +127,9 @@ impl StochasticEvents {
             units: Units::new(compiled, EngineType::StochasticEvents, settings.rounding),
             settings,
             position: 0.0,
+            run_end: 0.0,
             clock: 0.0,
+            cut: f64::INFINITY,
             remaining: None,
             settled: false,
             leap: None,
@@ -144,47 +152,46 @@ impl StochasticEvents {
         buffer: &mut Vec<Vec<f64>>,
     ) -> Result<(), SimulationError> {
         self.units.model.check_values()?;
-        commol_core::check_positions(positions, self.position, |position| {
-            EngineType::StochasticEvents.check_position(position)
+        commol_core::check_positions_in_continuous_time(positions, self.position, |position| {
+            commol_core::SimulationEngine::check_position(self, position)
         })?;
         buffer.resize_with(positions.len(), Vec::new);
         self.units.begin();
         if !self.settled {
-            self.units.apply_impulses(self.clock)?;
+            let impulses = self.units.model.impulses_at(self.clock);
+            self.units.apply_impulses(self.clock, &impulses)?;
             self.settled = true;
         }
         let Some(&end) = positions.last() else {
             return Ok(());
         };
-        // The points past `end` do not matter, and every point up to `end`
-        // is a breakpoint of the model, not the end of the search.
-        let breakpoints: Vec<f64> = self
-            .units
-            .model
-            .breakpoints(self.clock, end + 1.0)?
-            .into_iter()
-            .filter(|&point| point <= end)
+        let plan = self.units.model.breakpoints(self.run_end, end)?;
+        let places: Vec<f64> = positions
+            .iter()
+            .map(|&position| plan.place(position))
             .collect();
         let mut next_break = 0;
         let mut next = 0;
         loop {
-            let limit = breakpoints
+            let (limit, cut) = plan
+                .stops
                 .get(next_break)
-                .copied()
-                .unwrap_or(f64::INFINITY);
-            let (stop, change) = self.next_change(limit, end)?;
-            while next < positions.len() && positions[next] < stop && positions[next] <= end {
+                .map_or((f64::INFINITY, f64::INFINITY), |stop| (stop.at, stop.cut));
+            self.cut = cut;
+            let (stop, change) = self.next_change(limit, plan.end)?;
+            while next < places.len() && places[next] < stop {
                 self.units.copy_row(&mut buffer[next]);
                 next += 1;
             }
-            if stop > end {
-                // The loop above copied every position up to `end`.
+            if stop > plan.end {
+                // The loop above copied every position up to the end.
                 self.position = end;
+                self.run_end = plan.end;
                 return Ok(());
             }
             match change {
                 Change::Event => {
-                    let flow = self.pick(stop, limit)?;
+                    let flow = self.pick(stop)?;
                     self.fire(flow, 1.0);
                 }
                 Change::Leap => {
@@ -201,37 +208,40 @@ impl StochasticEvents {
             }
             self.clock = stop;
             self.no_leap = false;
-            if next_break < breakpoints.len() && same_position(stop, limit) {
+            if next_break < plan.stops.len() && same_position(stop, limit) {
                 self.clock = limit;
-                self.units.apply_impulses(limit)?;
+                self.units
+                    .apply_impulses(limit, &plan.stops[next_break].impulses)?;
                 next_break += 1;
             }
-            while next < positions.len() && positions[next] <= self.clock {
+            while next < places.len() && places[next] <= self.clock {
                 self.units.copy_row(&mut buffer[next]);
                 next += 1;
             }
         }
     }
 
-    /// Move the clock to the position, so that what comes after the position
-    /// is drawn again with the parameters and the seed of the next run.
+    /// Move the clock to the stop where the last run ended, so that what
+    /// comes after the stop is drawn again with the parameters and the seed
+    /// of the next run.
     ///
     /// The exponential wait pending from the clock has no memory: no event
-    /// came before the position, so the wait from the position is a new draw.
-    /// A pending leap holds `N ~ Poisson(λτ)` events of each flow; the events
-    /// in the fraction `f` of it up to the position are `Binomial(N, f)`, a
-    /// `Poisson(λτf)`, which the state takes at the position, and the rest of
-    /// the leap is dropped. The position is not a breakpoint when the clock
-    /// is behind it, so no impulse acts there.
+    /// came before the stop, so the wait from the stop is a new draw. A
+    /// pending leap holds `N ~ Poisson(λτ)` events of each flow. The events in
+    /// the fraction `f` of it up to the stop are `Binomial(N, f)`, a
+    /// `Poisson(λτf)`, which the state takes at the stop, and the rest of the
+    /// leap is dropped. When the clock is behind the stop, the run ended at
+    /// its last position, which is not a stop of the model, so no impulse acts
+    /// there.
     fn settle(&mut self) {
         if let Some(leap) = self.leap.take() {
-            let fraction = (self.position - self.clock) / (leap.at - self.clock);
+            let fraction = (self.run_end - self.clock) / (leap.at - self.clock);
             for (flow, &count) in leap.counts.iter().enumerate() {
                 let kept = sample::binomial(&mut self.units.generator, count as u64, fraction);
                 self.fire(flow, kept as f64);
             }
         }
-        self.clock = self.position;
+        self.clock = self.run_end;
         self.remaining = None;
         self.no_leap = false;
     }
@@ -312,16 +322,11 @@ impl StochasticEvents {
         Ok(total)
     }
 
-    /// The total propensity at `t`, on the piece that ends at `limit`: rates
-    /// see the step of the clock, and `t` below `limit`, so a value that
-    /// jumps at `limit` acts only from there.
-    fn total_at(&mut self, t: f64, limit: f64) -> Result<f64, SimulationError> {
-        let t = if limit.is_finite() {
-            t.min(limit.next_down())
-        } else {
-            t
-        };
-        self.propensities(self.clock.floor(), t)
+    /// The total propensity at `t`, on the piece from the clock to the next
+    /// stop: rates see the step of the clock, and `t` below the cut of the
+    /// stop (`Self::cut`).
+    fn total_at(&mut self, t: f64) -> Result<f64, SimulationError> {
+        self.propensities(self.clock.floor(), t.min(self.cut.next_down()))
     }
 
     /// The next event of the direct method, from the clock: where the total
@@ -336,7 +341,7 @@ impl StochasticEvents {
             }
         };
         let start = self.clock;
-        let first = self.total_at(start, limit)?;
+        let first = self.total_at(start)?;
         if !self.units.model.reads_time() {
             if first <= 0.0 {
                 return Ok(if limit.is_finite() {
@@ -384,7 +389,7 @@ impl StochasticEvents {
                 return Ok(Next::Beyond);
             }
             let high = (low + width).min(limit);
-            let piece = self.integral(low, high, limit, tolerance * remaining)?;
+            let piece = self.integral(low, high, tolerance * remaining)?;
             if below + piece >= remaining {
                 break high;
             }
@@ -395,7 +400,7 @@ impl StochasticEvents {
         // `below + ∫ from low to at` reaches `remaining` in `[low, high]`.
         let (mut left, mut right) = (low, high);
         let mut at = {
-            let rate = self.total_at(low, limit)?;
+            let rate = self.total_at(low)?;
             if rate > 0.0 {
                 (low + (remaining - below) / rate).clamp(low, high)
             } else {
@@ -403,7 +408,7 @@ impl StochasticEvents {
             }
         };
         for _ in 0..100 {
-            let gap = below + self.integral(low, at, limit, tolerance * remaining)? - remaining;
+            let gap = below + self.integral(low, at, tolerance * remaining)? - remaining;
             if gap.abs() <= tolerance * remaining {
                 break;
             }
@@ -415,7 +420,7 @@ impl StochasticEvents {
             if right - left <= tolerance * at.abs().max(1.0) {
                 break;
             }
-            let rate = self.total_at(at, limit)?;
+            let rate = self.total_at(at)?;
             let newton = if rate > 0.0 {
                 at - gap / rate
             } else {
@@ -430,27 +435,21 @@ impl StochasticEvents {
         Ok(if at < limit {
             Next::Event(at)
         } else {
-            Next::Break(below + self.integral(low, limit, limit, tolerance * remaining)?)
+            Next::Break(below + self.integral(low, limit, tolerance * remaining)?)
         })
     }
 
     /// The total propensity integrated from `from` to `to`, with the state
     /// fixed, by the adaptive Simpson rule within `tolerance`.
-    fn integral(
-        &mut self,
-        from: f64,
-        to: f64,
-        limit: f64,
-        tolerance: f64,
-    ) -> Result<f64, SimulationError> {
+    fn integral(&mut self, from: f64, to: f64, tolerance: f64) -> Result<f64, SimulationError> {
         if to <= from {
             return Ok(0.0);
         }
         let middle = 0.5 * (from + to);
         let (a, m, b) = (
-            self.total_at(from, limit)?,
-            self.total_at(middle, limit)?,
-            self.total_at(to, limit)?,
+            self.total_at(from)?,
+            self.total_at(middle)?,
+            self.total_at(to)?,
         );
         let whole = (to - from) / 6.0 * (a + 4.0 * m + b);
         self.simpson(
@@ -461,7 +460,6 @@ impl StochasticEvents {
             b,
             whole,
             tolerance.max(f64::MIN_POSITIVE),
-            limit,
             SIMPSON_DEPTH,
         )
     }
@@ -476,47 +474,29 @@ impl StochasticEvents {
         b: f64,
         whole: f64,
         tolerance: f64,
-        limit: f64,
         depth: u32,
     ) -> Result<f64, SimulationError> {
         let middle = 0.5 * (from + to);
         let left_middle = 0.5 * (from + middle);
         let right_middle = 0.5 * (middle + to);
-        let lm = self.total_at(left_middle, limit)?;
-        let rm = self.total_at(right_middle, limit)?;
+        let lm = self.total_at(left_middle)?;
+        let rm = self.total_at(right_middle)?;
         let left = (middle - from) / 6.0 * (a + 4.0 * lm + m);
         let right = (to - middle) / 6.0 * (m + 4.0 * rm + b);
         let error = left + right - whole;
         if depth == 0 || error.abs() <= 15.0 * tolerance {
             return Ok(left + right + error / 15.0);
         }
-        Ok(self.simpson(
-            from,
-            middle,
-            a,
-            lm,
-            m,
-            left,
-            0.5 * tolerance,
-            limit,
-            depth - 1,
-        )? + self.simpson(
-            middle,
-            to,
-            m,
-            rm,
-            b,
-            right,
-            0.5 * tolerance,
-            limit,
-            depth - 1,
-        )?)
+        Ok(
+            self.simpson(from, middle, a, lm, m, left, 0.5 * tolerance, depth - 1)?
+                + self.simpson(middle, to, m, rm, b, right, 0.5 * tolerance, depth - 1)?,
+        )
     }
 
     /// The flow of an event at `at`, drawn in proportion to the propensities
     /// there.
-    fn pick(&mut self, at: f64, limit: f64) -> Result<usize, SimulationError> {
-        let total = self.total_at(at, limit)?;
+    fn pick(&mut self, at: f64) -> Result<usize, SimulationError> {
+        let total = self.total_at(at)?;
         let point = self.units.generator.uniform() * total;
         let mut sum = 0.0;
         let mut last = 0;
@@ -539,7 +519,7 @@ impl StochasticEvents {
     /// leaves an amount below zero.
     fn draw_leap(&mut self, limit: f64) -> Result<Option<(f64, Change)>, SimulationError> {
         let start = self.clock;
-        let total = self.total_at(start, limit)?;
+        let total = self.total_at(start)?;
         if total <= 0.0 {
             return Ok(None);
         }
@@ -644,7 +624,14 @@ impl commol_core::SimulationEngine for StochasticEvents {
     }
 
     fn check_position(&self, position: f64) -> Result<(), String> {
-        EngineType::StochasticEvents.check_position(position)
+        let engine = EngineType::StochasticEvents;
+        engine.check_position(position)?;
+        self.units.model.check_reach(position).map_err(|reason| {
+            format!(
+                "The {} engine cannot run to {position}: {reason}",
+                engine.name()
+            )
+        })
     }
 
     fn engine_type(&self) -> Option<EngineType> {
@@ -667,7 +654,9 @@ impl commol_core::SimulationEngine for StochasticEvents {
     fn reset(&mut self) {
         self.units.reset();
         self.position = 0.0;
+        self.run_end = 0.0;
         self.clock = 0.0;
+        self.cut = f64::INFINITY;
         self.remaining = None;
         self.settled = false;
         self.leap = None;

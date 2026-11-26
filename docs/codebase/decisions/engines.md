@@ -62,8 +62,8 @@ accumulator. Every engine reads them, and none has flow logic of its own:
 fixed order; another order changes the last bits of a deterministic run. The
 deterministic engines are the mean-field limits of the stochastic ones, which
 gives the main test oracle. The positions where a rate can jump come from the
-same model (`CompiledModel::breakpoints`), so the differential
-and the continuous-time stochastic engines stop at the same positions.
+model (`CompiledModel::breakpoints`), so both engines in continuous time stop at
+the same positions and read the same `step` there.
 
 A rate that is not a number stops the run in every engine, with a
 `RuntimeError` that names the flow and the position: a calibration fails with

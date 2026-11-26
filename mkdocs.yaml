@@ -230,6 +230,7 @@ nav:
               - Dependence: codebase/decisions/dependence.md
               - Results: codebase/decisions/results.md
               - Descriptions: codebase/decisions/descriptions.md
+              - Windows: codebase/decisions/windows.md
               - Files: codebase/decisions/files.md
               - Python Models: codebase/decisions/python-models.md
               - Progress: codebase/decisions/progress.md
