@@ -36,8 +36,9 @@ class InformationMatchingEta(RangeChecked):
     of squares of a model with Gaussian noise of variance ``σ²`` it estimates
     ``1/(2σ²)``; for a correct observation model, 1.
 
-    It needs ``loss_function="sse"`` or observation models, and a
-    deterministic engine, and is cheap and local. The variance sums the
+    It needs ``loss_function="sse"`` or observation models, a deterministic
+    engine and a curvature that the data determine, and is cheap and local.
+    `η` is the same in any unit of the parameters. The variance sums the
     scores over blocks of positions, so it holds under dependence inside a
     block, and enters only through a trace, so it takes two blocks or more,
     also fewer blocks than parameters. The trace is corrected by the share

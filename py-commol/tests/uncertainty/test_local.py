@@ -10,6 +10,7 @@ the information of ``c`` is ``n / sd²``; without windows the prediction at
 
 import logging
 import math
+import re
 from pathlib import Path
 
 import numpy as np
@@ -54,6 +55,7 @@ from tests.support import (
     flow_observations,
     two_wells_calibrator,
     normal_values,
+    weak_parameter_calibrator,
 )
 
 
@@ -160,9 +162,25 @@ class TestCurvature:
                 Laplace(draws=10)
             )
 
-        assert len(result.notes) == 1
-        assert "The curvature of ('c', 'c')" in result.notes[0]
-        assert result.notes[0] in caplog.text
+        (note,) = result.notes
+        # The note gives the share only: an entry on the unbounded scale can be
+        # below or above any number.
+        assert re.fullmatch(
+            r"The curvature of \('c', 'c'\) has an estimated error of \d+\.\d% of "
+            r"the scale of its row and column",
+            note,
+        )
+        assert note in caplog.text
+
+    def test_an_error_above_the_scale_of_its_entry_is_noted_as_such(self) -> None:
+        # At this scale the data barely read k2: the error of the differences
+        # of (k1, k2) is above the scale of its row and column.
+        result = weak_parameter_calibrator(1e-30).uncertainty(Laplace(draws=2))
+
+        assert result.notes == [
+            "The curvature of ('k1', 'k2') has an estimated error of more than 100% "
+            "of the scale of its row and column"
+        ]
 
 
 class TestLaplace:
@@ -332,6 +350,38 @@ class TestSandwich:
         half = t_quantile * 3.0 * derivative * math.sqrt(result.covariance[0][0])
         assert result.blocks == 4
         assert band.upper["B"][0] - band.center["B"][0] == pytest.approx(half, rel=1e-6)
+
+    @pytest.mark.parametrize("scale", [1e78, 1e150])
+    def test_a_sandwich_reads_scores_whose_squares_overflow(self, scale: float) -> None:
+        # Each prediction is c · scale, and the data are the values times the
+        # scale: the score of a block over the curvature is Σ_b (v − ĉ) / n at
+        # any scale, while the square of a score is above the largest number
+        # from a scale of about 1e77. A holds more than the run moves.
+        values = normal_values(10, 5, sd=1.0)
+        model = build(
+            a_to_b_builder(
+                parameters={"c": None},
+                rate=f"A / A * c * {scale!r}",
+                amounts={"A": 1e300, "B": 0},
+            )
+        )
+        problem = CalibrationProblem(
+            observed_data=flow_observations(
+                [scale * value for value in values], windowed=True
+            ),
+            parameters=[bounded("c", 0.0, 50.0, initial_guess=25.0)],
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(max_iterations=500),
+            seed=1,
+        )
+        calibrator = Calibrator(Simulation(model), problem)
+
+        result = calibrator.uncertainty(Sandwich(block_length=2, draws=10))
+
+        c = result.fit.best_parameters["c"]
+        shares = (np.array(values) - c).reshape(5, 2).sum(axis=1) / len(values)
+        expected = 5 / 4 * np.sum(shares**2) / (c * (50.0 - c) / 50.0) ** 2
+        assert result.covariance[0][0] == pytest.approx(expected, rel=1e-9)
 
     def test_sandwich_refuses_too_few_blocks(self) -> None:
         calibrator = flow_calibrator(normal_values(6, 4, sd=1.0), windowed=True)

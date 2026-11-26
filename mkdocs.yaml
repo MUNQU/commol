@@ -224,6 +224,7 @@ nav:
               - Identifiability: codebase/decisions/identifiability.md
               - Sensitivity Analysis: codebase/decisions/sensitivity.md
               - Scores and Distribution Functions: codebase/decisions/scores.md
+              - Curvature: codebase/decisions/curvature.md
               - Local approximations: codebase/decisions/local-approximations.md
               - Profiles: codebase/decisions/profiles.md
               - Dependence: codebase/decisions/dependence.md

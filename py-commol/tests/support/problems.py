@@ -21,7 +21,7 @@ from commol.observations.models import _ObservationModel
 from commol.sensitivity import InputSpace
 
 from .flows import Flow, flow_model
-from .models import a_to_b_builder, abc_builder, build, fan_builder
+from .models import a_to_b_builder, abc_builder, abcd_builder, build, fan_builder
 
 
 def initial_condition_problem(
@@ -375,16 +375,26 @@ def structural_zero_calibrator(first_c: int, *, first_b: int = 1) -> Calibrator:
     return Calibrator(Simulation(model), problem)
 
 
-def weak_parameter_calibrator(scale: float) -> Calibrator:
+def weak_parameter_calibrator(scale: float, *, own_bin: bool = False) -> Calibrator:
     """
     ``k1`` and ``k2`` of A → B → C, with C fed from B at ``k2 · scale · B · step``.
 
     B has negative binomial counts with noise parameter ``phi``; C is observed
     at 0 with a normal model of sd 1. A tiny ``scale`` leaves ``k2`` barely
-    read by the data, so the curvature of ``k2`` is near 0.
+    read by the data, so the curvature of ``k2`` is near 0. With `own_bin`, D is
+    observed, fed from C (1000) at ``k2 · scale · step``, which `scale` rescales.
     """
+    fed = "D" if own_bin else "C"
     model = build(
-        abc_builder(
+        abcd_builder(
+            parameters={"k1": None, "k2": None},
+            ab="k1 * A",
+            bc=None,
+            cd=f"k2 * {scale!r} * step * C / C",
+            amounts={"A": 1000, "B": 0, "C": 1000, "D": 0},
+        )
+        if own_bin
+        else abc_builder(
             parameters={"k1": None, "k2": None},
             ab="k1 * A",
             bc=f"k2 * {scale!r} * B * step",
@@ -398,7 +408,7 @@ def weak_parameter_calibrator(scale: float) -> Calibrator:
         for t, v in enumerate(counts, start=1)
     ]
     data += [
-        ObservedDataPoint(at=t, output="C", value=0.0, label="C") for t in range(1, 21)
+        ObservedDataPoint(at=t, output=fed, value=0.0, label=fed) for t in range(1, 21)
     ]
     problem = CalibrationProblem(
         observed_data=data,
@@ -409,7 +419,7 @@ def weak_parameter_calibrator(scale: float) -> Calibrator:
         ],
         observation_models={
             "B": NegativeBinomialObservations(overdispersion="phi"),
-            "C": NormalObservations(sd=1.0),
+            fed: NormalObservations(sd=1.0),
         },
         optimization_config=NelderMeadConfig(max_iterations=500),
         seed=1,

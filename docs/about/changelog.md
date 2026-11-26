@@ -882,6 +882,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its runner exists. See
   [How replicates run](../guide/uncertainty/resampling.md#how-replicates-run).
 
+- `InformationMatchingEta` gives the same `η`, degrees of freedom and note in
+  any unit of a parameter, and `Laplace`, `Sandwich` and `LaplaceMixture` the
+  covariance of that unit, with either curvature: the curvature is kept in
+  units of its parameters, and `curvature="hessian"` takes its differences in
+  the unit of its step, a power of two, at the same points. Before, the range
+  of a number stopped them. With `weak_parameter_calibrator` of the tests,
+  whose data read `k2` through a factor `scale`, `InformationMatchingEta`
+  raised a `RuntimeError` of a singular curvature from a scale of `2e-159`;
+  `η` is now the same down to at least `1e-310`. There the covariance of
+  `Laplace` held `inf` from `2e-159` to `1e-166`, and `Laplace` raised a
+  `ValueError` of a curvature that is not positive definite from `1e-167`.
+  With its `own_bin`, where `k2` feeds a bin of its own, the variance of `k2`
+  from `Sandwich` was `1.2e-7` off its closed form at `1e-81` and 0.24 % off at
+  `1e-82`, `Sandwich` raised a `ValueError` of a covariance that is not
+  positive definite from `1e-83`, and `InformationMatchingEta` the
+  `RuntimeError` from `2e-157`; the variance is now within `1e-9` of its
+  closed form, and `η` the same, down to `1e-308`. `Sandwich` reads a squared
+  error whose squared scores overflow, where it gave an infinite variance (an
+  `"sse"` loss on data at a scale of `1e78` and above). `Laplace` and
+  `LaplaceMixture` give covariances that they refused: for a parameter in
+  `[0, 100]` read by an observation of scale `1e152`, a variance of
+  `4.0e-310`, where both raised a `ValueError`; in `[0, 1]` at `1e155`,
+  `4.0e-312`, where they raised a `RuntimeError` that a derivative may be too
+  large for its square. A variance below the smallest number raises a
+  `RuntimeError` that names the parameter whose curvature is too large for its
+  covariance to be a number, where `Sandwich` raised a `ValueError` of a
+  covariance that is not positive definite. A variance above the largest number
+  raises that `ValueError` from `Laplace`, where its covariance held `inf`, and
+  `LaplaceMixture` notes the end that has it. `InformationMatchingEta` raises a
+  `RuntimeError` when the scores are too small against the curvature for `η`
+  to be a number, as for the sum of squares of a line through data of size
+  `1e-156`, where it gave `inf`, which `GibbsPosterior` refused with a
+  `ValueError`, or said that the scores were all 0. The notes of a curvature
+  give the share of the error only, as "The curvature of ('c', 'c') has an
+  estimated error of 42.5% of the scale of its row and column", or "more than
+  100%".
+  Before, they gave the entry and its error on the unbounded scale and a share
+  of up to about 150 digits, or "inf%". In Rust, `Curvature::matrix`,
+  `gradients` and `block_matrix` are `scaled_matrix`, `scaled_gradients` and
+  `scaled_block_matrix`, in the units of `Curvature::scales`;
+  `local::block_scores` is `scaled_block_scores`; `local::block_meat` is
+  removed; `Curvature::names` is new; and `Transform::derivatives` is finite
+  and not 0 for any width of the bounds that is a number. See
+  [The curvature and the unbounded scale](../guide/uncertainty/local.md#the-curvature-and-the-unbounded-scale).
+
+- `Laplace`, `Sandwich` and `InformationMatchingEta` refuse a curvature that
+  the data do not determine by one rule, that of the collinearity index, and
+  with one `ValueError`, and `LaplaceMixture` gives no component for such an
+  end: the curvature scaled to a diagonal of 1 has a smallest eigenvalue of at
+  most `p·ε` times the largest, for `p` parameters. A diagonal entry that is
+  only the rounding of its sum is 0, so a parameter that the parts of a window
+  read and their total does not is refused too. Before, the sign of a rounding
+  decided. With two parameters that the model reads only through their product
+  (`A → B` at `k1 · k2 · A`, 20 and 200 positions, 20 draws of the noise),
+  `Laplace` gave standard deviations of about `1e5` to `1e6` for 7 or 8 of 20,
+  and `Sandwich` for 2 to 4, or a `ValueError` of their covariance;
+  `LaplaceMixture` raised a `RuntimeError` that every importance weight is 0
+  for 7 or 8; and `InformationMatchingEta` a `ValueError` that blamed the
+  blocks or a `RuntimeError` of a sampler whose moves accept nothing. The rule
+  sees such a product only with derivatives exact enough: the error of finite
+  differences, as with an ODE or a long series, can still hide it.
+  `InformationMatchingEta` raised a `RuntimeError` for a parameter that the
+  data do not read. `Sandwich` gives the covariance of two parameters that the
+  data tell apart by little, where it raised a `ValueError` of a covariance
+  that is not positive definite. `LaplaceMixture` marks its sample unreliable
+  for any end that gives no component and fits at least as well as its worst
+  component, not only one on a bound, and its note says so. In Rust,
+  `Curvature::inverse`, `local::InverseCurvature`,
+  `commol_statistics::linear_algebra::singular` and `symmetric_inverse` and
+  `commol_statistics::numeric::CompensatedSum` are new, and
+  `information_matching_eta` returns `MethodError::Invalid` for a singular
+  curvature. See
+  [The curvature and the unbounded scale](../guide/uncertainty/local.md#the-curvature-and-the-unbounded-scale).
+
 - A `"pulse"` series acts on step 0 with a point at `-0.0`, in every engine,
   as `"step_function"` and `"linear"` do. Before, the point was accepted and
   never read, so the pulse at step 0 did nothing, with no message. In Rust,
@@ -950,9 +1024,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mean of 0, raises a `ValueError` from the local methods, the sandwich and
   information matching. The error names the observation and says whether
   the fit is outside the support of its observation model. Before, it
-  reached them as a NaN. `InformationMatchingEta` reports a curvature that
-  is singular to working precision as singular. Before, it reported that
-  the scores were all 0.
+  reached them as a NaN.
 
 - A prediction or a derivative that is not finite at the fit, such as a
   difference of finite runs that overflows, raises a `RuntimeError` from
@@ -972,7 +1044,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `LaplaceMixture` whose matrix was right is refused too: one with
   `curvature="hessian"` or, in Rust, one with the entry in a term of weight 0.
   The error of a curvature that is not finite with finite derivatives says
-  that a derivative may be too large for its square. In Rust,
+  that a mean sits on the edge of the means its observation model allows. In
+  Rust,
   `Curvature::gauss_newton` and `Curvature::hessian` return
   `MethodError::Failed`, also where they returned `MethodError::Invalid` at a
   prediction or a derivative that is not finite, and

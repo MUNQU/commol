@@ -244,8 +244,9 @@ class ImportanceResult(ResultModel):
     effective_size : float
         Kish's effective size of the smoothed weights.
     reliable : bool
-        Whether ``k_hat`` is at most 0.7. An unreliable sample is also
-        logged as a warning.
+        Whether ``k_hat`` is at most 0.7 and no end that gives no component
+        fits at least as well as the worst component. An unreliable sample is
+        also logged as a warning.
     notes : list[str]
         Ends that gave no component, and an unreliable sample, in words.
     """

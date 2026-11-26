@@ -28,6 +28,7 @@ from tests.support import (
     sum_calibrator,
     normal_values,
     structural_zero_calibrator,
+    weak_parameter_calibrator,
 )
 
 
@@ -175,6 +176,27 @@ class TestInformationMatching:
         (note,) = one.uncertainty(_matching(block_length=1)).diagnostics.notes
         assert "ν = 5 (block_length 1)" in note
         assert "Shorter blocks" not in note
+
+    @pytest.mark.parametrize("scale", [1e-157, 1e-160, 1e-200, 1e-300])
+    def test_information_matching_does_not_depend_on_the_scale_of_a_parameter(
+        self, scale: float
+    ) -> None:
+        # The residuals and the derivatives of D are proportional to the scale,
+        # which leaves η, its degrees of freedom and their note as they are:
+        # the curvature of k2 on the unbounded scale, about 8e3 scale², is
+        # below the smallest normal number from about 1.6e-156, and below any
+        # number from about 1e-164.
+        matching = _matching(block_length=4)
+        expected = weak_parameter_calibrator(1e-30, own_bin=True).uncertainty(matching)
+
+        result = weak_parameter_calibrator(scale, own_bin=True).uncertainty(matching)
+
+        assert result.eta == pytest.approx(expected.eta, rel=1e-9)
+        assert result.degrees_of_freedom == pytest.approx(
+            expected.degrees_of_freedom, rel=1e-9
+        )
+        assert len(expected.diagnostics.notes) == 1
+        assert result.diagnostics.notes == expected.diagnostics.notes
 
     @pytest.mark.parametrize(
         ("model", "reads_them"),

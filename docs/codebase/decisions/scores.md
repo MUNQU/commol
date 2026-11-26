@@ -4,7 +4,9 @@
 
 Where the scores, the Fisher information and the distribution functions of
 the observation models live, and what they give at the ends of a support. The
-methods that read them are on [Local approximations](local-approximations.md).
+methods that read them are on [Local approximations](local-approximations.md),
+and the curvature that reads the scores and the information is on
+[Curvature](curvature.md).
 
 ## Scores and information live in commol-calibration
 
@@ -42,8 +44,7 @@ parameter is not 0, and the results change with it.
 `Likelihood::term_derivatives` refuses a score that is not finite, as it
 refuses a mean outside its model, naming the observation
 (`MethodError::Invalid`): no probability at the fit, outside the support, or
-an overflow next to the edge. No reader of the terms sums a NaN. Information
-matching reads an inverse of the curvature that is not finite as singular.
+an overflow next to the edge. No reader of the terms sums a NaN.
 
 | Alternative | Why not |
 |---|---|
@@ -57,7 +58,7 @@ matching reads an inverse of the curvature that is not finite as singular.
 `crates/commol-calibration/tests/test_likelihood.rs::sums_of_parts_of_mean_zero_have_the_limit_of_their_scores`, `crates/commol-calibration/tests/test_likelihood.rs::terms_name_a_score_that_is_not_finite`,
 `crates/commol-inference/tests/test_local.rs::a_count_of_zero_at_a_mean_of_zero_adds_no_score`, `crates/commol-inference/tests/test_local.rs::a_count_with_no_probability_at_its_mean_has_no_curvature`,
 `tests/uncertainty/test_information_matching.py::TestInformationMatching::test_a_fitted_scale_reads_the_observations_of_mean_and_value_zero`,
-`tests/uncertainty/test_smc.py::test_the_blocks_ignore_observations_that_carry_no_information_at_shared_positions`, `tests/uncertainty/test_smc.py::test_information_matching_refuses_a_curvature_singular_to_working_precision`, `tests/uncertainty/test_profiles.py::test_a_count_of_zero_at_a_mean_of_zero_keeps_the_floors`,
+`tests/uncertainty/test_smc.py::test_the_blocks_ignore_observations_that_carry_no_information_at_shared_positions`, `tests/uncertainty/test_profiles.py::test_a_count_of_zero_at_a_mean_of_zero_keeps_the_floors`,
 `crates/commol-calibration/tests/test_likelihood.rs::scores_equal_the_differences_of_the_terms`,
 `crates/commol-inference/tests/test_local.rs::the_gradient_of_a_sum_is_that_of_its_density`,
 `crates/commol-inference/tests/test_local.rs::the_information_of_a_sum_is_that_of_its_density`,

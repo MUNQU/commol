@@ -203,7 +203,9 @@ inside a block, and `block_length` has no default: `block_length=1` gives
 the independent version, every observation its own block. `I` enters only
 through a trace, so `η` needs no inverse of `I`: it takes two blocks or more,
 also fewer blocks than parameters, and blocks can be long enough to hold the
-dependence.
+dependence. `J` is inverted, so a `J` that the data
+[do not determine](local.md#the-curvature-and-the-unbounded-scale) raises a
+`ValueError`. `η` is the same in any unit of the parameters.
 
 The blocks read at most `p(G − 1)` degrees of freedom `ν` about the scale,
 for `G` blocks, and fewer when they share the curvature `J` unevenly: a

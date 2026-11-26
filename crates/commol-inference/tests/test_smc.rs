@@ -993,10 +993,12 @@ fn information_matching_needs_two_blocks_and_scores_that_are_not_all_0() {
     assert!(error.to_string().contains("all 0"), "{error}");
 }
 
-/// The output `x0 = k0 + k1 · t` at every position `t`: a line.
+/// The output `x0 = k0 + unit · k1 · t` at every position `t`: a line, whose
+/// slope is `k1` units.
 #[derive(Clone, Debug)]
 struct Line {
     values: [f64; 2],
+    unit: f64,
 }
 
 impl SimulationEngine for Line {
@@ -1023,7 +1025,7 @@ impl SimulationEngine for Line {
         buffer.extend(
             positions
                 .iter()
-                .map(|&t| vec![self.values[0] + self.values[1] * t]),
+                .map(|&t| vec![self.values[0] + self.unit * self.values[1] * t]),
         );
         Ok(())
     }
@@ -1065,17 +1067,26 @@ impl SimulationEngine for Line {
 /// …, against the line `k0 + k1 · t`, `k0` in `[−20, 20]` and `k1` in
 /// `[−5, 5]`, with its fit: the least-squares line.
 fn line_problem(values: &[f64]) -> (CalibrationProblem<Line>, Vec<f64>) {
+    line_problem_in_units(values, 1.0)
+}
+
+/// [`line_problem`] with the slope in units of `unit`: `k1` and its bounds are
+/// divided by it, and the line is the same.
+fn line_problem_in_units(values: &[f64], unit: f64) -> (CalibrationProblem<Line>, Vec<f64>) {
     let observations = values
         .iter()
         .enumerate()
         .map(|(t, &value)| ObservedDataPoint::new(t as f64, "x0".to_string(), value))
         .collect();
     let problem = CalibrationProblem::new(
-        Line { values: [0.0; 2] },
+        Line {
+            values: [0.0; 2],
+            unit,
+        },
         observations,
         vec![
             CalibrationParameter::new("k0".to_string(), -20.0, 20.0),
-            CalibrationParameter::new("k1".to_string(), -5.0, 5.0),
+            CalibrationParameter::new("k1".to_string(), -5.0 / unit, 5.0 / unit),
         ],
         None,
         vec![],
@@ -1091,7 +1102,7 @@ fn line_problem(values: &[f64]) -> (CalibrationProblem<Line>, Vec<f64>) {
         stt += (t as f64 - mean_t) * (t as f64 - mean_t);
     }
     let slope = sty / stt;
-    (problem, vec![mean_y - slope * mean_t, slope])
+    (problem, vec![mean_y - slope * mean_t, slope / unit])
 }
 
 #[test]
@@ -1233,6 +1244,83 @@ fn information_matching_reads_the_degrees_of_freedom_of_its_blocks() {
         "{} {expected}",
         calibration.eta
     );
+}
+
+#[test]
+fn information_matching_does_not_depend_on_the_unit_of_a_parameter() {
+    // A unit that is a power of two rounds nothing, so every number is the
+    // same, bit for bit. The curvature of the slope is about 10⁴ unit²: below
+    // the smallest normal number at 2⁻⁵³⁰, below any number at 2⁻¹⁰⁰⁰, and
+    // above the largest from 2⁵¹⁰.
+    let values: Vec<f64> = (0..24)
+        .map(|t| 5.0 + 0.5 * t as f64 + (t * t % 7) as f64)
+        .collect();
+    let calibration = |unit: f64| {
+        let (problem, fit) = line_problem_in_units(&values, unit);
+        information_matching_eta(&problem, &fit, 4).unwrap()
+    };
+    let expected = calibration(1.0);
+
+    for exponent in [-1000, -540, -530, -300, 300, 530, 1000] {
+        assert_eq!(calibration(2f64.powi(exponent)), expected, "2^{exponent}");
+    }
+}
+
+#[test]
+fn information_matching_refuses_a_parameter_the_data_do_not_read() {
+    // `x0` alone is observed, and `k1` is the constant of `x1`.
+    let (read, fit) = means_problem(&[vec![5.0, 6.0, 4.0]]);
+    let problem = CalibrationProblem::new(
+        Means {
+            values: vec![0.0; 2],
+        },
+        read.observed_data().to_vec(),
+        (0..2)
+            .map(|i| CalibrationParameter::new(format!("k{i}"), 0.0, 20.0))
+            .collect(),
+        None,
+        vec![],
+        LossConfig::SumSquaredError,
+    )
+    .unwrap();
+
+    let error = information_matching_eta(&problem, &[fit[0], 2.0], 1).unwrap_err();
+
+    assert!(matches!(error, MethodError::Invalid(_)), "{error:?}");
+    assert!(
+        error
+            .to_string()
+            .starts_with("The curvature at the fit is not positive definite: the data"),
+        "{error}"
+    );
+}
+
+#[test]
+fn information_matching_refuses_scores_too_small_for_eta_to_be_a_number() {
+    // The sum of squares of these data times `size` has `η = 0.257 / size²`:
+    // 2.6e307 at 1e-154, above the largest number from 1e-155. From 1e-162
+    // the squares of the scores against the curvature are below the smallest
+    // number too.
+    let calibration = |size: f64| {
+        let values: Vec<f64> = (0..24)
+            .map(|t| size * (5.0 + 0.5 * t as f64 + (t * t % 7) as f64))
+            .collect();
+        let (problem, fit) = line_problem(&values);
+        information_matching_eta(&problem, &fit, 4)
+    };
+    assert!(calibration(1e-154).unwrap().eta > 2.5e307);
+
+    for size in [1e-156, 1e-170] {
+        let error = calibration(size).unwrap_err();
+
+        assert!(matches!(error, MethodError::Failed(_)), "{size}: {error:?}");
+        assert_eq!(
+            error.to_string(),
+            "The scores of the terms at the fit are all 0, as when the fit runs through every \
+             observation, or too small against the curvature for eta to be a number",
+            "{size}"
+        );
+    }
 }
 
 #[test]

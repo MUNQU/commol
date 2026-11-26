@@ -7,10 +7,12 @@
 //! - [`dependence`]: the autocovariances of a series with gaps, the robust
 //!   portmanteau and the integrated autocorrelation time of Geyer;
 //! - [`linear_algebra`]: the spectral radius of a square matrix, which the
-//!   model compiler reads;
-//! - [`numeric`]: `log Σ exp`, `x ln y` and `x ln(1 + y)`, the special
-//!   functions `ln Γ`, `ln B`, digamma and trigamma, and the log densities of
-//!   the normal, the log-normal and the Student t, one copy of each;
+//!   model compiler reads, and the inverse of a symmetric matrix with its rule
+//!   of what is singular, which the inference methods read;
+//! - [`numeric`]: `log Σ exp`, the compensated sum, `x ln y` and `x ln(1 + y)`,
+//!   the special functions `ln Γ`, `ln B`, digamma and trigamma, and the log
+//!   densities of the normal, the log-normal and the Student t, one copy of
+//!   each;
 //! - [`special`]: the normal distribution function and its quantile, the
 //!   regularized incomplete gamma and beta functions, and the quantiles of
 //!   the Student t and of the F of one degree of freedom;

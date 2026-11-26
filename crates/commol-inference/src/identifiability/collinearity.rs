@@ -21,6 +21,7 @@
 //! (its sensitivity measure is 0), or when a pair that holds it has an index
 //! at or above the threshold; otherwise it is determined.
 
+use commol_statistics::linear_algebra::singular;
 use commol_statistics::statistics::quantiles;
 use rayon::prelude::*;
 
@@ -104,12 +105,10 @@ pub fn collinearity_index(scaled: &Matrix, subset: &[usize]) -> f64 {
 fn index_of_normalized(normalized: &Matrix) -> f64 {
     let gram = normalized.transpose() * normalized;
     let eigenvalues = gram.symmetric_eigenvalues();
-    let smallest = eigenvalues.iter().copied().fold(f64::INFINITY, f64::min);
-    let largest = eigenvalues.iter().copied().fold(0.0, f64::max);
-    if smallest <= gram.nrows() as f64 * f64::EPSILON * largest {
+    if singular(&eigenvalues) {
         f64::INFINITY
     } else {
-        1.0 / smallest.sqrt()
+        1.0 / eigenvalues.min().sqrt()
     }
 }
 

@@ -19,14 +19,14 @@ use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
 use commol_inference::distribution::Family;
 use commol_inference::importance::TemperedPosterior;
 use commol_inference::local::{
-    Curvature, CurvatureKind, Gaussian, delta_band, laplace, laplace_mixture,
+    Curvature, CurvatureKind, Gaussian, curvature_at, delta_band, laplace, laplace_mixture,
     sandwich_approximation,
 };
 use commol_inference::psis::smooth;
 use commol_inference::sensitivity::{
-    Design, FiniteDifferences, Sensitivities, SensitivityError, SensitivitySource,
+    Design, FiniteDifferences, Matrix, Sensitivities, SensitivityError, SensitivitySource,
 };
-use commol_inference::smc::LikelihoodTarget;
+use commol_inference::smc::{LikelihoodTarget, information_matching_eta};
 use commol_inference::target::Target;
 use commol_inference::transform::Transform;
 use commol_inference::{MethodError, Priors};
@@ -44,6 +44,19 @@ enum Shape {
     /// One output `x = a·t + b·t²`, whose increments over equal parts grow
     /// along the axis.
     Quadratic,
+    /// One output `x = a + unit·b·t`: a line whose slope is `b` units.
+    Units(f64),
+    /// Two outputs, `x = a` and `y = unit·(b (1 + t) + a)`.
+    Coupled(f64),
+    /// One output `x = a·b·(1 + t)`, which reads `a` and `b` only as their
+    /// product.
+    Product,
+    /// Two outputs, `x = a + b·t` and `y = b`.
+    LineAndSlope,
+    /// One cumulative output `x = a·(t + b·(1 − cos 2πt)/2π)`: its increment
+    /// over a window from one whole position to the next does not read `b`,
+    /// and its increments over the parts of that window do.
+    Wave,
 }
 
 /// An engine whose outputs at a position `t` are a closed form of its
@@ -99,6 +112,14 @@ impl SimulationEngine for Curve {
             Shape::Square => vec![a * a],
             Shape::Banana => vec![a, b + a * a],
             Shape::Quadratic => vec![a * t + b * t * t],
+            Shape::Units(unit) => vec![a + unit * b * t],
+            Shape::Coupled(unit) => vec![a, unit * (b * (1.0 + t) + a)],
+            Shape::Product => vec![a * b * (1.0 + t)],
+            Shape::LineAndSlope => vec![a + b * t, b],
+            Shape::Wave => {
+                let tau = std::f64::consts::TAU;
+                vec![a * (t + b * (1.0 - (tau * t).cos()) / tau)]
+            }
         }));
         Ok(())
     }
@@ -109,8 +130,10 @@ impl SimulationEngine for Curve {
 
     fn output_names(&self) -> Vec<String> {
         match self.shape {
-            Shape::Line | Shape::Square | Shape::Quadratic => vec!["x".to_string()],
-            Shape::Banana => vec!["x".to_string(), "y".to_string()],
+            Shape::Banana | Shape::Coupled(_) | Shape::LineAndSlope => {
+                vec!["x".to_string(), "y".to_string()]
+            }
+            _ => vec!["x".to_string()],
         }
     }
 
@@ -209,6 +232,14 @@ fn line_information(fit: &[f64]) -> [[f64; 3]; 3] {
     information
 }
 
+/// The curvature `H_u = S Ĥ S` on the unbounded scale.
+fn on_the_unbounded_scale(curvature: &Curvature) -> nalgebra::DMatrix<f64> {
+    let (scales, matrix) = (curvature.scales(), curvature.scaled_matrix());
+    nalgebra::DMatrix::from_fn(scales.len(), scales.len(), |j, k| {
+        scales[j] * matrix[(j, k)] * scales[k]
+    })
+}
+
 fn assert_matrix(actual: &nalgebra::DMatrix<f64>, expected: &[[f64; 3]; 3], relative: f64) {
     for j in 0..3 {
         for k in 0..3 {
@@ -231,8 +262,11 @@ fn curvatures_of_a_linear_model_equal_the_information() {
 
     let curvature = Curvature::gauss_newton(&problem, &source, &fit).unwrap();
 
-    assert_matrix(curvature.matrix(), &line_information(&fit), 1e-8);
+    let matrix = on_the_unbounded_scale(&curvature);
+    assert_matrix(&matrix, &line_information(&fit), 1e-8);
     assert!(curvature.notes().is_empty(), "{:?}", curvature.notes());
+    let identity = laplace(&curvature).unwrap().covariance() * matrix;
+    assert!((identity - nalgebra::DMatrix::identity(3, 3)).amax() < 1e-9);
 }
 
 #[test]
@@ -265,7 +299,54 @@ fn the_hessian_of_a_linear_model_equals_the_information() {
     let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
     let curvature = Curvature::hessian(&problem, &source, &fit).unwrap();
 
-    assert_matrix(curvature.matrix(), &line_information(&fit), 1e-5);
+    let matrix = on_the_unbounded_scale(&curvature);
+    assert_matrix(&matrix, &line_information(&fit), 1e-5);
+}
+
+#[test]
+fn a_hessian_keeps_the_scores_and_the_blocks_of_gauss_newton() {
+    // Its units are not those of Gauss–Newton, and on the unbounded scale both
+    // have the same scores and blocks.
+    let problem = line_problem();
+    let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+    let fit = [1.1, 0.48, 0.4];
+    let expected = Curvature::gauss_newton(&problem, &source, &fit).unwrap();
+    let curvature = Curvature::hessian(&problem, &source, &fit).unwrap();
+
+    assert_ne!(curvature.scales(), expected.scales());
+    let block = [0, 3, 4];
+    let read = |curvature: &Curvature| {
+        let scales = nalgebra::DMatrix::from_diagonal(&curvature.scales().to_vec().into());
+        (
+            curvature.scaled_gradients() * &scales,
+            &scales * curvature.scaled_block_matrix(&block) * &scales,
+        )
+    };
+    let (gradients, matrix) = read(&curvature);
+    let (expected_gradients, expected_matrix) = read(&expected);
+    assert!((gradients - &expected_gradients).amax() < 1e-12 * expected_gradients.amax());
+    assert!((matrix - &expected_matrix).amax() < 1e-12 * expected_matrix.amax());
+}
+
+#[test]
+fn a_scale_is_a_power_of_two_times_the_derivative_of_its_parameter() {
+    // So that the units of a curvature round nothing.
+    let problem = line_problem();
+    let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+    let fit = [1.1, 0.48, 0.4];
+    let derivatives = Transform::new(&problem.parameter_bounds()).derivatives(&fit);
+    for curvature in [
+        Curvature::gauss_newton(&problem, &source, &fit).unwrap(),
+        Curvature::hessian(&problem, &source, &fit).unwrap(),
+    ] {
+        for (scale, derivative) in curvature.scales().iter().zip(&derivatives) {
+            assert_eq!(
+                libm::frexp(scale / derivative).0,
+                0.5,
+                "{scale} {derivative}"
+            );
+        }
+    }
 }
 
 #[test]
@@ -377,6 +458,36 @@ fn mixture_finds_both_modes_in_proportion() {
     assert!(run.reliable, "{}", run.sample.k_hat);
 }
 
+#[test]
+fn a_component_reads_the_curvature_of_the_target() {
+    // The target is 3 times as curved as the objective.
+    let problem = line_problem();
+    let names = problem.parameter_names();
+    let bounds = problem.parameter_bounds();
+    let fit = [1.1, 0.48, 0.4];
+    let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+    let curvature = Curvature::gauss_newton(&problem, &source, &fit).unwrap();
+    let priors = Priors::uniform_on_bounds(&names, &bounds).unwrap();
+    let target = LikelihoodTarget::new(&problem, &priors).unwrap();
+
+    let run = laplace_mixture(
+        &problem,
+        &TemperedPosterior::new(&target, 3),
+        3.0,
+        &[fit.to_vec()],
+        100,
+        CurvatureKind::GaussNewton,
+        3,
+        &NoSteps,
+    )
+    .unwrap();
+
+    let laplace = laplace(&curvature).unwrap();
+    let expected = laplace.covariance() / 3.0;
+    let covariance = run.components[0].gaussian.covariance();
+    assert!((covariance - &expected).amax() < 1e-12 * expected.amax());
+}
+
 /// `x = a²` observed near 4 with `a` in `[−5, 1.5]`: the positive optimum
 /// 2 lies beyond the upper bound, so a start ends on it.
 fn square_on_a_bound() -> (CalibrationProblem<Curve>, Priors) {
@@ -445,7 +556,7 @@ fn an_end_on_a_bound_better_than_a_component_marks_the_sample_unreliable() {
     assert!(
         run.notes
             .iter()
-            .any(|note| note.contains("misses an optimum on a bound")),
+            .any(|note| note.contains("misses an optimum that gives no component")),
         "{:?}",
         run.notes
     );
@@ -630,13 +741,13 @@ fn every_scale_maps_the_curvature_by_its_derivative() {
         Curvature::gauss_newton(&problem, &source, &fit).unwrap(),
         Curvature::hessian(&problem, &source, &fit).unwrap(),
     ] {
+        let matrix = on_the_unbounded_scale(&curvature);
         for j in 0..2 {
             for k in 0..2 {
                 let scale = (expected[j][j] * expected[k][k]).sqrt();
                 assert!(
-                    (curvature.matrix()[(j, k)] - expected[j][k]).abs() < 1e-5 * scale,
-                    "({j}, {k}): {}",
-                    curvature.matrix()
+                    (matrix[(j, k)] - expected[j][k]).abs() < 1e-5 * scale,
+                    "({j}, {k}): {matrix}"
                 );
             }
         }
@@ -704,7 +815,11 @@ fn a_mean_on_the_edge_of_its_model_has_no_finite_curvature() {
     let error = Curvature::gauss_newton(&problem, &source, &[0.0]).unwrap_err();
 
     assert!(matches!(error, MethodError::Failed(_)));
-    assert!(error.to_string().contains("not finite"), "{error}");
+    assert_eq!(
+        error.to_string(),
+        "The curvature at the fit is not finite: a mean sits on the edge of the means its \
+         observation model allows"
+    );
 }
 
 /// The Poisson counts of `x = a·t`, `a` in `[−1, 5]`, `b = 0`: `first` at
@@ -729,7 +844,7 @@ fn a_count_of_zero_at_a_mean_of_zero_adds_no_score() {
 
     let curvature = Curvature::gauss_newton(&problem, &source, &[7.0 / 6.0]).unwrap();
 
-    let gradients = curvature.gradients();
+    let gradients = curvature.scaled_gradients();
     assert_eq!(gradients[(0, 0)], 0.0);
     // The other terms keep their scores, which sum to 0 at the fit.
     assert!(
@@ -967,24 +1082,146 @@ fn a_loss_with_no_curvature_is_refused_before_a_derivative_that_is_not_finite() 
     );
 }
 
+/// `x = a + b·t` at the positions 0 to 8 with noise of sd 0.5, and at 4 the
+/// series `far` of `y = b`, `scale` times its value, with noise of sd 1, seen
+/// at its prediction at `fit`.
+fn line_and_slope(scale: f64, fit: [f64; 2]) -> CalibrationProblem<Curve> {
+    let values = [0.1, 0.3, 0.2, 0.6, 0.5, 0.8, 0.7, 1.0, 0.9];
+    let mut data = observed("x", &values);
+    let mut far = ObservedDataPoint::new(4.0, "y".to_string(), scale * fit[1]);
+    far.label = "far".to_string();
+    far.scale = scale;
+    data.push(far);
+    CalibrationProblem::new(
+        Curve::new(Shape::LineAndSlope),
+        data,
+        vec![
+            CalibrationParameter::new("a".to_string(), -1.0, 1.0),
+            CalibrationParameter::new("b".to_string(), -1.0, 1.0),
+        ],
+        None,
+        vec![],
+        DiscrepancyConfig::Likelihood(vec![
+            normal("x", Argument::Value(0.5)),
+            normal("far", Argument::Value(1.0)),
+        ]),
+    )
+    .unwrap()
+}
+
 #[test]
-fn a_derivative_too_large_for_its_square_has_no_finite_curvature() {
-    // The derivative 3 scale of scale (a + b t) at t = 3 is finite and its
-    // square is not.
-    for scale in [1e154, 1e157] {
-        let problem = line_and_far(scale, 1.0, 1.0);
+fn a_covariance_is_given_until_the_curvature_is_too_large_for_it() {
+    // The curvature of b is about scale², so its variance is about 1/scale²
+    // in the Laplace approximation, a number below the smallest normal one at
+    // 1e157 and below any number at 1e200. In the sandwich, which reads the
+    // scores of x alone, it is about 1/scale⁴, below the smallest normal number
+    // at 1e78. With bounds that do not move, a derivative whose square is above
+    // the largest number is read in its unit.
+    let fit = [0.05, 0.1];
+    let refused = MethodError::Failed(
+        "The curvature of 'b' at the fit is too large for its covariance to be a number: its \
+         variance on the unbounded scale is below the smallest number"
+            .to_string(),
+    );
+    let laplace_of = |scale: f64| {
+        let problem = line_and_slope(scale, fit);
         let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+        laplace(&Curvature::gauss_newton(&problem, &source, &fit).unwrap())
+    };
+    let sandwich_of = |scale: f64| {
+        sandwich_approximation(
+            &line_and_slope(scale, fit),
+            &fit,
+            CurvatureKind::GaussNewton,
+            1,
+        )
+    };
+    let eta_of = |scale: f64| information_matching_eta(&line_and_slope(scale, fit), &fit, 1);
 
-        let error = Curvature::gauss_newton(&problem, &source, &[0.0, 0.0]).unwrap_err();
-
-        assert!(matches!(error, MethodError::Failed(_)), "{error:?}");
+    let variance = laplace_of(1e157).unwrap().covariance()[(1, 1)];
+    assert!(variance > 0.0 && variance < f64::MIN_POSITIVE, "{variance}");
+    let variance = sandwich_of(1e78).unwrap().gaussian.covariance()[(1, 1)];
+    assert!(variance > 0.0 && variance < f64::MIN_POSITIVE, "{variance}");
+    for scale in [1e200, 1e300] {
+        assert_eq!(laplace_of(scale).unwrap_err(), refused, "{scale:e}");
+        assert_eq!(sandwich_of(scale).unwrap_err(), refused, "{scale:e}");
+    }
+    let expected = eta_of(1e10).unwrap();
+    for scale in [1e157, 1e200, 1e300] {
+        let calibration = eta_of(scale).unwrap();
         assert!(
-            error
-                .to_string()
-                .ends_with("or a derivative is too large for its square"),
-            "{error}"
+            (calibration.eta / expected.eta - 1.0).abs() < 1e-12,
+            "{scale:e}: {} against {}",
+            calibration.eta,
+            expected.eta
         );
     }
+}
+
+#[test]
+fn a_sandwich_whose_scores_are_all_0_is_refused_by_its_covariance() {
+    // The data lie on the line: every residual and every block score at the
+    // fit is 0, so the sandwich is 0, which is no curvature too large for it.
+    let values: Vec<f64> = (0..8).map(|t| 1.0 + 0.5 * t as f64).collect();
+    let problem = CalibrationProblem::new(
+        Curve::new(Shape::Line),
+        observed("x", &values),
+        vec![
+            CalibrationParameter::new("a".to_string(), -10.0, 10.0),
+            CalibrationParameter::new("b".to_string(), -5.0, 5.0),
+        ],
+        None,
+        vec![],
+        DiscrepancyConfig::Likelihood(vec![normal("x", Argument::Value(0.5))]),
+    )
+    .unwrap();
+
+    let error =
+        sandwich_approximation(&problem, &[1.0, 0.5], CurvatureKind::GaussNewton, 2).unwrap_err();
+
+    assert!(matches!(error, MethodError::Invalid(_)), "{error:?}");
+    assert!(
+        error
+            .to_string()
+            .starts_with("The covariance is not positive definite"),
+        "{error}"
+    );
+}
+
+#[test]
+fn a_term_of_no_weight_adds_nothing_whatever_its_derivative() {
+    // The derivative 3·10³⁰⁷ of the term of weight 0 is a number, and no
+    // number in the unit of b, whose other derivatives are at most 2.
+    let curvature = |scale: f64| {
+        let values = [0.1, 0.2, 0.1, 1.0];
+        let mut data = observed("x", &values);
+        data[3].label = "far".to_string();
+        data[3].scale = scale;
+        let problem = CalibrationProblem::new(
+            Curve::new(Shape::Line),
+            data,
+            vec![
+                CalibrationParameter::new("a".to_string(), -1.0, 1.0),
+                CalibrationParameter::new("b".to_string(), -1.0, 1.0),
+            ],
+            None,
+            vec![],
+            DiscrepancyConfig::Likelihood(vec![
+                normal("x", Argument::Value(100.0)),
+                normal("far", Argument::Value(1.0)),
+            ]),
+        )
+        .unwrap()
+        .with_data(&values, &[1.0, 1.0, 1.0, 0.0])
+        .unwrap();
+        let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+        Curvature::gauss_newton(&problem, &source, &[0.0, 0.01]).unwrap()
+    };
+    let (expected, far) = (curvature(1.0), curvature(1e307));
+
+    assert_eq!(far.scaled_matrix(), expected.scaled_matrix());
+    assert_eq!(far.scaled_gradients(), expected.scaled_gradients());
+    assert_eq!(far.scales(), expected.scales());
 }
 
 #[test]
@@ -1056,6 +1293,128 @@ fn an_end_whose_curvature_is_singular_gives_no_component() {
 }
 
 #[test]
+fn a_refused_end_that_fits_best_marks_the_sample_unreliable() {
+    // x = a² observed near 0: the end 0 fits best and its curvature is 0, so
+    // the mixture keeps the end 1 alone and misses the optimum.
+    let problem = CalibrationProblem::new(
+        Curve::new(Shape::Square),
+        observed("x", &[0.1, -0.1, 0.05]),
+        vec![CalibrationParameter::new("a".to_string(), -5.0, 5.0)],
+        None,
+        vec![],
+        DiscrepancyConfig::Likelihood(vec![normal("x", Argument::Value(0.5))]),
+    )
+    .unwrap();
+    let priors = Priors::uniform_on_bounds(&["a".to_string()], &[(-5.0, 5.0)]).unwrap();
+    let target = LikelihoodTarget::new(&problem, &priors).unwrap();
+
+    let run = laplace_mixture(
+        &problem,
+        &TemperedPosterior::new(&target, 1),
+        1.0,
+        &[vec![0.0], vec![1.0]],
+        200,
+        CurvatureKind::GaussNewton,
+        1,
+        &NoSteps,
+    )
+    .unwrap();
+
+    assert_eq!(run.components.len(), 1);
+    assert_eq!(run.components[0].center, vec![1.0]);
+    assert!(!run.reliable);
+    assert!(
+        run.notes.iter().any(|note| note.starts_with(
+            "The mixture misses an optimum that gives no component and fits at least as \
+             well as its worst component"
+        ) && note.contains("[0.0]")),
+        "{:?}",
+        run.notes
+    );
+}
+
+/// The increments of [`Shape::Wave`] over the windows of the positions 1 to
+/// 30, each split into `parts` parts, at `fit` and with noise.
+fn wave_in_parts(parts: usize, fit: [f64; 2], seed: u64) -> CalibrationProblem<Curve> {
+    let tau = std::f64::consts::TAU;
+    let total = |t: f64| fit[0] * (t + fit[1] * (1.0 - (tau * t).cos()) / tau);
+    let mut generator = commol_random::Generator::from_seed(seed);
+    let data = (1..=30)
+        .map(|n| {
+            let at = n as f64;
+            let value = total(at) - total(at - 1.0) + 0.1 * (generator.open_uniform() - 0.5);
+            let mut point = ObservedDataPoint::with_window(at, "x".to_string(), value, 1.0);
+            point.parts = parts;
+            point
+        })
+        .collect();
+    CalibrationProblem::new(
+        Curve::new(Shape::Wave),
+        data,
+        vec![
+            CalibrationParameter::new("a".to_string(), 0.1, 3.0),
+            CalibrationParameter::new("b".to_string(), -1.0, 1.0),
+        ],
+        None,
+        vec![],
+        DiscrepancyConfig::Likelihood(vec![normal("x", Argument::Value(0.3))]),
+    )
+    .unwrap()
+}
+
+#[test]
+fn a_parameter_read_only_by_parts_that_cancel_is_refused_by_every_method() {
+    // The total of each window does not read b, and each of its parts does:
+    // the curvature of b sums terms that cancel to a rounding of their size.
+    let mut generator = commol_random::Generator::from_seed(9);
+    for parts in [3, 12] {
+        for seed in 0..10 {
+            let fit = [
+                0.5 + generator.open_uniform(),
+                -0.8 + 1.6 * generator.open_uniform(),
+            ];
+            let problem = wave_in_parts(parts, fit, seed);
+            let priors =
+                Priors::uniform_on_bounds(&problem.parameter_names(), &problem.parameter_bounds())
+                    .unwrap();
+            let target = LikelihoodTarget::new(&problem, &priors).unwrap();
+            let curvature = curvature_at(&problem, &fit, CurvatureKind::GaussNewton).unwrap();
+            let mixture = laplace_mixture(
+                &problem,
+                &TemperedPosterior::new(&target, 1),
+                1.0,
+                &[fit.to_vec()],
+                100,
+                CurvatureKind::GaussNewton,
+                1,
+                &NoSteps,
+            );
+            let sandwich = sandwich_approximation(&problem, &fit, CurvatureKind::GaussNewton, 2);
+
+            assert_eq!(curvature.scaled_matrix()[(1, 1)], 0.0, "{parts} at {fit:?}");
+            for (method, outcome) in [
+                ("laplace", laplace(&curvature).err()),
+                ("sandwich", sandwich.err()),
+                ("mixture", mixture.err()),
+                (
+                    "information matching",
+                    information_matching_eta(&problem, &fit, 2).err(),
+                ),
+            ] {
+                let error = outcome.unwrap_or_else(|| panic!("{method}, {parts} at {fit:?}"));
+                assert!(
+                    matches!(error, MethodError::Invalid(_))
+                        && error.to_string().contains(
+                            "The curvature at the fit is not positive definite: the data"
+                        ),
+                    "{method}, {parts} at {fit:?}: {error}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn a_sandwich_needs_more_blocks_than_parameters() {
     let values: Vec<f64> = (0..8)
         .map(|t| 1.0 + 0.5 * t as f64 + [0.3, -0.2, 0.1, -0.4][t % 4])
@@ -1084,6 +1443,225 @@ fn a_sandwich_needs_more_blocks_than_parameters() {
     let run = sandwich_approximation(&problem, &fit, CurvatureKind::GaussNewton, 3).unwrap();
     assert_eq!((run.blocks, run.block_length), (3, 3));
     assert_eq!(run.gaussian.degrees_of_freedom(), Some(2.0));
+}
+
+/// The line `x = a + unit·b·t` observed at eight positions, with a normal
+/// model of sd `sd`, and a point near its fit.
+fn line_in_units(unit: f64, sd: f64) -> (CalibrationProblem<Curve>, [f64; 2]) {
+    let values: Vec<f64> = (0..8)
+        .map(|t| 1.0 + 0.5 * t as f64 + [0.3, -0.2, 0.1, -0.4][t % 4])
+        .collect();
+    let problem = CalibrationProblem::new(
+        Curve::new(Shape::Units(unit)),
+        observed("x", &values),
+        vec![
+            CalibrationParameter::new("a".to_string(), -10.0, 10.0),
+            CalibrationParameter::new("b".to_string(), -5.0 / unit, 5.0 / unit),
+        ],
+        None,
+        vec![],
+        DiscrepancyConfig::Likelihood(vec![normal("x", Argument::Value(sd))]),
+    )
+    .unwrap();
+    (problem, [1.0, 0.5 / unit])
+}
+
+/// The covariances of the Laplace approximation and of the sandwich, with
+/// blocks of 2, of [`line_in_units`] with the curvature `kind`.
+fn covariances_in_units(unit: f64, sd: f64, kind: CurvatureKind) -> [Matrix; 2] {
+    let (problem, fit) = line_in_units(unit, sd);
+    let curvature = curvature_at(&problem, &fit, kind).unwrap();
+    let sandwich = sandwich_approximation(&problem, &fit, kind, 2).unwrap();
+    [
+        laplace(&curvature).unwrap().covariance().clone(),
+        sandwich.gaussian.covariance().clone(),
+    ]
+}
+
+#[test]
+fn a_covariance_does_not_depend_on_the_unit_of_a_parameter() {
+    // A unit that is a power of two rounds nothing, and the bounds of b move
+    // with it, so on the unbounded scale every number is the same, bit for
+    // bit. On the scale of b its curvature is below the smallest normal number
+    // at 2⁻⁵³⁰, below any number at 2⁻¹⁰⁰⁰, and above the largest from 2⁵¹⁰.
+    for (kind, exponents) in [
+        (
+            CurvatureKind::GaussNewton,
+            &[-1000, -530, -300, 300, 530, 1000][..],
+        ),
+        (CurvatureKind::Hessian, &[-1000, 1000][..]),
+    ] {
+        let expected = covariances_in_units(1.0, 0.5, kind);
+        for &exponent in exponents {
+            assert_eq!(
+                covariances_in_units(2f64.powi(exponent), 0.5, kind),
+                expected,
+                "{kind:?} at 2^{exponent}"
+            );
+        }
+    }
+}
+
+#[test]
+fn a_unit_holds_a_derivative_whose_product_with_the_root_of_its_information_overflows() {
+    // With an sd of 2⁻³⁰ the root of the information is 2³⁰, and at 2¹⁰⁰⁰
+    // its product with the derivative 7·2¹⁰⁰⁰ of the last mean by b is above
+    // the largest number, while both are finite.
+    let sd = 2f64.powi(-30);
+    for kind in [CurvatureKind::GaussNewton, CurvatureKind::Hessian] {
+        assert_eq!(
+            covariances_in_units(2f64.powi(1000), sd, kind),
+            covariances_in_units(1.0, sd, kind),
+            "{kind:?}"
+        );
+    }
+}
+
+#[test]
+fn a_sandwich_reads_scores_whose_squares_underflow() {
+    // x = a has noise of sd 1/2, and y = unit·(b (1 + t) + a) has noise of sd 1
+    // and data in the same unit: the scores and the curvature that y gives are
+    // in unit², so their quotient does not depend on it, and the square of a
+    // score is below any number from 2⁻³⁰⁰ on and above the largest from 2²⁵⁶.
+    // From 2⁵¹² the square of a residual is above it too, and the likelihood
+    // has no value.
+    // With a small unit only x reads a, and b follows the change of a by its
+    // coupling in y; with a large unit only y reads both.
+    let x = [0.9, 1.3, 0.7, 1.2, 1.1, 0.6];
+    let y = [1.2, 2.3, 2.1, 3.4, 3.2, 4.6];
+    let fit = [1.0, 0.5];
+    let d = [
+        logit_derivative(fit[0], -10.0, 10.0),
+        logit_derivative(fit[1], -5.0, 5.0),
+    ];
+    let reads = |t: usize| 1.0 + t as f64;
+    let coupling: f64 = (0..6).map(reads).sum();
+    let curvature: f64 = (0..6).map(|t| reads(t) * reads(t)).sum();
+    let determinant = 6.0 * curvature - coupling * coupling;
+    let expected = |small: bool| {
+        let mut expected = [[0.0; 2]; 2];
+        for t in 0..6 {
+            let residual = y[t] - fit[1] * reads(t) - fit[0];
+            let influence = if small {
+                let first = -(x[t] - fit[0]) / 6.0;
+                [first, (-residual * reads(t) - coupling * first) / curvature]
+            } else {
+                [
+                    residual * (coupling * reads(t) - curvature) / determinant,
+                    residual * (coupling - 6.0 * reads(t)) / determinant,
+                ]
+            };
+            for j in 0..2 {
+                for k in 0..2 {
+                    expected[j][k] += 6.0 / 5.0 * influence[j] / d[j] * influence[k] / d[k];
+                }
+            }
+        }
+        expected
+    };
+
+    for exponent in [-100, -300, -900, 300, 500] {
+        let unit = 2f64.powi(exponent);
+        let expected = expected(exponent < 0);
+        let mut data = observed("x", &x);
+        data.extend(observed("y", &y.map(|value| value * unit)));
+        let problem = CalibrationProblem::new(
+            Curve::new(Shape::Coupled(unit)),
+            data,
+            vec![
+                CalibrationParameter::new("a".to_string(), -10.0, 10.0),
+                CalibrationParameter::new("b".to_string(), -5.0, 5.0),
+            ],
+            None,
+            vec![],
+            DiscrepancyConfig::Likelihood(vec![
+                normal("x", Argument::Value(0.5)),
+                normal("y", Argument::Value(1.0)),
+            ]),
+        )
+        .unwrap();
+
+        let run = sandwich_approximation(&problem, &fit, CurvatureKind::GaussNewton, 1).unwrap();
+
+        let covariance = run.gaussian.covariance();
+        for j in 0..2 {
+            for k in 0..2 {
+                assert!(
+                    (covariance[(j, k)] / expected[j][k] - 1.0).abs() < 1e-8,
+                    "2^{exponent}, ({j}, {k}): {covariance} against {expected:?}"
+                );
+            }
+        }
+        assert_eq!(covariance[(0, 1)], covariance[(1, 0)]);
+    }
+}
+
+#[test]
+fn parameters_read_through_their_product_are_refused_by_every_method() {
+    // At these points and numbers of observations, the derivatives of the
+    // closed form are exact enough that the curvature of a and b has an
+    // eigenvalue of 0 but for rounding.
+    let mut generator = commol_random::Generator::from_seed(5);
+    let mut uniform = |low: f64, high: f64| low + (high - low) * generator.open_uniform();
+    for count in [8, 60, 400] {
+        for _ in 0..20 {
+            let fit = [uniform(0.1, 2.0), uniform(0.1, 2.0)];
+            let values: Vec<f64> = (0..count)
+                .map(|t| fit[0] * fit[1] * (1.0 + t as f64) + uniform(-1.0, 1.0))
+                .collect();
+            let names = ["a".to_string(), "b".to_string()];
+            let bounds = [(0.01, 5.0), (0.01, 5.0)];
+            let problem = CalibrationProblem::new(
+                Curve::new(Shape::Product),
+                observed("x", &values),
+                vec![
+                    CalibrationParameter::new("a".to_string(), 0.01, 5.0),
+                    CalibrationParameter::new("b".to_string(), 0.01, 5.0),
+                ],
+                None,
+                vec![],
+                DiscrepancyConfig::Likelihood(vec![normal("x", Argument::Value(0.3))]),
+            )
+            .unwrap();
+            let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+            let curvature = Curvature::gauss_newton(&problem, &source, &fit).unwrap();
+            let priors = Priors::uniform_on_bounds(&names, &bounds).unwrap();
+            let target = LikelihoodTarget::new(&problem, &priors).unwrap();
+            let mixture = laplace_mixture(
+                &problem,
+                &TemperedPosterior::new(&target, 1),
+                1.0,
+                &[fit.to_vec()],
+                100,
+                CurvatureKind::GaussNewton,
+                1,
+                &NoSteps,
+            );
+            let sandwich = sandwich_approximation(&problem, &fit, CurvatureKind::GaussNewton, 2);
+
+            for (method, outcome) in [
+                ("laplace", laplace(&curvature).err()),
+                ("sandwich", sandwich.err()),
+                ("mixture", mixture.err()),
+                (
+                    "information matching",
+                    information_matching_eta(&problem, &fit, 2).err(),
+                ),
+            ] {
+                let error = outcome.unwrap_or_else(|| panic!("{method}, {count} at {fit:?}"));
+                assert!(
+                    matches!(error, MethodError::Invalid(_)),
+                    "{method}: {error:?}"
+                );
+                assert!(
+                    error
+                        .to_string()
+                        .contains("The curvature at the fit is not positive definite: the data"),
+                    "{method}, {count} at {fit:?}: {error}"
+                );
+            }
+        }
+    }
 }
 
 #[test]
@@ -1466,7 +2044,7 @@ fn the_gradient_of_a_sum_is_that_of_its_density() {
         };
         for (j, &(lower, upper)) in bounds.iter().enumerate() {
             let expected = central(&term, &fit, j) * logit_derivative(fit[j], lower, upper);
-            let actual = curvature.gradients()[(i, j)];
+            let actual = curvature.scaled_gradients()[(i, j)] * curvature.scales()[j];
             assert!(
                 (actual - expected).abs() <= 1e-5 * expected.abs().max(1e-3),
                 "term {i}, parameter {j}: {actual} against {expected}"

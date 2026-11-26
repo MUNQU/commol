@@ -4,7 +4,7 @@ sandwich and the Laplace mixture, their settings and their results.
 Each reads the curvature of the objective at the fit on the unbounded scale
 of the parameters (the logit of a parameter between two bounds, a log with
 one bound, the identity with none), so every draw maps back inside the
-bounds.
+bounds. A curvature that the data do not determine is refused.
 """
 
 from typing import Annotated, Literal

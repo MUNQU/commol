@@ -30,16 +30,17 @@ impl Gaussian {
     ///
     /// # Errors
     ///
-    /// [`MethodError::Invalid`] when the covariance is not positive definite.
+    /// [`MethodError::Invalid`] when the covariance is not positive definite,
+    /// or an entry is not finite.
     pub fn new(
         transform: Transform,
         center: Vec<f64>,
         covariance: Matrix,
         degrees_of_freedom: Option<f64>,
     ) -> Result<Self, MethodError> {
-        let factor = covariance
-            .clone()
-            .cholesky()
+        let factor = Some(&covariance)
+            .filter(|covariance| covariance.iter().all(|entry| entry.is_finite()))
+            .and_then(|covariance| covariance.clone().cholesky())
             .ok_or_else(|| {
                 MethodError::Invalid(
                     "The covariance is not positive definite: the data do not determine every \
@@ -139,36 +140,15 @@ impl Gaussian {
 ///
 /// # Errors
 ///
-/// [`MethodError::Invalid`] when the curvature is not positive definite.
+/// As [`Curvature::inverse`], [`super::InverseCurvature::covariance`] and
+/// [`Gaussian::new`].
 pub fn laplace(curvature: &Curvature) -> Result<Gaussian, MethodError> {
-    let covariance = inverse(curvature.matrix())?;
     Gaussian::new(
         curvature.transform().clone(),
         curvature.unbounded_fit().to_vec(),
-        covariance,
+        curvature.inverse()?.covariance(1.0)?,
         None,
     )
-}
-
-/// The inverse of a symmetric positive definite matrix, by its Cholesky
-/// factor.
-///
-/// # Errors
-///
-/// [`MethodError::Invalid`] when the matrix is not positive definite.
-pub(crate) fn inverse(matrix: &Matrix) -> Result<Matrix, MethodError> {
-    matrix
-        .clone()
-        .cholesky()
-        .map(|cholesky| cholesky.inverse())
-        .ok_or_else(|| {
-            MethodError::Invalid(
-                "The curvature at the fit is not positive definite: the data do not \
-                 determine every parameter there, or the fit is not a minimum. \
-                 Calibrator.identifiability(...) shows which parameters the data determine"
-                    .to_string(),
-            )
-        })
 }
 
 #[cfg(test)]
@@ -196,5 +176,21 @@ mod tests {
             * (1.0f64 + 1.0 / 3.0).powi(-2))
         .ln();
         assert!((gaussian(Some(3.0)).log_density(&[3.0]) - t).abs() < 1e-12);
+    }
+
+    #[test]
+    fn a_covariance_that_is_not_finite_is_refused() {
+        // A Cholesky factor of a diagonal of infinities exists, and draws from
+        // it are not numbers.
+        let transform = Transform::new(&[(f64::NEG_INFINITY, f64::INFINITY); 2]);
+        for entry in [f64::INFINITY, f64::NAN] {
+            let covariance = Matrix::from_row_slice(2, 2, &[1.0, 0.0, 0.0, entry]);
+            let error = Gaussian::new(transform.clone(), vec![0.0; 2], covariance, None);
+            assert!(
+                matches!(&error, Err(MethodError::Invalid(message))
+                    if message.starts_with("The covariance is not positive definite")),
+                "{entry}: {error:?}"
+            );
+        }
     }
 }

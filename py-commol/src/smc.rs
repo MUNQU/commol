@@ -277,8 +277,9 @@ fn calibrated_eta(
 ///     with its calibration
 ///
 /// Raises:
-///     ValueError: If a prior or a setting is not valid, or the problem
-///         does not fit the calibration of `η`
+///     ValueError: If a prior or a setting is not valid, the problem does
+///         not fit the calibration of `η`, or the curvature it reads is
+///         singular
 ///     RuntimeError: If the fit or a run fails, the calibration of `η`
 ///         fails, or the sampler stops before its target
 #[pyfunction]
