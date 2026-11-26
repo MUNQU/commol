@@ -901,6 +901,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   other scale. Before, their products passed the largest number, which made
   `Q̃` and its p-value NaN, or fell to 0, which left `Q̃` with no lag. A
   statistic that is NaN has no p-value.
+- A profile with a side that ends at `max_steps` gives a verdict only when
+  no longer side can change it: the other side ends at a bound or at an
+  unreachable prediction, and the points already show that the profile is
+  not flat, as when a side rises above the tolerance. That verdict is
+  `practically_non_identifiable`. `["crossed", "max_steps"]`,
+  `["max_steps", "max_steps"]` and a profile flat so far give no verdict
+  (`None`). Before, any side at `max_steps` gave
+  `practically_non_identifiable`, which the identifiability report read as
+  `poorly_determined`, so the limit of the computation set the verdict: the
+  quick path of the guide gave it with `max_steps` from 1 to 5, and
+  `identifiable` with 100. Resets of the other parameters that would prove
+  `non_identifiable` give no verdict with a side at `max_steps`
+  (`ProfileStructure.undetermined` is `"max_steps"`). With a stochastic
+  engine, a flat profile with a side at `max_steps` and a side at a bound
+  still reads `practically_non_identifiable`, but its
+  `ProfileStructure.undetermined` is now `"stochastic"`, not `"not_flat"`,
+  and a note says that a stochastic engine gives no structural verdict.
+  `Profile.undetermined` says
+  why a profile has no verdict: `"below_tolerance"` or `"max_steps"`. A note
+  names each side that ends at `max_steps`, with a verdict or without one.
+  `PracticalVerdict.verdict` may be `None`: `ProfileIdentifiability` gives
+  it, with the reason, to a profile with no verdict, which had no entry
+  before, and `merge` adds its reasons and leaves the verdicts of the other
+  reports. In Rust, `ProfileTracer::verdict` and `ProfileTracer::verdict_with`
+  return the verdict or its reason, a `NoVerdict`, `Profile::reading` gives
+  the same for the shape, `Undetermined::MaxSteps` is new, and
+  `Structure::non_identifiable` is gone.
+  See
+  [Verdicts](../guide/uncertainty/profiles.md#verdicts-and-the-identifiability-report).
 - Every method that refits around a fit refuses a fit that is not feasible,
   with a `ValueError` that says why: `BayesianBootstrap`, `ResidualBootstrap`,
   `WildBootstrap`, `BlockJackknife`, `RollingConformal`, `JackknifePlus`,

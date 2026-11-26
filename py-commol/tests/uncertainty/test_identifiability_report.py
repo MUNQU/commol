@@ -97,6 +97,30 @@ class TestReport:
             verdict="conflicting", reasons=["determined", "poorly_determined"]
         )
 
+    def test_merge_leaves_out_a_practical_verdict_of_none(self) -> None:
+        none = IdentifiabilityReport(
+            parameters=["k"],
+            verdicts={
+                "k": ParameterVerdicts(
+                    practical=PracticalVerdict(verdict=None, reasons=["no verdict"])
+                )
+            },
+        )
+
+        alone = none.merge(none)
+        merged = none.merge(_report(practical="determined"))
+
+        assert alone.verdicts["k"].practical == PracticalVerdict(
+            verdict=None, reasons=["no verdict", "no verdict"]
+        )
+        assert merged.verdicts["k"].practical == PracticalVerdict(
+            verdict="determined", reasons=["no verdict", "determined"]
+        )
+        assert none.report()["parameters"]["k"]["practical"] == {
+            "verdict": None,
+            "reasons": ["no verdict"],
+        }
+
     def test_merge_keeps_each_combination_once_in_order(self) -> None:
         def report(*combinations: str) -> IdentifiabilityReport:
             verdict = StructuralVerdict(

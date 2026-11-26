@@ -36,6 +36,9 @@ from tests.support import (
 
 # ``5 + 2 t`` at t = 1, …, 10 plus a fixed draw of unit noise.
 VALUES = [7.4, 8.6, 11.3, 12.8, 15.1, 16.4, 19.9, 20.6, 23.5, 24.7]
+# ``5 + 0.1 t`` at t = 1, …, 10 plus a fixed draw of noise: the slope sits
+# near its lower bound, 0.
+SHALLOW = [5.5, 4.8, 5.6, 5.2, 5.6, 5.2, 6.6, 5.4, 6.4, 5.7]
 RESET = "with the other parameters at their fitted values"
 
 
@@ -261,11 +264,16 @@ class TestShapes:
 
         assert result.profiles["c"].threshold <= result.tolerance
         assert result.verdicts["c"] is None
+        assert result.profiles["c"].undetermined == "below_tolerance"
         assert any(
             "'c'" in note and "below the numerical tolerance" in note
             for note in result.notes
         )
-        assert _profiled(calibrator, result).verdicts["c"].practical is None
+        practical = _profiled(calibrator, result).verdicts["c"].practical
+        assert practical is not None
+        assert practical.verdict is None
+        (reason,) = practical.reasons
+        assert "no verdict" in reason and "below the numerical tolerance" in reason
 
     def test_a_refit_below_the_fit_is_noted(self) -> None:
         # Three iterations of Nelder-Mead leave the fit far from the optimum;
@@ -479,12 +487,12 @@ class TestDefaults:
 
 class TestNotes:
     def test_a_loss_with_no_floor_says_so(self) -> None:
-        calibrator = line_calibrator(VALUES)
+        calibrator = line_calibrator(SHALLOW)
         problem = calibrator.problem.model_copy(update={"loss_function": "mae"})
 
         result = Calibrator(calibrator.simulation, problem).uncertainty(
             ProfileLikelihood(
-                parameters=["c"],
+                parameters=["B"],
                 threshold=Threshold.bootstrap_calibrated(
                     ResidualBootstrap(
                         replicates=5,
@@ -494,10 +502,10 @@ class TestNotes:
                     ),
                     0.9,
                 ),
-                max_steps=3,
             )
         )
 
+        assert result.verdicts["B"] == "practically_non_identifiable"
         assert result.evaluation_floor is None
         assert any("cannot be computed" in note for note in result.notes)
 

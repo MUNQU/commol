@@ -8,8 +8,8 @@
 use crate::parallelism::{parallel, parallel_logged};
 use crate::records::StepLog;
 use commol_inference::profiles::{
-    Profile, ProfileEnd, ProfileTracer, ProfileVerdict, ProfiledQuantity, StructuralReading,
-    Structure, Undetermined, beale, bootstrap_thresholds, chi_square,
+    NoVerdict, Profile, ProfileEnd, ProfileTracer, ProfileVerdict, ProfiledQuantity,
+    StructuralReading, Structure, Undetermined, beale, bootstrap_thresholds, chi_square,
 };
 use commol_inference::resampling::FitUnit;
 use commol_inference::settings::profiles::{
@@ -53,9 +53,11 @@ pub struct PyProfile {
     /// The rise of each kept replicate, with a bootstrap threshold
     rises: Option<Vec<f64>>,
     /// "identifiable", "practically_non_identifiable" or
-    /// "structurally_non_identifiable"; None when the threshold is below the
-    /// tolerance
+    /// "structurally_non_identifiable"; None with no verdict
     verdict: Option<String>,
+    /// Why there is no verdict: "below_tolerance" or "max_steps"; None with
+    /// a verdict
+    undetermined: Option<String>,
     /// The lowest statistic
     lowest: f64,
     /// Where the side below and the side above leave the box: the value and
@@ -81,7 +83,8 @@ pub struct PyStructure {
     /// "in_combination", "non_identifiable", or None
     verdict: Option<String>,
     /// Why there is no verdict: "below_tolerance", "not_flat", "below_fit",
-    /// "stochastic", "on_bound" or "undecided"; None with a verdict
+    /// "stochastic", "on_bound", "undecided", "no_noise_floor" or
+    /// "max_steps"; None with a verdict
     undetermined: Option<String>,
     /// The free parameter on its bound at the fit, for "on_bound"
     on_bound: Option<usize>,
@@ -132,7 +135,7 @@ impl PyProfile {
     fn new(
         profile: Profile,
         rises: Option<Vec<f64>>,
-        verdict: Option<ProfileVerdict>,
+        verdict: Result<ProfileVerdict, NoVerdict>,
         structure: Option<Structure>,
         tolerance: f64,
     ) -> Self {
@@ -142,7 +145,8 @@ impl PyProfile {
             refit_error: profile.refit_error,
             inaccurate_refit: profile.inaccurate_refit(tolerance),
             below_fit: profile.below_fit(tolerance),
-            verdict: verdict.map(|verdict| verdict.name().to_string()),
+            verdict: verdict.ok().map(|verdict| verdict.name().to_string()),
+            undetermined: verdict.err().map(|why| why.name().to_string()),
             lowest: profile.lowest(),
             structure: structure.map(PyStructure::from),
             box_exits: {
@@ -263,13 +267,13 @@ fn trace(
         let rises = rises
             .as_ref()
             .map(|rises: &Vec<Vec<f64>>| rises[index].clone());
-        // A profile of a parameter that does not cross on both sides gets its
-        // resets.
+        // A profile of a parameter with a verdict before the resets other
+        // than `identifiable` gets its resets.
         let structure = match quantity {
             ProfiledQuantity::Parameter(parameter)
                 if !matches!(
-                    profile.verdict(tracer.tolerance()),
-                    None | Some(ProfileVerdict::Identifiable)
+                    tracer.verdict(&profile),
+                    Err(_) | Ok(ProfileVerdict::Identifiable)
                 ) =>
             {
                 Some(parallel(py, || {

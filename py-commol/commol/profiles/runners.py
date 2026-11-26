@@ -21,11 +21,13 @@ from commol.profiles.results import (
     ProfileResult,
     ProfileStructure,
     Threshold,
+    max_steps_sides,
 )
 from commol.resampling.runners import log_failed
 
 if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import (
+        ProfileProtocol,
         ProfileRunProtocol,
         ProfileStructureProtocol,
     )
@@ -73,12 +75,41 @@ def _structure_notes(
     return [f"'{name}': the profile gives no structural verdict: {why}."]
 
 
+def _verdict_notes(
+    name: str, profile: "ProfileProtocol", tolerance: float, max_steps: int
+) -> list[str]:
+    """The sides of a profile that end at `max_steps`, and why it gives no
+    verdict."""
+    notes = []
+    sides = max_steps_sides(profile.ends)
+    if sides is not None:
+        note = f"'{name}': {sides} ({max_steps}) below the threshold"
+        if profile.undetermined == "max_steps":
+            note += (
+                ". A longer side could change the verdict, so there is no "
+                "verdict. Raise max_steps to read one."
+            )
+        elif profile.verdict is not None:
+            note += ". A longer side cannot change the verdict."
+        else:
+            note += "."
+        notes.append(note)
+    if profile.undetermined == "below_tolerance":
+        notes.append(
+            f"'{name}': the threshold {profile.threshold:.3g} is at or below "
+            f"the numerical tolerance {tolerance:.3g}, so no rise can be "
+            "told from numerical error; no verdict."
+        )
+    return notes
+
+
 def _result(
     calibrator: CalibrationPort,
     fit: CalibrationResult,
     quantity: str,
     names: Sequence[str],
     threshold: Threshold,
+    max_steps: int,
     run: "ProfileRunProtocol",
 ) -> ProfileResult:
     parameter_names = calibrator.parameter_names
@@ -89,12 +120,7 @@ def _result(
     notes: list[str] = []
     for name, profile in zip(names, run.profiles, strict=True):
         verdicts[name] = profile.verdict
-        if profile.verdict is None:
-            notes.append(
-                f"'{name}': the threshold {profile.threshold:.3g} is at or below "
-                f"the numerical tolerance {run.tolerance:.3g}, so no rise can be "
-                "told from numerical error; no verdict."
-            )
+        notes.extend(_verdict_notes(name, profile, run.tolerance, max_steps))
         exits = [
             f"at {value:.4g} {side} the fit, where '{parameter_names[index]}' "
             "reaches its bound"
@@ -155,6 +181,7 @@ def _result(
                 "replicate_rises": profile.rises,
                 "box_crossings": crossings,
                 "refit_error": profile.refit_error,
+                "undetermined": profile.undetermined,
             }
         )
         lower, upper = profile.interval
@@ -206,7 +233,13 @@ def run_profile_likelihood(
     )
     fit = fit_result(starts, calibrator.parameter_names, calibrator.seed, logger)
     return _result(
-        calibrator, fit, "parameter", method.parameters, method.threshold, run
+        calibrator,
+        fit,
+        "parameter",
+        method.parameters,
+        method.threshold,
+        method.max_steps,
+        run,
     )
 
 
@@ -244,5 +277,6 @@ def run_prediction_profile(
         "prediction",
         [spec.as_observation().label for spec in method.specs],
         method.threshold,
+        method.max_steps,
         run,
     )

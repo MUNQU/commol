@@ -296,34 +296,52 @@ where
         self.optimizer_tolerance().max(self.noise_floor)
     }
 
-    /// The verdict of `profile` at the tolerance [`Self::tolerance`]; with a
-    /// stochastic engine, a flat profile reads `practically_non_identifiable`
-    /// and never `structurally_non_identifiable`: a run of replicates is not
-    /// a smooth function of the parameters.
-    pub fn verdict(&self, profile: &Profile) -> Option<ProfileVerdict> {
-        let verdict = profile.verdict(self.tolerance())?;
-        Some(
-            if self.stochastic && verdict == ProfileVerdict::StructurallyNonIdentifiable {
-                ProfileVerdict::PracticallyNonIdentifiable
-            } else {
-                verdict
-            },
-        )
+    /// The verdict of `profile` at the tolerance [`Self::tolerance`]
+    /// ([`Profile::reading`]), or why it gives none. With a stochastic
+    /// engine, a flat profile reads `practically_non_identifiable` and never
+    /// `structurally_non_identifiable`: a run of replicates is not a smooth
+    /// function of the parameters. So a side at `max_steps` beside a side
+    /// that ends at a bound or an unreachable prediction reads
+    /// `practically_non_identifiable` there, whatever a longer side shows.
+    pub fn verdict(
+        &self,
+        profile: &Profile,
+    ) -> Result<ProfileVerdict, crate::profiles::verdict::NoVerdict> {
+        use crate::profiles::verdict::NoVerdict;
+        let open = profile
+            .effective_ends()
+            .iter()
+            .any(|end| matches!(end, ProfileEnd::Bound | ProfileEnd::Unreachable));
+        match profile.reading(self.tolerance()) {
+            Ok(ProfileVerdict::StructurallyNonIdentifiable) if self.stochastic => {
+                Ok(ProfileVerdict::PracticallyNonIdentifiable)
+            }
+            Err(NoVerdict::MaxSteps) if self.stochastic && open => {
+                Ok(ProfileVerdict::PracticallyNonIdentifiable)
+            }
+            reading => reading,
+        }
     }
 
     /// The verdict of `profile` read with its resets
-    /// ([`Self::read_structure`]): `structurally_non_identifiable` when the
-    /// resets prove the parameter non-identifiable, [`Self::verdict`]
-    /// otherwise.
+    /// ([`Self::read_structure`]), or why it gives none:
+    /// `structurally_non_identifiable` when the resets prove the parameter
+    /// non-identifiable, no verdict when they would but a side ends at
+    /// `max_steps`, [`Self::verdict`] otherwise.
     pub fn verdict_with(
         &self,
         profile: &Profile,
         structure: Option<&crate::profiles::resets::Structure>,
-    ) -> Option<ProfileVerdict> {
-        if structure.is_some_and(|structure| structure.non_identifiable()) {
-            return Some(ProfileVerdict::StructurallyNonIdentifiable);
+    ) -> Result<ProfileVerdict, crate::profiles::verdict::NoVerdict> {
+        use crate::profiles::resets::{StructuralReading, Undetermined};
+        use crate::profiles::verdict::NoVerdict;
+        match structure.map(|structure| structure.verdict) {
+            Some(Ok(StructuralReading::NonIdentifiable)) => {
+                Ok(ProfileVerdict::StructurallyNonIdentifiable)
+            }
+            Some(Err(Undetermined::MaxSteps)) => Err(NoVerdict::MaxSteps),
+            _ => self.verdict(profile),
         }
-        self.verdict(profile)
     }
 
     /// The error of a refit at the fit, `|δ|`: the parameter at `index`

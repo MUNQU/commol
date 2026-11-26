@@ -121,8 +121,9 @@ flat within `ε` over its points inside the box, has one past the fit, and
 ends at a bound, an unreachable prediction or a point outside the box; the
 result notes where the ridge leaves the box (`Profile::box_exits`).
 `identifiable`: otherwise, both sides cross. `practically_non_identifiable`:
-the rest. A crossing whose point has a free parameter on a bound it is not
-on over the whole side from the fit comes from the box
+the rest, when no side ends at `max_steps` (next section). A crossing whose
+point has a free parameter on a bound it is not on over the whole side from
+the fit comes from the box
 (`Profile::box_crossings`): the side counts as a bound end, and the interval
 end stays with a note. A parameter that stays on its bound from the fit to
 the crossing is not seen, so the verdict holds within the box. A threshold at or below `ε` gives no verdict, and the result says
@@ -142,6 +143,43 @@ why. With a stochastic engine a flat profile reads
 `a_threshold_at_or_below_the_tolerance_reads_no_structure`),
 `crates/commol-inference/tests/test_profiles.rs::the_tolerance_follows_the_optimizer`,
 `tests/uncertainty/test_profile_verdicts.py` (`TestShapes`).
+
+## A side at `max_steps` sets no verdict
+
+`max_steps` is a limit of the computation, not of the data, so it never sets
+a verdict. With a side at `max_steps`, `Profile::reading` gives one only when
+every continuation of that side gives the same: the other side is open (a
+bound or an unreachable prediction), and the profile can no longer be flat,
+as when a side already rises above `ε`. That verdict is
+`practically_non_identifiable`.
+`["crossed", "max_steps"]`, `["max_steps", "max_steps"]` and a profile flat so
+far give `Err(NoVerdict::MaxSteps)` (`BelowTolerance` for a threshold at or
+below `ε`). Resets within the floor with a side at `max_steps` give
+`Undetermined::MaxSteps` (`read_structure`), and `ProfileTracer::verdict_with`
+no verdict: a reset past the end of the side could rise, and a longer profile
+could then read another verdict. A free parameter on its bound at the fit
+comes first (`OnBound`): the resets then never prove the profile flat, and
+the shape keeps its verdict. With a stochastic engine a flat profile
+reads `practically_non_identifiable`, so a side at `max_steps` beside an open
+side reads it too (`ProfileTracer::verdict`). `verdict_with` gives the
+verdict or its reason as one `Result`, and the extension takes both from it.
+Python notes each side at `max_steps`, with a
+verdict or without one, and the identifiability report gives a practical
+`None` with its reason, as the structural verdict does.
+
+| Alternative | Why not |
+|---|---|
+| A new verdict name such as `undetermined` | A second way to say what `None` says, and one more case in `merge` and the reports. |
+| No entry in the report | It does not say why the verdict is missing. |
+| Keep the verdict of the resets | `max_steps`, not the data, would set it: a rate that a parameter changes only past the end of a short side reads `structurally_non_identifiable`. |
+| No verdict with any side at `max_steps` | It drops a verdict already proven, such as a side that rises to a bound. |
+
+**Guards:** `verdict::tests` (`the_ends_and_the_flatness_of_a_profile_give_its_verdict`,
+`a_side_at_max_steps_beside_a_side_outside_the_box_is_practical`),
+`crates/commol-inference/tests/test_profiles.rs::a_side_that_ends_at_max_steps_gives_no_verdict`,
+`crates/commol-inference/tests/test_profile_structure.rs::resets_within_the_floor_with_a_side_at_max_steps_give_no_verdict`,
+`tests/uncertainty/test_profile_max_steps.py`,
+`tests/uncertainty/test_identifiability_report.py::TestReport::test_merge_leaves_out_a_practical_verdict_of_none`.
 
 ## A flat profile is read by resetting the others
 
@@ -163,14 +201,18 @@ or the root mean squared error of a perfect fit, there is no structural
 verdict, with a note.
 
 Every reset feasible and within the floor of `f̂` gives `non_identifiable`,
-unless a free parameter sits on its bound at the fit; since the minimum of
+unless a free parameter sits on its bound at the fit, or `max_steps` ends a
+side, which gives no verdict. Since the minimum of
 the profile is at most each reset, this proves the profile flat from above,
 and its own verdict reads `structurally_non_identifiable`. A profile flat
 within `ε` with a feasible reset inside the box above `f̂ + T` gives
 `in_combination`; the ends of the box only rule out `non_identifiable`. Below
 the fit by more than the floor, with a stochastic engine, or otherwise, a
 flat profile gets no structural verdict, the report gives the practical
-`poorly_determined`, and a note says why. A parameter is named in the reason
+`poorly_determined`, and a note says why. With a stochastic engine, a
+profile flat so far with a side at `max_steps` beside a bound reads the
+same (`Undetermined::Stochastic`), and one that already rises reads
+`not_flat`, with no note. A parameter is named in the reason
 when resetting it alone, at its largest displacement on the scale of
 `Transform`, raises the objective of that point above `T`; the parameters not
 named, noise parameters included, are then reset together on each side, and

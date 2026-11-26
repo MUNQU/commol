@@ -27,9 +27,10 @@ class StructuralVerdictEntry(TypedDict):
 
 
 class PracticalVerdictEntry(TypedDict):
-    """The practical verdict of a parameter and its reasons."""
+    """The practical verdict of a parameter (None when the evidence gives
+    none) and its reasons."""
 
-    verdict: str
+    verdict: str | None
     reasons: list[str]
 
 

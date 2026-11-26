@@ -11,7 +11,10 @@
 //! - Every reset feasible and within the evaluation floor of `f̂`
 //!   ([`ProfileTracer::evaluation_floor`]): nothing the data read depends on
 //!   the parameter, `NonIdentifiable`. Since the minimum of the profile is
-//!   at most each reset, this also proves the profile flat from above.
+//!   at most each reset, this also proves the profile flat from above. With
+//!   a side that ends at `max_steps`, the resets give `Undetermined::MaxSteps`
+//!   and the profile no verdict ([`ProfileTracer::verdict_with`]): a reset
+//!   past the end of that side could rise.
 //! - A flat profile (within the tolerance `ε`,
 //!   [`ProfileTracer::tolerance`]) whose reset at a point inside the box
 //!   rises above the threshold `T`: other parameters compensate it,
@@ -23,7 +26,7 @@
 use commol_calibration::{CalibrationParameterType, OptimizationObjective};
 use commol_core::SimulationEngine;
 
-use crate::profiles::tracer::{Profile, ProfilePoint, ProfileTracer};
+use crate::profiles::tracer::{Profile, ProfileEnd, ProfilePoint, ProfileTracer};
 use crate::profiles::verdict::ProfileVerdict;
 use crate::transform::{Transform, on_bound};
 
@@ -43,12 +46,14 @@ pub enum StructuralReading {
 pub enum Undetermined {
     /// The threshold is at or below the tolerance.
     BelowTolerance,
-    /// The profile is not flat, and the resets do not prove it flat.
+    /// The profile is not flat over its whole range, and the resets do not
+    /// prove it flat.
     NotFlat,
     /// The profile goes below the fit by more than the evaluation floor:
     /// the fit is not the optimum.
     BelowFit,
-    /// The engine is stochastic.
+    /// The engine is stochastic, and the profile is flat, or flat so far
+    /// with a side at `max_steps`.
     Stochastic,
     /// Every reset stays within the evaluation floor, but this free
     /// parameter, by index, sits on its bound at the fit: what lies past the
@@ -60,14 +65,19 @@ pub enum Undetermined {
     /// The evaluation floor cannot be computed, as for a loss with no term
     /// derivatives.
     NoNoiseFloor,
+    /// Every reset stays within the evaluation floor and no free parameter
+    /// sits on its bound at the fit, but a side ends at `max_steps`: a reset
+    /// past its end could rise.
+    MaxSteps,
 }
 
 impl Undetermined {
     /// The name of the reason: `"below_tolerance"`, `"not_flat"`,
-    /// `"below_fit"`, `"stochastic"`, `"on_bound"`, `"undecided"` or
-    /// `"no_noise_floor"`.
+    /// `"below_fit"`, `"stochastic"`, `"on_bound"`, `"undecided"`,
+    /// `"no_noise_floor"` or `"max_steps"`.
     pub fn name(self) -> &'static str {
         match self {
+            Self::MaxSteps => "max_steps",
             Self::BelowTolerance => "below_tolerance",
             Self::NotFlat => "not_flat",
             Self::BelowFit => "below_fit",
@@ -111,11 +121,6 @@ impl Structure {
             infeasible: 0,
         }
     }
-
-    /// Whether the resets prove the parameter non-identifiable.
-    pub fn non_identifiable(&self) -> bool {
-        self.verdict == Ok(StructuralReading::NonIdentifiable)
-    }
 }
 
 impl<E> ProfileTracer<'_, E>
@@ -152,10 +157,16 @@ where
         if shape == Some(ProfileVerdict::Identifiable) {
             return Structure::undetermined(Undetermined::NotFlat);
         }
-        let not_read =
-            |why| Structure::undetermined(if flat { why } else { Undetermined::NotFlat });
         if self.stochastic {
-            return not_read(Undetermined::Stochastic);
+            // A profile that already rises is not flat. A flat one, or one
+            // flat so far, is not read on a stochastic engine.
+            return Structure::undetermined(
+                if shape == Some(ProfileVerdict::PracticallyNonIdentifiable) {
+                    Undetermined::NotFlat
+                } else {
+                    Undetermined::Stochastic
+                },
+            );
         }
         let Some(floor) = self.evaluation_floor() else {
             return Structure::undetermined(Undetermined::NoNoiseFloor);
@@ -189,6 +200,7 @@ where
         let verdict = if within_floor {
             match on_bound_at_fit {
                 Some(i) => Err(Undetermined::OnBound(i)),
+                None if profile.ends.contains(&ProfileEnd::MaxSteps) => Err(Undetermined::MaxSteps),
                 None => Ok(StructuralReading::NonIdentifiable),
             }
         } else if profile.below_fit(floor) {
@@ -291,6 +303,7 @@ mod tests {
             Undetermined::OnBound(2),
             Undetermined::Undecided,
             Undetermined::NoNoiseFloor,
+            Undetermined::MaxSteps,
         ]
         .map(Undetermined::name);
         assert_eq!(
@@ -302,7 +315,8 @@ mod tests {
                 "stochastic",
                 "on_bound",
                 "undecided",
-                "no_noise_floor"
+                "no_noise_floor",
+                "max_steps"
             ]
         );
     }

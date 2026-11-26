@@ -199,6 +199,10 @@ class Profile(_FrozenResult):
         For a parameter, ``|δ|``: the largest distance from the objective at
         the fit of a refit with the parameter at its fitted value, from each
         neighbour of the fit. A diagnostic of the optimizer.
+    undetermined : {"below_tolerance", "max_steps"} | None
+        Why the profile gives no verdict: its threshold is at or below the
+        tolerance, or a side ends at `max_steps` and a longer side could
+        change the verdict. None with a verdict.
     """
 
     center: float
@@ -213,6 +217,22 @@ class Profile(_FrozenResult):
     replicate_rises: list[float] | None = None
     box_crossings: tuple[str | None, str | None] = (None, None)
     refit_error: float | None = None
+    undetermined: Literal["below_tolerance", "max_steps"] | None = None
+
+
+def max_steps_sides(ends: tuple[str, str]) -> str | None:
+    """The sides of a profile that end at `max_steps`, as ``"the side above
+    the fit ends at max_steps"``; None when no side does."""
+    sides = [
+        side
+        for side, end in zip(("below", "above"), ends, strict=True)
+        if end == "max_steps"
+    ]
+    if not sides:
+        return None
+    if len(sides) == 2:
+        return "the sides below and above the fit end at max_steps"
+    return f"the side {sides[0]} the fit ends at max_steps"
 
 
 UndeterminedName = Literal[
@@ -223,6 +243,7 @@ UndeterminedName = Literal[
     "on_bound",
     "undecided",
     "no_noise_floor",
+    "max_steps",
 ]
 """Why a flat profile gives no structural verdict."""
 
@@ -246,9 +267,11 @@ class ProfileStructure(_FrozenResult):
     ----------
     verdict : {"in_combination", "non_identifiable"} | None
         ``non_identifiable``: every reset is feasible and within the
-        evaluation floor of the fit. ``in_combination``: the profile is flat
-        and a feasible reset inside the box rises above the threshold. None
-        otherwise, and `undetermined` says why.
+        evaluation floor of the fit, no other free parameter sits on its
+        bound at the fit (``undetermined="on_bound"``), and no side ends at
+        `max_steps` (``undetermined="max_steps"``). ``in_combination``: the
+        profile is flat and a feasible reset inside the box rises above the
+        threshold. None otherwise, and `undetermined` says why.
     largest_rise : float | None
         The largest rise of a feasible reset over the objective at the fit;
         None when none was feasible.
@@ -363,13 +386,21 @@ class ProfileResult(_FrozenResult):
     verdicts : dict[str, ProfileVerdictName | None]
         What the shape of each profile says: ``identifiable`` (it crosses the
         threshold on both sides), ``practically_non_identifiable`` (it stays
-        below on a side, up to a bound or `max_steps`) or
+        below on a side up to a bound or an unreachable prediction, and is not
+        shown flat over its whole range; with a stochastic engine, a flat
+        profile too) or
         ``structurally_non_identifiable`` (flat within `tolerance` over the
-        whole range). None when the threshold is below `tolerance`: the
-        profile cannot tell a rise from numerical error.
+        whole range). None when the profile gives no verdict, and
+        `Profile.undetermined` says why: the threshold is at or below `tolerance`,
+        or a side ends at `max_steps` and a longer side could change the
+        verdict.
     structure : dict[str, ProfileStructure]
-        For each profile of a parameter that does not cross on both sides,
-        what resetting the other parameters says.
+        For each profile of a parameter that gives
+        ``practically_non_identifiable`` or ``structurally_non_identifiable``
+        before its resets, what resetting the other parameters says. With a
+        stochastic engine a flat profile gives ``practically_non_identifiable``
+        before its resets. The verdict of the profile may then be None: the
+        resets would prove it flat, but a side ends at `max_steps`.
     tolerance : float
         The numerical tolerance of the statistic: ``max(τ, ν)``, the
         tolerance of the optimizer and the noise floor of the objective at
@@ -378,8 +409,8 @@ class ProfileResult(_FrozenResult):
         The floor of a comparison of two evaluations of the objective; None
         when it cannot be computed.
     notes : list[str]
-        What a reader should know, such as a threshold below the tolerance or
-        a refit below the fit.
+        What a reader should know, such as a threshold below the tolerance, a
+        side that ends at `max_steps` or a refit below the fit.
     failed : list[str]
         With a bootstrap threshold, each replicate that failed:
         ``"Replicate <index> failed: <reason>"``, also logged as a warning.

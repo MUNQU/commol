@@ -480,11 +480,14 @@ runs no model; a flat
 profile gives the structural verdict `in_combination` when resetting the
 other parameters to their fitted values breaks it, and `non_identifiable`
 when nothing the data read depends on the parameter
-([Profile Likelihood](profiles.md#verdicts-and-the-identifiability-report)). `merge` joins reports: a
+([Profile Likelihood](profiles.md#verdicts-and-the-identifiability-report)).
+A profile with no verdict, as one with a side at `max_steps` that a longer
+side could change, gives the practical verdict `None`. Its reason names the
+side and `max_steps`. `merge` joins reports: a
 verdict the reports agree on stays, with every reason; one they disagree on is
 `conflicting`, with both reasons. A structural verdict of `None`, as that of
-a noise parameter, adds its reasons and leaves the verdicts of the other
-reports. `report.report()` gives it as plain data
+a noise parameter, or a practical verdict of `None`, adds its reasons and
+leaves the verdicts of the other reports. `report.report()` gives it as plain data
 ([Reports](../reports.md#the-report-of-an-identifiability-analysis)).
 
 ```python

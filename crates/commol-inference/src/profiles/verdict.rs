@@ -8,7 +8,10 @@ pub enum ProfileVerdict {
     /// The profile crosses the threshold on both sides.
     Identifiable,
     /// The profile stays below the threshold on at least one side, up to a
-    /// bound, the end of the reachable predictions or `max_steps`.
+    /// bound or the end of the reachable predictions, and its points do not
+    /// show it flat over its whole range. With a stochastic engine, a flat
+    /// profile too
+    /// ([`ProfileTracer::verdict`](crate::profiles::ProfileTracer::verdict)).
     PracticallyNonIdentifiable,
     /// The profile is flat within the numerical tolerance over its whole
     /// range inside the box of the parameters: each side reaches a bound or
@@ -29,10 +32,36 @@ impl ProfileVerdict {
     }
 }
 
+/// Why a profile gives no verdict.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NoVerdict {
+    /// The threshold is at or below the tolerance, where a rise cannot be
+    /// told from numerical error.
+    BelowTolerance,
+    /// A side ends at `max_steps`, and a longer side could change the
+    /// verdict.
+    MaxSteps,
+}
+
+impl NoVerdict {
+    /// The name of the reason: `"below_tolerance"` or `"max_steps"`.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::BelowTolerance => "below_tolerance",
+            Self::MaxSteps => "max_steps",
+        }
+    }
+}
+
 impl Profile {
     /// The verdict of the profile, whose statistic is known to `tolerance`;
-    /// `None` when the threshold is at or below the tolerance, where a rise
-    /// cannot be told from numerical error.
+    /// `None` when it gives none ([`Self::reading`] says why).
+    pub fn verdict(&self, tolerance: f64) -> Option<ProfileVerdict> {
+        self.reading(tolerance).ok()
+    }
+
+    /// The verdict of the profile, whose statistic is known to `tolerance`,
+    /// or why it gives none.
     ///
     /// A point where a free parameter sits on its bound
     /// ([`ProfilePoint::on_bound`]) is outside the ridge the data leave
@@ -42,12 +71,20 @@ impl Profile {
     /// of the reachable predictions, or on a point outside the box. A side
     /// whose crossing comes from the box ([`Profile::box_crossings`]) counts
     /// as ending at a bound, so it is never `identifiable`.
-    pub fn verdict(&self, tolerance: f64) -> Option<ProfileVerdict> {
+    ///
+    /// A profile with a side that ends at `max_steps` has a verdict only
+    /// when no longer side can change it: the other side ends at a bound or
+    /// at the end of the reachable predictions, and the profile can no
+    /// longer be flat, as when a side already rises above the tolerance.
+    /// That verdict is `practically_non_identifiable`.
+    pub fn reading(&self, tolerance: f64) -> Result<ProfileVerdict, NoVerdict> {
         if self.threshold <= tolerance {
-            return None;
+            return Err(NoVerdict::BelowTolerance);
         }
         let ends = self.effective_ends();
-        let flat_to_the_end = self.sides().iter().zip(ends).all(|(side, end)| {
+        // A side at `max_steps` can still be flat to its end when it is
+        // flat so far.
+        let can_be_flat = self.sides().iter().zip(ends).all(|(side, end)| {
             let inside: Vec<&ProfilePoint> = side
                 .iter()
                 .copied()
@@ -56,12 +93,25 @@ impl Profile {
             let ends_outside = match end {
                 ProfileEnd::Bound | ProfileEnd::Unreachable => true,
                 ProfileEnd::Crossed => side.last().is_some_and(|p| p.on_bound.is_some()),
-                ProfileEnd::MaxSteps => false,
+                ProfileEnd::MaxSteps => true,
             };
-            let reaches_out = !inside.is_empty() || (side.is_empty() && end == ProfileEnd::Bound);
+            let reaches_out = !inside.is_empty()
+                || end == ProfileEnd::MaxSteps
+                || (side.is_empty() && end == ProfileEnd::Bound);
             ends_outside && reaches_out && inside.iter().all(|p| p.statistic.abs() <= tolerance)
         });
-        Some(if flat_to_the_end {
+        if ends.contains(&ProfileEnd::MaxSteps) {
+            // A longer side may cross, rise, or stay flat to its end.
+            let open = ends
+                .iter()
+                .any(|end| matches!(end, ProfileEnd::Bound | ProfileEnd::Unreachable));
+            return if open && !can_be_flat {
+                Ok(ProfileVerdict::PracticallyNonIdentifiable)
+            } else {
+                Err(NoVerdict::MaxSteps)
+            };
+        }
+        Ok(if can_be_flat {
             ProfileVerdict::StructurallyNonIdentifiable
         } else if ends == [ProfileEnd::Crossed; 2] {
             ProfileVerdict::Identifiable
@@ -237,23 +287,56 @@ mod tests {
             Some(ProfileVerdict::PracticallyNonIdentifiable)
         );
         assert_eq!(
+            verdict(&[1e-7, 0.0, -1e-7], [Bound, Unreachable]),
+            Some(ProfileVerdict::StructurallyNonIdentifiable)
+        );
+        // A side at `max_steps` that a longer side cannot change: the other
+        // side does not cross, and a side already rises.
+        assert_eq!(
             verdict(&[0.5, 0.0, 0.5], [MaxSteps, Bound]),
             Some(ProfileVerdict::PracticallyNonIdentifiable)
         );
         assert_eq!(
-            verdict(&[1e-7, 0.0, -1e-7], [Bound, Unreachable]),
-            Some(ProfileVerdict::StructurallyNonIdentifiable)
-        );
-        // Flat, but not over the whole range.
-        assert_eq!(
-            verdict(&[1e-7, 0.0, 1e-7], [MaxSteps, Bound]),
+            verdict(&[0.5, 0.0, 1e-7], [MaxSteps, Unreachable]),
             Some(ProfileVerdict::PracticallyNonIdentifiable)
         );
+        // A side at `max_steps` that a longer side can change: it may cross,
+        // or stay flat to its end.
+        for (statistics, ends) in [
+            ([0.5, 0.0, 3.0], [MaxSteps, Crossed]),
+            ([0.5, 0.0, 0.5], [MaxSteps, MaxSteps]),
+            ([1e-7, 0.0, 1e-7], [MaxSteps, Bound]),
+        ] {
+            let profile = profile(&statistics, ends, 2.0);
+            assert_eq!(profile.verdict(1e-6), None, "{ends:?}");
+            assert_eq!(profile.reading(1e-6), Err(NoVerdict::MaxSteps));
+        }
         // A rise above the tolerance up to both bounds.
         assert_eq!(
             verdict(&[1e-3, 0.0, 1e-7], [Bound, Bound]),
             Some(ProfileVerdict::PracticallyNonIdentifiable)
         );
+    }
+
+    #[test]
+    fn a_side_at_max_steps_beside_a_side_outside_the_box_is_practical() {
+        use ProfileEnd::{Bound, MaxSteps, Unreachable};
+        // The side below has no point inside the box, so the profile can no
+        // longer be flat, though the side above is flat so far.
+        for end in [Bound, Unreachable] {
+            let profile = boxed(
+                &[1e-9, 0.0, 1e-9],
+                &[Some(1), None, None],
+                1,
+                [end, MaxSteps],
+            );
+            assert_eq!(
+                profile.verdict(1e-6),
+                Some(ProfileVerdict::PracticallyNonIdentifiable),
+                "{end:?}"
+            );
+            assert_eq!(profile.reading(1e-6).err(), None);
+        }
     }
 
     #[test]
@@ -276,9 +359,15 @@ mod tests {
         let flat = profile(&[0.0, 0.0, 0.0], [ProfileEnd::Bound; 2], 1e-9);
         assert_eq!(flat.verdict(1e-6), None);
         assert_eq!(flat.verdict(1e-9), None);
+        assert_eq!(flat.reading(1e-9), Err(NoVerdict::BelowTolerance));
         assert_eq!(
             flat.verdict(1e-12),
             Some(ProfileVerdict::StructurallyNonIdentifiable)
+        );
+        assert_eq!(flat.reading(1e-12).err(), None);
+        assert_eq!(
+            [NoVerdict::BelowTolerance, NoVerdict::MaxSteps].map(NoVerdict::name),
+            ["below_tolerance", "max_steps"]
         );
     }
 

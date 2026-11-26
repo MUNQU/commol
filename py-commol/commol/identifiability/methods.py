@@ -238,8 +238,11 @@ class ProfileIdentifiability(IdentifiabilityMethod[IdentifiabilityReport]):
     ``non_identifiable``, with no combination: the reason names the
     compensating parameters. A flat profile with no structural verdict gives
     the practical verdict ``poorly_determined``. Every reason says that the
-    verdict holds with the other parameters at their fitted values. A
-    parameter with no profile, or no verdict, gets neither.
+    verdict holds with the other parameters at their fitted values. A profile
+    with no verdict gives a practical verdict of ``None``, whose reason says
+    why: its threshold is at or below the tolerance, or it names each side
+    that ends at `max_steps` where a longer side could change the verdict. A
+    parameter with no profile gets neither.
 
     Attributes
     ----------
