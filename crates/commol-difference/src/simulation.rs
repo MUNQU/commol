@@ -83,9 +83,10 @@ impl DifferenceEquations {
         }
         if self.model.has_impulses() {
             self.rates.copy_from_slice(&self.state);
+            let impulses = self.model.impulses_at(self.current_step);
             if self
                 .model
-                .apply_impulses(self.current_step, &mut self.state)?
+                .apply_impulses(self.current_step, &impulses, &mut self.state)?
             {
                 self.check_impulses()?;
             }
@@ -104,9 +105,10 @@ impl DifferenceEquations {
             return Ok(());
         };
         let step = self.current_step;
+        let impulses = self.model.impulses_at(step);
         let drains = self
             .model
-            .impulse_outflows(step, &self.rates, compartment)?;
+            .impulse_outflows(step, &impulses, &self.rates, compartment)?;
         Err(self.below_zero(
             format!("The impulses at step {step}"),
             compartment,

@@ -6,7 +6,9 @@ pub const SPECIAL_VAR_TOTAL: &str = "total";
 /// The prefix of a subgroup total: `total_<cat>…` is the sum of the
 /// compartments with the categories `<cat>…`.
 pub const SUBGROUP_TOTAL_PREFIX: &str = "total_";
-/// The step that holds the current position: `floor(t)`.
+/// The step that holds the current position: `floor(t)`. An engine in
+/// continuous time reads it at the start of each piece, which is the integer
+/// itself for a point that is the same position as an integer.
 pub const SPECIAL_VAR_STEP: &str = "step";
 /// The current position on the axis. An engine that reports only at integer
 /// steps (`DifferenceEquations`, `StochasticSteps`) reads it at each step, so

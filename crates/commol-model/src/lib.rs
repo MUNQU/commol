@@ -64,6 +64,7 @@ mod layout;
 mod matrices;
 mod rates;
 pub mod rules;
+mod stops;
 mod system;
 mod types;
 
@@ -80,4 +81,5 @@ pub use initial_conditions::{
 };
 pub use labels::{CATEGORY_SEPARATOR, OutputLabels, output_sums};
 pub use matrices::{MatrixVariable, matrix_variables};
+pub use stops::{Breakpoints, Stop};
 pub use types::{CompiledModel, FlowChange};

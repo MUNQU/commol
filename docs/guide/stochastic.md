@@ -253,7 +253,11 @@ with the message of the engine, `epsilon is strictly between 0 and 1, got
 - **Breakpoints.** The engine stops at every position where a rate can jump
   (the impulses, the values a rate compares `t` with, the points of a series
   read at `t`, and every integer when a rate reads `step`), so no wait and no
-  leap crosses one (`CompiledModel::breakpoints`).
+  leap crosses one (`CompiledModel::breakpoints`). Every event between two
+  stops reads the step of the first. Positions next to an integer are a stop
+  at that integer, as in a
+  [differential model](simulations.md#time-inside-a-step), and a row there
+  shows the state after the impulses of the stop.
 - **Impulses.** At its positions, before the events there, a proportional
   impulse moves a binomial draw of its source (its rate is the probability
   that one unit moves, between 0 and 1); an absolute impulse moves its rate,

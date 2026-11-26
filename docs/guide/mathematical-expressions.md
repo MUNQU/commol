@@ -86,7 +86,7 @@ never a variable.
 | `neighbors_<bin>`, `neighbors` | In a transition rate only: what the neighbors of a unit hold, of one bin or of every bin. The structure says who they are; a rate that reads them and no compartment is proportional. See [Neighbors](building-models.md#neighbors) |
 | `<M>_<i>_<j>`, `<M>_radius` | The entry of row `i` and column `j` of the matrix `M`, and its spectral radius, both scaled by the parameters of its rows and columns. See [Matrix sums](#matrix-sums) |
 | `t` | The current position on the axis. A difference model reads it at each step, so there it equals `step`; a differential model reads it anywhere |
-| `step` | The step that holds the current position, `floor(t)`: 0, 1, 2, … It is constant on each unit interval of a differential model; see [Time inside a step](simulations.md#time-inside-a-step) |
+| `step` | The step that holds the current position, `floor(t)`: 0, 1, 2, … It is constant on each unit interval of a differential model, and a position within a relative `1e-9` of an integer is in the step of that integer; see [Time inside a step](simulations.md#time-inside-a-step) |
 | `pi`, `e` | π and e |
 
 ### Subgroup totals

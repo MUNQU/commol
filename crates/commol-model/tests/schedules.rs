@@ -1,8 +1,9 @@
 //! Where an engine in continuous time stops (impulses, the values a rate
 //! compares `t` with, the points of a series, every integer when a rate reads
-//! `step`), the checks of the series points and impulse positions an engine
-//! runs, and the flows that drain a compartment. The rules of an impulse are
-//! in `value_rules.rs`.
+//! `step`), the points each stop holds and the impulses that act there, the
+//! checks of the series points and impulse positions an engine runs, and the
+//! flows that drain a compartment. The rules of an impulse are in
+//! `value_rules.rs`.
 
 use commol_core::{EngineType, Model, ModelEngine, ParameterValue, SeriesMode};
 use commol_model::{CompiledModel, as_whole, check_model};
@@ -31,12 +32,46 @@ fn compiled(model: &Model) -> CompiledModel {
     CompiledModel::try_from_model(model).unwrap()
 }
 
+/// Where the pieces of a run of `model` from `from` to `to` end: at each
+/// stop, and at `to` when no stop holds it.
+fn ends(model: &mut CompiledModel, from: f64, to: f64) -> Vec<f64> {
+    let plan = model.breakpoints(from, to).unwrap();
+    let mut ends: Vec<f64> = plan.stops.iter().map(|stop| stop.at).collect();
+    if ends.last() != Some(&plan.end) {
+        ends.push(plan.end);
+    }
+    ends
+}
+
+/// The stops of a run of `model` from `from` to `to` where impulses act,
+/// with the impulses of each.
+fn impulses(model: &mut CompiledModel, from: f64, to: f64) -> Vec<(f64, Vec<usize>)> {
+    let plan = model.breakpoints(from, to).unwrap();
+    plan.stops
+        .into_iter()
+        .filter(|stop| !stop.impulses.is_empty())
+        .map(|stop| (stop.at, stop.impulses))
+        .collect()
+}
+
+/// The state after a run of `model` from `from` to `to` that applies the
+/// impulses of every stop, and how many stops had impulses.
+fn after_impulses(model: &mut CompiledModel, from: f64, to: f64) -> (Vec<f64>, usize) {
+    let mut state = model.initial_state().to_vec();
+    let mut acted = 0;
+    for stop in model.breakpoints(from, to).unwrap().stops {
+        let applied = model.apply_impulses(stop.at, &stop.impulses, &mut state);
+        acted += usize::from(applied.unwrap());
+    }
+    (state, acted)
+}
+
 #[test]
 fn a_value_a_rate_compares_t_with_is_a_breakpoint_inside_the_range() {
     // The series adds its points 1, 5 and 9.
     let mut model = compiled(&model("if(t > 6, k, 0)", "k", "step_function", ""));
-    assert_eq!(model.breakpoints(2.0, 4.0).unwrap(), [4.0]);
-    assert_eq!(model.breakpoints(2.0, 8.0).unwrap(), [5.0, 6.0, 8.0]);
+    assert_eq!(ends(&mut model, 2.0, 4.0), [4.0]);
+    assert_eq!(ends(&mut model, 2.0, 8.0), [5.0, 6.0, 8.0]);
 }
 
 #[test]
@@ -47,7 +82,7 @@ fn only_a_fixed_value_compared_with_t_is_a_breakpoint() {
         "if(A / 1000 + 0.5 < t, k, 0)",
     ] {
         let mut model = compiled(&model(rate, "k", "step_function", ""));
-        assert_eq!(model.breakpoints(0.0, 0.9), Ok(vec![0.9]), "{rate}");
+        assert_eq!(ends(&mut model, 0.0, 0.9), [0.9], "{rate}");
     }
 }
 
@@ -59,39 +94,214 @@ fn a_threshold_of_fixed_values_through_functions_is_a_breakpoint() {
         ("if(t > if(k > 0, 3, 4), k, 0)", 3.0),
     ] {
         let mut model = compiled(&model(rate, "k", "step_function", ""));
-        assert_eq!(model.breakpoints(1.5, 4.5), Ok(vec![point, 4.5]), "{rate}");
+        assert_eq!(ends(&mut model, 1.5, 4.5), [point, 4.5], "{rate}");
     }
 }
 
 #[test]
 fn a_rate_of_step_stops_at_every_integer_after_the_start() {
     let mut model = compiled(&model("k * step", "k", "step_function", ""));
-    assert_eq!(model.breakpoints(2.5, 5.0).unwrap(), [3.0, 4.0, 5.0]);
+    assert_eq!(ends(&mut model, 2.5, 5.0), [3.0, 4.0, 5.0]);
+}
+
+/// Positions on either side of 3 that `same_position` calls 3: the float
+/// just below it (`0.3 / 0.1`), the float just above it, and 1e-9 from it.
+fn next_to_three() -> [f64; 4] {
+    [0.3 / 0.1, 3.0 - 1e-9, 3.0_f64.next_up(), 3.0 + 1e-9]
+}
+
+#[test]
+fn a_point_next_to_a_step_is_in_the_stop_of_that_step() {
+    for on in next_to_three() {
+        let rate = format!("if(t >= {on:?}, k, 0) + step");
+        let mut model = compiled(&model(&rate, "k", "step_function", ""));
+        let plan = model.breakpoints(2.0, 5.0).unwrap();
+        assert_eq!((plan.stops[0].at, plan.stops[0].cut), (3.0, on.min(3.0)));
+        assert_eq!(ends(&mut model, 2.0, 5.0), [3.0, 4.0, 5.0], "{on:?}");
+        // A run that ends next to 3 ends at the stop 3, and the next run
+        // starts there, with the point behind it.
+        assert_eq!(model.breakpoints(2.0, on).unwrap().end, 3.0, "{on:?}");
+        assert_eq!(ends(&mut model, 3.0, 5.0), [4.0, 5.0], "{on:?}");
+    }
+}
+
+#[test]
+fn a_position_next_to_a_step_goes_to_that_step_before_another_stop() {
+    // 2.999999996 is a stop of its own, as it is not the same position as 3.
+    // 2.9999999985 is the same position as both, and it goes to the step 3,
+    // where the impulse acts. So does a run that starts at 2.999999996.
+    let rate = "if(t >= 2.999999996, k, 0) + step";
+    let mut model = compiled(&model(rate, "k", "step_function", r#","impulse_at":[3]"#));
+    let next = 2.999_999_998_5;
+    assert_eq!(ends(&mut model, 2.0, 4.0), [2.999999996, 3.0, 4.0]);
+    assert_eq!(model.breakpoints(2.0, 4.0).unwrap().place(next), 3.0);
+    for from in [2.0, 2.999999996] {
+        let plan = model.breakpoints(from, next).unwrap();
+        assert_eq!((plan.end, plan.place(next)), (3.0, 3.0), "{from}");
+        assert_eq!(impulses(&mut model, from, next), [(3.0, vec![0])], "{from}");
+    }
+    assert_eq!(ends(&mut model, 3.0, 4.0), [4.0]);
+    // A start that is the same position as 3 holds the step.
+    let plan = model.breakpoints(2.9999999995, 3.000000001).unwrap();
+    assert_eq!((plan.stops.len(), plan.end), (0, 2.9999999995));
+}
+
+#[test]
+fn a_start_that_no_stop_holds_leaves_a_position_next_to_it_to_a_stop() {
+    // A run ends at 3.5 - 5e-9, which no stop holds. The next run asks for
+    // 3.5 - 2.5e-9, the same position as that start and as the stop 3.5: it
+    // ends at the stop, as the whole run does.
+    let (start, next) = (3.5 - 5e-9, 3.5 - 2.5e-9);
+    for rate in ["k", "k * step"] {
+        let mut model = compiled(&model(rate, "k", "step_function", r#","impulse_at":[3.5]"#));
+        assert_eq!(
+            model.breakpoints(2.0, 5.0).unwrap().place(next),
+            3.5,
+            "{rate}"
+        );
+        assert_eq!(model.breakpoints(2.0, start).unwrap().end, start, "{rate}");
+        let plan = model.breakpoints(start, next).unwrap();
+        assert_eq!((plan.end, plan.place(next)), (3.5, 3.5), "{rate}");
+        assert_eq!(
+            impulses(&mut model, start, next),
+            [(3.5, vec![0])],
+            "{rate}"
+        );
+    }
+}
+
+#[test]
+fn a_point_just_below_0_is_in_the_step_0() {
+    // The point rounds to -0.0, which is the step 0.
+    let rate = "if(t >= -1e-10, k, 0) + step";
+    let mut model = compiled(&model(rate, "k", "step_function", ""));
+    let plan = model.breakpoints(-1.5, 2.0).unwrap();
+    let cuts: Vec<(f64, f64)> = plan.stops.iter().map(|stop| (stop.at, stop.cut)).collect();
+    assert_eq!(cuts, [(-1.0, -1.0), (0.0, -1e-10), (1.0, 1.0), (2.0, 2.0)]);
+}
+
+#[test]
+fn a_run_from_a_point_has_that_point_as_its_stop() {
+    // A run that ended at the point 2.5 of a threshold or of an impulse, or
+    // at 5 of a series, starts from that stop, so a position next to it
+    // stays there, as in the whole run. Each model has that one point near
+    // the start, and no step.
+    let impulse = r#","impulse_at":[2.5]"#;
+    for (rate, extra, point) in [
+        ("k * if(t >= 2.5, 1, 0)", "", 2.5),
+        ("k", impulse, 2.5),
+        ("s", "", 5.0),
+    ] {
+        let mut model = compiled(&model(rate, "k", "step_function", extra));
+        let next = point + 1e-9;
+        let whole = model.breakpoints(point - 0.5, point + 0.5).unwrap();
+        assert_eq!(whole.place(next), point, "{rate}");
+        let plan = model.breakpoints(point, next).unwrap();
+        assert_eq!((plan.end, plan.place(next)), (point, point), "{rate}");
+    }
+}
+
+#[test]
+fn a_run_of_a_model_that_reads_the_step_stays_below_5e8_on_either_side() {
+    let mut steps = compiled(&model("k * step", "k", "step_function", ""));
+    let error = steps.breakpoints(-6e8, -6e8 + 3.0).unwrap_err();
+    let start = "A run cannot reach -600000000: a model that reads `step`";
+    assert!(error.starts_with(start), "{error}");
+    let mut plain = compiled(&model("k", "k", "step_function", ""));
+    assert_eq!(ends(&mut plain, -6e8, -6e8 + 3.0), [-6e8 + 3.0]);
+}
+
+#[test]
+fn a_point_the_same_as_a_point_of_a_stop_is_in_that_stop() {
+    // 2.5 and 2.500000004 are not the same position, and the impulse is the
+    // same position as both: it acts at the stop 2.5 alone. A run that ends
+    // at 2.500000003, the same position as the impulse and as the next stop,
+    // ends at that stop.
+    let rate = "k * if(t >= 2.5, 1, 0) + k * if(t >= 2.500000004, 1, 0)";
+    let mut model = compiled(&model(
+        rate,
+        "k",
+        "step_function",
+        r#","impulse_at":[2.500000002]"#,
+    ));
+    assert_eq!(impulses(&mut model, 2.0, 4.0), [(2.5, vec![0])]);
+    assert_eq!(ends(&mut model, 2.0, 4.0), [2.5, 2.500000004, 4.0]);
+    assert_eq!(
+        model.breakpoints(2.0, 2.500000003).unwrap().end,
+        2.500000004
+    );
+    assert_eq!(model.breakpoints(2.0, 2.5000000015).unwrap().end, 2.5);
+    // A run from the stop 2.5 has the impulse behind it. A position that is
+    // the same position as the start and as the next stop stays at the start.
+    let plan = model.breakpoints(2.5, 2.500000002).unwrap();
+    assert_eq!((plan.stops.len(), plan.end), (0, 2.5));
+    assert_eq!(impulses(&mut model, 2.5, 4.0), []);
+    assert_eq!(ends(&mut model, 2.5, 4.0), [2.500000004, 4.0]);
+    let plan = model.breakpoints(2.0, 2.4).unwrap();
+    assert_eq!((plan.stops.len(), plan.end, plan.place(2.4)), (0, 2.4, 2.4));
+    // Without the stop 2.500000004, 2.5000000035 is in the start 2.5, which
+    // holds 2.500000002.
+    let rate = "k * if(t >= 2.5, 1, 0) + k * if(t >= 2.500000002, 1, 0)";
+    let mut pair = compiled(&self::model(rate, "k", "step_function", ""));
+    assert_eq!(pair.breakpoints(2.5, 2.5000000035).unwrap().end, 2.5);
+}
+
+#[test]
+fn an_impulse_of_a_schedule_just_below_a_step_reads_that_step() {
+    // 90 × 0.7 is 62.99999999999999.
+    let rate = "if(step == 63, 0.5, 0)";
+    let schedule = r#","impulse_every":[0.7,0]"#;
+    let mut model = compiled(&model(rate, "z", "step_function", schedule));
+    let (state, acted) = after_impulses(&mut model, 62.5, 63.5);
+    assert_eq!((state, acted), (vec![400.0, 600.0, 0.0], 1));
+}
+
+#[test]
+fn an_impulse_next_to_a_step_reads_that_step_and_acts_once() {
+    // This impulse moves half of A at step 3 and nothing at another step.
+    for on in next_to_three() {
+        let impulse = format!(r#","impulse_at":[{on:?}]"#);
+        let rate = "if(step == 3, 0.5, 0)";
+        let mut model = compiled(&model(rate, "z", "step_function", &impulse));
+        assert_eq!(impulses(&mut model, 2.0, 5.0), [(3.0, vec![0])], "{on}");
+        let (state, acted) = after_impulses(&mut model, 2.0, 5.0);
+        assert_eq!((state, acted), (vec![400.0, 600.0, 0.0], 1), "{on}");
+    }
 }
 
 #[test]
 fn the_points_of_a_series_read_at_t_are_breakpoints_inside_the_range() {
     let mut model = compiled(&model("s", "k", "step_function", ""));
-    assert_eq!(model.breakpoints(2.0, 6.0).unwrap(), [5.0, 6.0]);
+    assert_eq!(ends(&mut model, 2.0, 6.0), [5.0, 6.0]);
 }
 
 #[test]
 fn impulses_act_at_their_positions_inside_the_range() {
-    let at = compiled(&model(
+    let mut at = compiled(&model(
         "k",
         "k",
         "step_function",
         r#","impulse_at":[1,5,9]"#,
     ));
-    assert_eq!(at.impulse_positions(2.0, 6.0), [5.0]);
-    let every = compiled(&model(
+    assert_eq!(impulses(&mut at, 2.0, 6.0), [(5.0, vec![0])]);
+    assert_eq!(
+        (at.impulses_at(5.0), at.impulses_at(4.0)),
+        (vec![0], vec![])
+    );
+    let mut every = compiled(&model(
         "k",
         "k",
         "step_function",
         r#","impulse_every":[2,0.5]"#,
     ));
-    assert_eq!(every.impulse_positions(4.0, 8.5), [4.5, 6.5, 8.5]);
-    assert_eq!(every.impulse_positions(6.0, 9.0), [6.5, 8.5]);
+    let at_each = |positions: &[f64]| -> Vec<(f64, Vec<usize>)> {
+        positions
+            .iter()
+            .map(|&position| (position, vec![0]))
+            .collect()
+    };
+    assert_eq!(impulses(&mut every, 4.0, 8.5), at_each(&[4.5, 6.5, 8.5]));
+    assert_eq!(impulses(&mut every, 6.0, 9.0), at_each(&[6.5, 8.5]));
 }
 
 /// `model` with the engine `engine`.
@@ -246,9 +456,11 @@ fn a_value_that_reads_a_parameter_without_a_value_fails_where_it_is_read() {
         .unwrap_err();
     let mut impulse = without_k("k", r#","impulse_at":[1]"#);
     let rate = impulse
-        .impulse_rates(1.0, &state, &mut Vec::new())
+        .impulse_rates(1.0, &[0], &state, &mut Vec::new())
         .unwrap_err();
-    let applied = impulse.apply_impulses(1.0, &mut state.clone()).unwrap_err();
+    let applied = impulse
+        .apply_impulses(1.0, &[0], &mut state.clone())
+        .unwrap_err();
 
     for error in [&program, &rate] {
         assert!(error.ends_with("the parameter 'k' has no value"), "{error}");
@@ -295,11 +507,16 @@ fn only_the_impulses_of_a_position_act_and_an_absolute_one_moves_its_rate() {
     let mut state = model.initial_state().to_vec();
 
     let mut rates = Vec::new();
-    model.impulse_rates(1.0, &state, &mut rates).unwrap();
+    let (at_one, at_two) = (model.impulses_at(1.0), model.impulses_at(2.0));
+    assert_eq!((at_one.as_slice(), at_two.as_slice()), (&[0][..], &[1][..]));
+    model
+        .impulse_rates(1.0, &at_one, &state, &mut rates)
+        .unwrap();
     assert_eq!(rates, [(0, 0.5)]);
-    assert!(model.apply_impulses(1.0, &mut state).unwrap());
+    assert!(model.apply_impulses(1.0, &at_one, &mut state).unwrap());
     assert_eq!(state, [400.0, 600.0, 0.0]);
-    assert!(model.apply_impulses(2.0, &mut state).unwrap());
+    assert!(!model.apply_impulses(1.5, &[], &mut state).unwrap());
+    assert!(model.apply_impulses(2.0, &at_two, &mut state).unwrap());
     assert_eq!(state, [350.0, 600.0, 50.0]);
 }
 

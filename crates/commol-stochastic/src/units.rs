@@ -143,7 +143,7 @@ impl Units {
         }
     }
 
-    /// Apply the impulses that act at position `t`.
+    /// Apply the impulses of `impulses` at position `t`.
     ///
     /// Every impulse reads the state before any of them, as in the
     /// deterministic engines. A proportional impulse moves a binomial draw of
@@ -160,9 +160,15 @@ impl Units {
     /// proportional rate is not a probability or an absolute rate is not a
     /// whole number of units, and [`SimulationError::Failed`] when a rate
     /// cannot be evaluated.
-    pub(crate) fn apply_impulses(&mut self, t: f64) -> Result<bool, SimulationError> {
+    pub(crate) fn apply_impulses(
+        &mut self,
+        t: f64,
+        impulses: &[usize],
+    ) -> Result<bool, SimulationError> {
         let mut rates = std::mem::take(&mut self.impulse_rates);
-        let result = self.model.impulse_rates(t, &self.state, &mut rates);
+        let result = self
+            .model
+            .impulse_rates(t, impulses, &self.state, &mut rates);
         let applied = result.map_err(SimulationError::from).and_then(|()| {
             let before = self.state.clone();
             for &(index, rate) in &rates {

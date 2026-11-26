@@ -115,6 +115,28 @@ pub fn check_positions(
     Ok(())
 }
 
+/// [`check_positions`] for an engine in continuous time, where a first
+/// position that is the same position as `from` ([`crate::same_position`])
+/// is not before it: it is where the last run ended.
+///
+/// An engine of integer steps keeps the exact check, since from `1e9` two
+/// steps can be the same position.
+///
+/// # Errors
+///
+/// The errors of [`check_positions`].
+pub fn check_positions_in_continuous_time(
+    positions: &[f64],
+    from: f64,
+    accept: impl Fn(f64) -> Result<(), String>,
+) -> Result<(), String> {
+    let from = match positions.first() {
+        Some(&first) if crate::same_position(first, from) => first.min(from),
+        _ => from,
+    };
+    check_positions(positions, from, accept)
+}
+
 /// The accuracy of the outputs of a run ([`SimulationEngine::accuracy`]).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Accuracy {

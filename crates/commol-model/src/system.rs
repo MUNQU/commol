@@ -1,12 +1,14 @@
 //! The right-hand side of a compiled model, and its accessors.
 
 use commol_core::{
-    MathExpressionContext, SPECIAL_VAR_T, SPECIAL_VAR_TOTAL, ScaledMatrix, same_position,
+    MathExpressionContext, POSITION_TOLERANCE, SPECIAL_VAR_T, SPECIAL_VAR_TOTAL,
+    STEP_POSITION_LIMIT, ScaledMatrix,
 };
 
 use crate::labels::OutputLabels;
 
 use crate::rates::{Clock, evaluate_rate};
+use crate::stops::Breakpoints;
 use crate::types::{CompiledModel, FlowChange, TransitionFlow};
 
 /// Set a reserved parameter slot during an evaluation. When `keep_cache_live`
@@ -410,10 +412,22 @@ impl CompiledModel {
         &self.impulse_changes
     }
 
-    /// The rate of each impulse that acts at position `t`, as its expression
-    /// gives it (the fraction of its source for a proportional impulse, the
-    /// amount for an absolute one), written into `out` as `(impulse index,
-    /// rate)`, in the order of [`Self::impulse_changes`].
+    /// The impulses that act at position `t`, ascending: those with a
+    /// position that [`commol_core::same_position`] calls `t`.
+    ///
+    /// An engine in discrete time applies them at each step, and an engine in
+    /// continuous time at the start of a run. At a later stop it applies the
+    /// impulses of the stop ([`crate::Stop::impulses`]).
+    pub fn impulses_at(&self, t: f64) -> Vec<usize> {
+        (0..self.impulse_flows.len())
+            .filter(|&index| self.impulse_flows[index].schedule.fires_at(t))
+            .collect()
+    }
+
+    /// The rate of each impulse of `impulses` at position `t`, as its
+    /// expression gives it (the fraction of its source for a proportional
+    /// impulse, the amount for an absolute one), written into `out` as
+    /// `(impulse index, rate)`, in the order of `impulses`.
     ///
     /// Every rate is computed from `state`. Rates see `step = floor(t)` and
     /// `t`, as in [`Self::apply_impulses`].
@@ -424,31 +438,26 @@ impl CompiledModel {
     pub fn impulse_rates(
         &mut self,
         t: f64,
+        impulses: &[usize],
         state: &[f64],
         out: &mut Vec<(usize, f64)>,
     ) -> Result<(), String> {
         out.clear();
-        if !self
-            .impulse_flows
-            .iter()
-            .any(|impulse| impulse.schedule.fires_at(t))
-        {
+        if impulses.is_empty() {
             return Ok(());
         }
         let amounts = &state[..self.compartments.len()];
         let clock = self.prepare_context(t.floor(), t, amounts)?;
         let mut jit_buf = [0.0_f64; 16];
-        for (index, impulse) in self.impulse_flows.iter().enumerate() {
-            if impulse.schedule.fires_at(t) {
-                let rate = evaluate_rate(
-                    &impulse.flow,
-                    amounts,
-                    &mut self.expression_context,
-                    clock,
-                    &mut jit_buf,
-                )?;
-                out.push((index, rate));
-            }
+        for &index in impulses {
+            let rate = evaluate_rate(
+                &self.impulse_flows[index].flow,
+                amounts,
+                &mut self.expression_context,
+                clock,
+                &mut jit_buf,
+            )?;
+            out.push((index, rate));
         }
         Ok(())
     }
@@ -460,39 +469,71 @@ impl CompiledModel {
         self.reads_time
     }
 
-    /// The positions in `(from, to]` where the right-hand side can jump,
-    /// ascending and without duplicates, ending at `to`: the impulse
-    /// positions, the values a rate compares `t` with, the points of a series
-    /// read at `t` and, when a rate reads `step` or a pulse series, every
-    /// integer.
+    /// The stops of a run from `from` to `to`, where the right-hand side can
+    /// jump: at the impulse positions, the values a rate compares `t` with,
+    /// the points of a series read at `t` and, when a rate reads `step` or a
+    /// pulse series, every integer.
     ///
     /// An engine in continuous time stops at each of them, so no step crosses
-    /// a discontinuity.
+    /// a discontinuity. The points that [`commol_core::same_position`] calls
+    /// one are one stop ([`crate::Stop`]). The run ends at the stop that
+    /// holds `to`, or at `to` when no stop holds it, so a run split at any
+    /// position stops where the whole run does.
     ///
     /// # Errors
     ///
     /// Returns a message when a value a rate compares `t` with cannot be
-    /// evaluated.
-    pub fn breakpoints(&mut self, from: f64, to: f64) -> Result<Vec<f64>, String> {
-        let mut points: Vec<f64> = self
-            .impulse_positions(from, to)
-            .into_iter()
-            .filter(|&position| position > from)
-            .collect();
-        points.extend(self.time_thresholds(from, to)?);
-        points.extend(self.series_points(from, to));
-        if self.depends_on_step {
-            let mut n = from.floor() + 1.0;
-            while n < to {
-                points.push(n);
-                n += 1.0;
-            }
+    /// evaluated, or when the run reaches a position that
+    /// [`Self::check_reach`] refuses.
+    pub fn breakpoints(&mut self, from: f64, to: f64) -> Result<Breakpoints, String> {
+        let farthest = if from.abs() > to.abs() { from } else { to };
+        self.check_reach(farthest)
+            .map_err(|reason| format!("A run cannot reach {farthest}: {reason}"))?;
+        // A stop that holds `to` holds points up to two tolerances past it.
+        let reach = to + 4.0 * POSITION_TOLERANCE * to.abs().max(1.0);
+        let mut points: Vec<(f64, Option<usize>)> = Vec::new();
+        for (index, impulse) in self.impulse_flows.iter().enumerate() {
+            let positions = impulse.schedule.positions_in(from, reach);
+            points.extend(
+                positions
+                    .into_iter()
+                    .filter(|&position| position >= from)
+                    .map(|position| (position, Some(index))),
+            );
         }
-        points.push(to);
-        points.sort_by(f64::total_cmp);
-        points.dedup_by(|later, earlier| same_position(*later, *earlier));
-        points.retain(|&point| !same_position(point, from));
-        Ok(points)
+        let thresholds = self.time_thresholds(from, reach)?;
+        let series = self.series_points(from, reach);
+        points.extend(
+            thresholds
+                .into_iter()
+                .chain(series)
+                .map(|point| (point, None)),
+        );
+        points.sort_by(|a, b| a.0.total_cmp(&b.0));
+        Ok(Breakpoints::new(from, to, &points, self.depends_on_step))
+    }
+
+    /// Check that a run of the model can reach `position`: a model that reads
+    /// `step` runs only where the magnitude of a position is below
+    /// [`STEP_POSITION_LIMIT`], since from there [`commol_core::same_position`]
+    /// cannot tell two steps apart.
+    ///
+    /// An engine in continuous time checks each position it receives with it,
+    /// and [`Self::breakpoints`] each run.
+    ///
+    /// # Errors
+    ///
+    /// Returns the reason, for the caller to name the position.
+    pub fn check_reach(&self, position: f64) -> Result<(), String> {
+        if self.depends_on_step && position.abs() >= STEP_POSITION_LIMIT {
+            return Err(format!(
+                "a model that reads `step` runs only below position \
+                 {STEP_POSITION_LIMIT:e}, where a relative tolerance of \
+                 {POSITION_TOLERANCE:e} is half a step, so two positions a step apart \
+                 can be the same position. Put the origin of the axis nearer the run"
+            ));
+        }
+        Ok(())
     }
 
     /// Whether the model has impulse transitions.
@@ -500,20 +541,7 @@ impl CompiledModel {
         !self.impulse_flows.is_empty()
     }
 
-    /// Positions in `[from, to]` where an impulse acts, ascending and without
-    /// duplicates.
-    pub fn impulse_positions(&self, from: f64, to: f64) -> Vec<f64> {
-        let mut positions: Vec<f64> = self
-            .impulse_flows
-            .iter()
-            .flat_map(|impulse| impulse.schedule.positions_in(from, to))
-            .collect();
-        positions.sort_by(f64::total_cmp);
-        positions.dedup();
-        positions
-    }
-
-    /// Positions in `(from, to)` where `t` reaches a value that a rate compares
+    /// Positions in `[from, to)` where `t` reaches a value that a rate compares
     /// it with, ascending and without duplicates, for the current parameter
     /// values.
     ///
@@ -532,7 +560,7 @@ impl CompiledModel {
                         threshold.formula
                     )
                 })?;
-            if position > from && position < to {
+            if position >= from && position < to {
                 positions.push(position);
             }
         }
@@ -541,7 +569,7 @@ impl CompiledModel {
         Ok(positions)
     }
 
-    /// Positions in `(from, to)` where a series parameter read at `t` jumps or
+    /// Positions in `[from, to)` where a series parameter read at `t` jumps or
     /// bends: the points of every `"step_function"` and `"linear"` series,
     /// ascending and without duplicates.
     pub fn series_points(&self, from: f64, to: f64) -> Vec<f64> {
@@ -556,7 +584,7 @@ impl CompiledModel {
         positions
     }
 
-    /// Apply the impulses that act at position `t` to `state`, at once.
+    /// Apply the impulses of `impulses` to `state` at position `t`, at once.
     ///
     /// Every jump is computed from the state before any of them, as the flows
     /// of a step are. A proportional rate moves that fraction of its source; an
@@ -568,12 +596,13 @@ impl CompiledModel {
     /// # Errors
     ///
     /// Returns a message when a rate cannot be evaluated.
-    pub fn apply_impulses(&mut self, t: f64, state: &mut [f64]) -> Result<bool, String> {
-        if !self
-            .impulse_flows
-            .iter()
-            .any(|impulse| impulse.schedule.fires_at(t))
-        {
+    pub fn apply_impulses(
+        &mut self,
+        t: f64,
+        impulses: &[usize],
+        state: &mut [f64],
+    ) -> Result<bool, String> {
+        if impulses.is_empty() {
             return Ok(false);
         }
         let num_compartments = self.compartments.len();
@@ -582,18 +611,15 @@ impl CompiledModel {
         let clock = self.prepare_context(t.floor(), t, amounts)?;
 
         let mut jit_buf = [0.0_f64; 16];
-        for (impulse, change) in self.impulse_flows.iter().zip(&self.impulse_changes) {
-            if !impulse.schedule.fires_at(t) {
-                continue;
-            }
+        for &index in impulses {
             let amount = flow_amount(
-                &impulse.flow,
+                &self.impulse_flows[index].flow,
                 amounts,
                 &mut self.expression_context,
                 clock,
                 &mut jit_buf,
             )?;
-            add_changes(change, amount, state);
+            add_changes(&self.impulse_changes[index], amount, state);
         }
         Ok(true)
     }
@@ -628,9 +654,9 @@ impl CompiledModel {
         )
     }
 
-    /// The impulses that act at `t` and drain compartment `compartment` when
-    /// [`Self::apply_impulses`] reads `state`, as [`Self::outflows`] gives
-    /// them.
+    /// The impulses of `impulses` that drain compartment `compartment` when
+    /// [`Self::apply_impulses`] reads `state` at `t`, as [`Self::outflows`]
+    /// gives them.
     ///
     /// # Errors
     ///
@@ -638,16 +664,15 @@ impl CompiledModel {
     pub fn impulse_outflows(
         &mut self,
         t: f64,
+        impulses: &[usize],
         state: &[f64],
         compartment: usize,
     ) -> Result<Vec<(String, f64)>, String> {
         let amounts = &state[..self.compartments.len()];
         let clock = self.prepare_context(t.floor(), t, amounts)?;
-        let firing = self
-            .impulse_flows
+        let firing = impulses
             .iter()
-            .filter(|impulse| impulse.schedule.fires_at(t))
-            .map(|impulse| &impulse.flow);
+            .map(|&index| &self.impulse_flows[index].flow);
         drains(
             firing,
             amounts,
