@@ -16,12 +16,18 @@ class AtParameters(RangeChecked):
     observation models at the predictions of the draw give the law of the
     integrated statistics: the p-values of ``Q̃`` and of the information
     factor, and the band of ``τ``. No model runs again. With `NoNoise`,
-    ``Q̃`` is read against ``χ²(h)`` and the band comes from `replicates`
-    sets of the residuals with signs ±1. A fit leaves its residuals
-    correlated with each other, the more so the more parameters it has, so
-    with the data of the fit this reference rejects more often than its
-    level (8 % at 5 % with 3 parameters and 24 to 26 % with 10, at 35
-    positions); `Refitted` holds there. It is the reference of held-out data.
+    ``Q̃`` is read against `replicates` permutations of the residuals of
+    each series, and the band comes from `replicates` sets of the residuals
+    with signs ±1. A p-value is at least ``1 / (replicates + 1)``, so fewer
+    than 19 replicates never reject at 5 %. Each series draws its
+    permutations from its own label, so its p-value does not depend on the
+    other series. With a noise model, the replicates draw all observations
+    together, so the test of a series depends on the others. A fit leaves
+    its residuals correlated with each other, the more so the more
+    parameters it has, so with the data of the fit this reference rejects
+    more often than its level (8 % at 5 % with 3 parameters and 24 to 26 %
+    with 10, at 35 positions); `Refitted` holds there. It is the reference
+    of held-out data.
 
     Attributes
     ----------
@@ -49,9 +55,10 @@ class Refitted(RangeChecked):
     problem from `starts` starts. The statistics of the residuals of the
     refits are the law of the statistics of the fit, so the test holds at a
     fit whatever its number of parameters: the p-value of ``Q̃`` and of the
-    information factor is ``(1 + #{Q_b ≥ Q}) / (B + 1)``. It needs the sample
-    of one point and the observations of the problem; the refits run in
-    parallel and log a record of each.
+    information factor is ``(1 + #{Q_b ≥ Q}) / (B + 1)``. A refit reads
+    all observations together, so the test of a series depends on the
+    other series. It needs the sample of one point and the observations of
+    the problem; the refits run in parallel and log a record of each.
 
     Attributes
     ----------

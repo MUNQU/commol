@@ -37,6 +37,24 @@ pub fn replicate_seed(seed: u64, index: u64) -> u64 {
     splitmix64(&mut state)
 }
 
+/// The 64-bit FNV-1a hash of the bytes of `label` (Fowler, Noll and Vo):
+/// fixed on every platform and version, as the hash of `std` is not.
+fn fnv1a(label: &str) -> u64 {
+    label.bytes().fold(0xcbf2_9ce4_8422_2325, |hash, byte| {
+        (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3)
+    })
+}
+
+/// The seed of the series `label` in a replicate seeded with `seed`: the
+/// SplitMix64 of the mixed `seed` and the mixed FNV-1a hash of `label`.
+///
+/// A series gets the same seed whatever other series a run reads and in
+/// whatever order, and two labels give unrelated seeds.
+pub fn label_seed(seed: u64, label: &str) -> u64 {
+    let mut state = mixed(seed) ^ mixed(fnv1a(label));
+    splitmix64(&mut state)
+}
+
 /// A `Xoshiro256PlusPlus` generator (Blackman and Vigna 2021).
 ///
 /// Its four words of state are the first four SplitMix64 numbers of the
@@ -119,6 +137,14 @@ impl TryRng for Generator {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_hash_of_a_label_is_fnv_1a() {
+        // The test vectors of Fowler, Noll and Vo.
+        assert_eq!(fnv1a(""), 0xcbf2_9ce4_8422_2325);
+        assert_eq!(fnv1a("a"), 0xaf63_dc4c_8601_ec8c);
+        assert_eq!(fnv1a("foobar"), 0x8594_4171_f739_67e8);
+    }
 
     #[test]
     fn the_trait_of_rand_core_draws_the_numbers_of_the_generator() {

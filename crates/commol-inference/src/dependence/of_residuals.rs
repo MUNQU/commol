@@ -13,8 +13,8 @@ use rayon::prelude::*;
 
 use super::SeriesDependence;
 use super::grid::Layout;
-use super::law::{Portmanteau, Tests, result, spread, test};
-use super::of_values::wild_band;
+use super::law::{PortmanteauLaw, Tests, result, spread, test};
+use super::of_values::{permuted_portmanteaus, wild_band};
 use super::sets::{SetStatistics, Summary, statistics, summarize};
 use crate::error::MethodError;
 use crate::predictive::{
@@ -213,7 +213,8 @@ struct Analysis<'a, E: SimulationEngine> {
 impl<E: SimulationEngine + Send + Sync> Analysis<'_, E> {
     /// The reference of `draw`, number `index`, at its parameters: data sets
     /// drawn from the observation models with no refit, or wild sets of
-    /// its additive residuals.
+    /// its additive residuals with their `Q̃` read against permutations of
+    /// the residuals; with the `Q̃` of each series in each replicate.
     ///
     /// # Errors
     ///
@@ -223,17 +224,24 @@ impl<E: SimulationEngine + Send + Sync> Analysis<'_, E> {
         index: usize,
         draw: &Draw<'_>,
         replicates: usize,
-    ) -> Result<(Vec<Summary>, Portmanteau), MethodError> {
+    ) -> Result<(Vec<Summary>, PortmanteauLaw), MethodError> {
         let Some(noise) = &self.noise else {
-            let seed = Stream::DependenceSigns.replicate(self.seed, index as u64);
+            let residuals = &draw.residuals[0];
             let band = wild_band(
                 &self.layout,
                 self.max_lag,
-                &draw.residuals[0],
+                residuals,
                 replicates,
-                seed,
+                Stream::DependenceSigns.replicate(self.seed, index as u64),
             );
-            return Ok((band, Portmanteau::ChiSquare));
+            let permuted = permuted_portmanteaus(
+                &self.layout,
+                self.max_lag,
+                residuals,
+                replicates,
+                Stream::DependencePermutations.replicate(self.seed, index as u64),
+            );
+            return Ok((band, PortmanteauLaw::Sets(permuted)));
         };
         let seed = Stream::DependenceReference.replicate(self.seed, index as u64);
         let summaries = (0..replicates)
@@ -258,8 +266,8 @@ impl<E: SimulationEngine + Send + Sync> Analysis<'_, E> {
                     &sets,
                 )))
             })
-            .collect::<Result<_, MethodError>>()?;
-        Ok((summaries, Portmanteau::Replicates))
+            .collect::<Result<Vec<_>, MethodError>>()?;
+        Ok((summaries, PortmanteauLaw::Replicates))
     }
 
     /// The reference of refits of the one draw `draw`: data sets drawn at it,
@@ -403,15 +411,17 @@ fn check<E: SimulationEngine>(
 /// `settings.reference`: [`Reference::AtParameters`] draws data sets from
 /// the observation models at the draw (the stream
 /// [`Stream::DependenceReference`]) and reads `Q̃` by the law of their
-/// statistics, or with additive residuals tests `Q̃` against `χ²(h)` and
+/// statistics, or with additive residuals reads `Q̃` against permutations
+/// of the residuals of each series ([`Stream::DependencePermutations`]) and
 /// takes the band from wild sets of the residuals ([`Stream::DependenceSigns`]);
 /// [`Reference::Refitted`] draws data sets at the draw (the observation
 /// models, or the fit plus its residuals with signs ±1), fits each again
 /// with `config` from its starts, sending the events of the refits to
 /// `steps`, and reads every statistic by the law of the residuals of the
-/// refits, with Monte Carlo p-values `(1 + #{Q_b ≥ Q}) / (B + 1)`. With many
-/// draws, the result gives the spread of the p-values of the draws, each
-/// against its own reference at its parameters, and no test of its own.
+/// refits. Every p-value is a Monte Carlo one, `(1 + #{Q_b ≥ Q}) / (B +
+/// 1)`. With many draws, the result gives the spread of the p-values of the
+/// draws, each against its own reference at its parameters, and no test of
+/// its own.
 ///
 /// # Errors
 ///
@@ -504,7 +514,7 @@ where
     let mut not_converged = 0;
     let tests = if let [draw] = draws.as_slice() {
         let observed = summary_of(&draw.statistics);
-        let (replicates, portmanteau) = match &settings.reference {
+        let (replicates, law) = match &settings.reference {
             Reference::AtParameters(reference) => {
                 analysis.at_parameters(0, draw, reference.replicates)?
             }
@@ -518,13 +528,13 @@ where
                 )?;
                 failed = refits.failed;
                 not_converged = refits.not_converged;
-                (refits.summaries, Portmanteau::Replicates)
+                (refits.summaries, PortmanteauLaw::Replicates)
             }
         };
         Tests::One(test(
             &observed,
             &replicates,
-            portmanteau,
+            &law,
             settings.confidence_level,
         ))
     } else {
@@ -533,11 +543,11 @@ where
             .par_iter()
             .enumerate()
             .map(|(index, draw)| {
-                let (reference, portmanteau) = analysis.at_parameters(index, draw, replicates)?;
+                let (reference, law) = analysis.at_parameters(index, draw, replicates)?;
                 Ok(test(
                     &summary_of(&draw.statistics),
                     &reference,
-                    portmanteau,
+                    &law,
                     settings.confidence_level,
                 ))
             })

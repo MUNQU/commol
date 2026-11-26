@@ -105,9 +105,10 @@ lag.
 | Statistic | What it says |
 |---|---|
 | `correlations` | The autocorrelation at lags `1 … max_lag`; `None` at a lag with no pair |
-| `portmanteau` | The robust portmanteau `Q̃ = Σ_k (Σ e_t e_{t−k})² / Σ e_t² e_{t−k}²` of the values centered per series, the diagonal form of the statistic of Dalla, Giraitis and Phillips (2022): `χ²` of `degrees_of_freedom` lags under independence, also when the size of the noise varies along the series; `None`, with the `portmanteau_reason`, when no lag enters its sum |
+| `portmanteau` | The robust portmanteau `Q̃ = Σ_k (Σ e_t e_{t−k})² / Σ e_t² e_{t−k}²` of the values centered per series, the diagonal form of the statistic of Dalla, Giraitis and Phillips (2022), which each lag scales by its own products, so that the size of the noise may vary along the series; `None`, with the `portmanteau_reason`, when no lag enters its sum |
+| `degrees_of_freedom` | The lags in the sum of `Q̃`: its degrees of freedom in the large-sample law `χ²` |
 | `few_pairs` | Each lag of fewer than 4 pairs, as `(lag, pairs)`: it keeps its correlation and is left out of `Q̃` and of `degrees_of_freedom` |
-| `p_value` | The p-value of `Q̃` under the reference |
+| `p_value` | The p-value of `Q̃` under the reference: `(1 + #{Q_b ≥ Q}) / (B + 1)` over its `B` replicates |
 | `tau` | The integrated autocorrelation time `τ = 1 + 2 Σ r(k)`, by the initial monotone sequence of Geyer (1992): how many times the series counts each value |
 | `tau_band` | The central interval of `τ` at `confidence_level` under independence, with one draw; `None` when no replicate has a `τ`, as for a constant series |
 | `cut_lag` | The largest lag in the sum of `τ`: the sequence `Γ_k = r(2k) + r(2k+1)`, made monotone, stops at its first `Γ_k ≤ 0` or at the first lag with no pair; over several sets, the largest of theirs |
@@ -124,25 +125,77 @@ the `tau_reason`, for fewer than 4 values, constant values, or an estimate
 not above 0, which comes from a negative correlation at the first lags; an
 undefined `τ` reads as below its band.
 
-A lag of few pairs adds a term bounded by its pairs, of mean near 1 but
-with less spread than the `χ²(1)` it counts as: a lag of one pair adds 1
+A lag of few pairs adds a term bounded by its pairs: a lag of one pair adds 1
 whatever the values. So `Q̃` sums only the lags of 4 pairs or more, and
 `few_pairs` names the others: a `max_lag` near the length of the series
-leaves out its last lags, and a gap the lags it breaks. Over 3000 sets of
-independent values each, with `max_lag` at the last lag of 12 positions,
-of 19 positions on a grid of 35 and of 14 on a grid of 24, `Q̃` rejects at
-5 % in 4.3 % of them, and in 3.1 % with every lag in its sum
-(`tests/uncertainty/test_dependence_coverage.py`).
+leaves out its last lags, and a gap the lags it breaks. A series whose every
+lag reads fewer than 4 pairs, such as one of 4 values, has no `Q̃`:
+`portmanteau` and `p_value` are `None`, and the `portmanteau_reason` says so.
 
-A lag of 4 pairs or more still pulls the rate down, less the more pairs
-it reads: one lag of 4 independent pairs alone rejects at 5 % in 0.2 % of
-the sets, of 6 in 1.2 %, of 10 in 3.1 % and of 20 in 4.4 %. So a series of
-a few values, or one whose gaps leave few pairs at every lag, stays
-conservative whatever its `max_lag`: 5 values have one lag of 4 pairs
-(0.2 %), and 8 values at most four lags, of 4 to 7 pairs (2.4 %). A series
-whose every lag reads fewer than 4 pairs, such as one of 4 values, has no
-`Q̃`: `portmanteau` and `p_value` are `None`, and the `portmanteau_reason`
-says so.
+### The law of `Q̃`
+
+`Q̃` is read against replicates of the values under independence, not
+against `χ²`. `χ²` is its law only for long series: at 5 % it rejects
+independent normal values in 0.2 % of series of 5 values and 2 % of 8, and
+in 7.5 % of 35 values at `max_lag=17`. Each reference draws its own
+replicates ([The reference](#the-reference)). `series_dependence`, and
+`AtParameters` with `NoNoise()`, permute the values of each series over its
+positions: under independent values of one law every order is equally
+likely, so the permutations are the exact law of `Q̃`, whatever that law is.
+The p-value is `(1 + #{Q_b ≥ Q}) / (B + 1)`, and a replicate within a
+relative `10⁻¹⁰` of `Q` counts as reaching it, since a reversed series gives
+the same `Q̃` up to rounding.
+
+Each series draws its permutations from the `seed` and its own label. The
+p-value of its `Q̃` does not depend on the other series of the call, or on
+their order. The band of `τ` still depends on them, since the signs of all
+series come from one sequence. A later change treats it. With
+`DistributionNoise()` and with `Refitted`, each replicate draws or refits
+all observations together, so there the test of a series depends on the
+others by design.
+
+At 5 %, over 2000 to 10 000 simulated series per design and 199
+permutations, the test rejects (`tests/uncertainty/test_dependence_coverage.py`,
+`crates/commol-inference/tests/test_dependence.rs`):
+
+| Values | Rate at 5 % |
+|---|---|
+| Independent normal and `t₃`, 6 to 100 values, with 0, 30 or 50 % gaps, `max_lag` 1, 4 and the last lag | 4.2 to 6.0 % |
+| Independent normal, 5 values | about 4 % |
+| Skewed, `χ²(1)` and lognormal, 35 and 100 values | 4.4 to 5.4 % |
+| An ARCH(1), uncorrelated values whose spread follows the last value | 5.0 % |
+
+It holds its level less well in these cases:
+
+- **A spread that changes along the series.** Permutations move a large
+  value to a quiet stretch, so they assume one spread. With a standard
+  deviation that grows 30 times along the series, the test rejects up to
+  10.4 % with fewer than 20 values (10.0 % with 12 values at `max_lag` 2)
+  and up to about 8 % from 20 on. Gaps make it worse: up to about 18 % with
+  fewer than 12 values, 14 % with 12 to 15, 9 % with 20 to 50 and 8 % from
+  75 on. Skewed values whose spread grows strongly reject more. Exponential
+  values whose standard deviation grows 30 times reject up to about 13 %
+  with 12 values, 7 to 10.5 % with 20 and up to about 9.4 % with 50. With
+  100 values they reject 6 to 7.5 % up to 17 lags, and 11 % at the last
+  lag. When the spread is known to change, read
+  the residuals of a fit with a reference that models the noise:
+  `DistributionNoise()` with `AtParameters`, or `Refitted`.
+- **Many equal values**, as counts or values 0 and 1. Many permutations give
+  the observed `Q̃`, and each counts as reaching it, so the test can reject
+  less than the level: 5.0 % for values 0 or 1 of share 0.3 on 35
+  positions, 3.1 % of share 0.1.
+- **Few values.** 5 values have 120 orders, which give 60 distinct values
+  of `Q̃`, so the test rejects about 4 % at 5 %.
+- **A trend.** `Q̃` centers each series on one mean, so a trend reads as
+  dependence. Read the residuals of a model of the trend.
+
+A Monte Carlo p-value depends on `replicates` and `seed`. It is at least
+`1 / (B + 1)`, so fewer than 19 replicates never reject at 5 %. Choose `B`
+so that `α (B + 1)` is a whole number, such as 199 or 999. Fewer replicates
+also cost power. Against an AR(1) of 0.5 on 100 values at `max_lag=7`, 19
+replicates reject 88.8 % and 199 reject 93.4 %. Against an AR(1) of 0.3 on
+35 values at `max_lag=4`, they reject 16.1 % and 17.5 % (10 000 simulated
+sets each).
 
 ### Choose the largest lag
 
@@ -155,27 +208,15 @@ the p-value of `Q̃` depends on it. commol does not choose it.
   shows at lag 7, so a smaller number can miss it.
 - **More lags cost power.** Each lag that enters `Q̃` is one more degree of
   freedom, and a lag with no dependence dilutes those that hold it.
-- **Many lags for the length of the series make `Q̃` liberal**, from about 20
-  values on. The table below gives the rates.
 - **A common bound is 10 and a fifth of the values, the smaller of the two.**
   Hyndman and Athanasopoulos (2021, section 5.4) suggest 10 lags for data with
   no season, `2m` for data with a season of `m` steps, and a fifth of the
   values when that is fewer. It is a reference, not a rule of commol. The
   bound of 10 does not know the period of your data.
 
-How often `Q̃` rejects independent normal values at 5 %, by the length of the
-series (40 000 simulated sets each, `Q̃` against `χ²`, each rate within about
-±0.2 points):
-
-| Values | `max_lag=4` | `max_lag=7` | `max_lag=10` |
-|---|---|---|---|
-| 12 | 3.7 % | 4.9 % | 4.9 % |
-| 20 | 4.4 % | 5.5 % | 6.2 % |
-| 35 | 4.6 % | 5.4 % | 6.2 % |
-| 100 | 4.8 % | 5.3 % | 5.6 % |
-
-Many lags can reject too often: 7.5 % at `max_lag=17` with 35 values, and
-8.1 % at 33 with 100.
+Every number of lags holds the level: independent normal values of 8 to
+100 positions reject at 5 % in about 4.6 to 5.2 % of them at `max_lag` 4,
+7, 10, 17 and 33 (10 000 simulated sets each, 199 permutations).
 
 One number serves series of different lengths. The last lags of a short
 series leave its `Q̃` and are in its `few_pairs`, and the longer series read
@@ -185,8 +226,8 @@ of `series_dependence`, or with the same predictive of `residual_dependence`.
 
 Choose each number before you read a p-value. The smallest p-value of several
 numbers rejects more often than its level. At 5 %, that of 4, 7 and 10 lags
-rejects 8 to 9 % of independent normal series of 20 to 100 values (40 000
-simulated sets each).
+rejects 7.6 to 8.8 % of independent normal series of 20 to 100 values
+(10 000 simulated sets each).
 
 ## The series together
 
@@ -208,14 +249,14 @@ positions they share.
 
 `series_dependence(values, observations, max_lag, replicates,
 confidence_level, seed)` reads one finite value per observation: a residual
-of held-out data, a score, any number. `Q̃` is read against `χ²`, and the
-band of `τ` and the test of the factor come from `replicates` sets of the
-values centered per series with independent signs ±1 (a wild band), from the
-`seed`. A band from independent normal series would leave 12 to 39 % of
-heteroscedastic values outside it; the wild band keeps the size of each
-value. In a study of 1000 sets of 35 independent values whose spread grows
-30 times along the series, `Q̃` at `max_lag=7` rejects at 5 % in 5.1 % of
-them, and an AR(1) of 0.5 on 100 positions in 98 %.
+of held-out data, a score, any number. `Q̃` is read against `replicates`
+permutations of the values of each series ([The law of `Q̃`](#the-law-of-q)).
+The band of `τ` and the test of the factor come from `replicates` sets of the
+values centered per series with independent signs ±1 (a wild band). Both come
+from the `seed`. A band from independent normal series would leave 12 to 39 %
+of heteroscedastic values outside it; the wild band keeps the size of each
+value. `Q̃` at `max_lag=7` rejects an AR(1) of 0.5 on 100 positions in 93.4 % of
+10 000 simulated sets, with 199 replicates.
 
 Two series with a shared AR(1) shock of 0.7: each series alone is near
 independent, and the factor of the problem says the observations count about
@@ -276,7 +317,7 @@ residuals come from.
 
 | Reference | What it draws | Use it for |
 |---|---|---|
-| `AtParameters(replicates)` | With `DistributionNoise()`, `replicates` data sets from the observation models at the predictions of the draw, with no refit and no run of the model; with `NoNoise()`, `Q̃` against `χ²` and the wild band | Held-out data, or data drawn at the parameters |
+| `AtParameters(replicates)` | With `DistributionNoise()`, `replicates` data sets from the observation models at the predictions of the draw, with no refit and no run of the model; with `NoNoise()`, `Q̃` against permutations of the residuals and the wild band | Held-out data, or data drawn at the parameters |
 | `Refitted(replicates, starts=1)` | `replicates` data sets drawn from the observation models at the fit (`DistributionNoise()`), or the fit plus its residuals with signs ±1 (`NoNoise()`), each fitted again by the optimizer of the problem from `starts` starts; the p-value is `(1 + #{Q_b ≥ Q}) / (B + 1)` | The data of the fit |
 
 A fit leaves its residuals correlated with each other, the more so the more

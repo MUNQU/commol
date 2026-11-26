@@ -6,10 +6,12 @@
 //! Every random number of a method follows one scheme: the seed of its
 //! source, then a stream of this registry ([`Stream::seed`]), then, for a
 //! method of many draws or replicates, the index of the draw
-//! ([`Stream::replicate`], `replicate_seed(stream, index)`), with a mix at
-//! each level. No method draws from the seed of its source or from its
-//! replicates. [`Stream::ALL`] lists every stream with its method and
-//! purpose, and the compiler rejects two streams of one number. The
+//! ([`Stream::replicate`], `replicate_seed(stream, index)`), then, for a
+//! method that draws each series of a replicate apart, the label of the
+//! series (`label_seed(replicate, label)`), with a mix at each level. No
+//! method draws from the seed of its source or from its replicates.
+//! [`Stream::ALL`] lists every stream with its method and purpose, and the
+//! compiler rejects two streams of one number. The
 //! registry lives in `commol-random`, below every crate that draws, so no
 //! crate takes a stream number outside it.
 
@@ -101,6 +103,8 @@ streams! {
     DependenceReference = 25, "a dependence analysis of residuals at the parameters",
         "the data of each replicate of its reference";
     DependenceSigns = 26, "a dependence analysis", "the signs ±1 of each replicate of a wild band";
+    DependencePermutations = 27, "a dependence analysis",
+        "the order of the values of each series in each replicate of the law of `Q̃`";
 }
 
 impl Stream {

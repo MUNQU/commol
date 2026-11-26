@@ -1,7 +1,7 @@
 //! The seeds of replicates and streams: two seeds give unrelated seeds for
 //! every pair of indices.
 
-use commol_random::{Stream, replicate_seed, seed_or_drawn};
+use commol_random::{Stream, label_seed, replicate_seed, seed_or_drawn};
 
 fn all_differ(mut seeds: Vec<u64>) -> bool {
     let count = seeds.len();
@@ -48,6 +48,16 @@ fn the_first_seeds_are_fixed() {
             3_791_248_478_382_738_589
         ]
     );
+}
+
+/// The seeds of two labels and two seeds, from a SplitMix64 and an FNV-1a
+/// written apart: the seed of a series is fixed by its label alone.
+#[test]
+fn the_seed_of_a_label_is_fixed() {
+    assert_eq!(label_seed(1, "x"), 5_976_136_156_242_554_941);
+    assert_eq!(label_seed(1, "y"), 14_361_264_922_848_622_352);
+    assert_eq!(label_seed(2, "x"), 16_519_580_627_462_480_599);
+    assert_eq!(label_seed(1, "ñu"), 17_567_107_184_455_838_833);
 }
 
 #[test]

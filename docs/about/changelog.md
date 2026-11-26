@@ -873,7 +873,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is too large for the Hessian, and which rounding hides the step. See [The
   curvature and the unbounded
   scale](../guide/uncertainty/local.md#the-curvature-and-the-unbounded-scale).
-
+- The robust portmanteau `Q̃` of `series_dependence`, and of
+  `residual_dependence` with `AtParameters` and `NoNoise()`, holds its level
+  at every `max_lag`. Its p-value is `(1 + #{Q_b ≥ Q}) / (replicates + 1)`
+  over `replicates` permutations of the values of each series over its
+  positions, the exact law of `Q̃` for independent values of one law. A
+  replicate within a relative `10⁻¹⁰` of `Q` counts as reaching it. This tie
+  also changes the p-values of the information factor, of `Refitted` and of
+  `DistributionNoise()`. The sets of signs all +1 or all −1 give the observed
+  statistic up to rounding, and they now count as reaching it. At 5 %,
+  independent normal and `t₃` values of 6 to 100 positions, with or without
+  gaps, reject in 4.2 to 6.0 %, and skewed values in 4.4 to 5.4 %. Before,
+  `Q̃` was read against `χ²`, which rejected 0.2 % of series of 5 values, 2 %
+  of 8, 7.5 % of 35 at `max_lag=17`, 11 % of skewed values at 100 positions
+  and 11 % of values 0 or 1. The p-value now depends on `replicates` and
+  `seed`, and fewer than 19 replicates never reject at 5 %. A spread that
+  grows 30 times along a series still rejects up to 10.4 % below 20 values,
+  and more with gaps or skewed values. The guide gives the cases in [The law
+  of `Q̃`](../guide/uncertainty/dependence.md#the-law-of-q). In Rust, the
+  stream `Stream::DependencePermutations` draws the permutations, and each
+  series draws from a generator of its own label
+  (`commol_random::label_seed`). So the p-value of a series does not change
+  when other series join the call or change order.
+- `robust_portmanteau` divides the values of a series by the largest of them
+  before it reads their products. `Q̃` does not change with the scale, and
+  values above about `10⁷⁷` or below about `10⁻⁸¹` read the `Q̃` of any
+  other scale. Before, their products passed the largest number, which made
+  `Q̃` and its p-value NaN, or fell to 0, which left `Q̃` with no lag. A
+  statistic that is NaN has no p-value.
 - Every method that refits around a fit refuses a fit that is not feasible,
   with a `ValueError` that says why: `BayesianBootstrap`, `ResidualBootstrap`,
   `WildBootstrap`, `BlockJackknife`, `RollingConformal`, `JackknifePlus`,

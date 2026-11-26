@@ -31,9 +31,11 @@ def series_dependence(
     that exist at that distance (Parzen 1963; Stoffer and Toloi 1992). For
     each series: the autocorrelation up to `max_lag`; the robust portmanteau
     ``Q̃ = Σ_k (Σ e_t e_{t−k})² / Σ e_t² e_{t−k}²`` of the values centered
-    per series (Dalla, Giraitis and Phillips 2022), which holds under
-    heteroscedasticity, over the ``h`` lags of 4 pairs or more with a
-    product other than 0, with its p-value against ``χ²(h)``; and the
+    per series (Dalla, Giraitis and Phillips 2022), over the ``h`` lags of 4
+    pairs or more with a product other than 0, with its Monte Carlo p-value
+    ``(1 + #{Q_b ≥ Q}) / (replicates + 1)`` against `replicates`
+    permutations of the values of each series over its positions, the
+    exact law of ``Q̃`` for independent values of one law; and the
     integrated autocorrelation time ``τ`` by the initial monotone sequence
     of Geyer (1992), with its band under independence from `replicates`
     sets of the centered values with signs ±1 (a wild band). For the series
@@ -53,11 +55,18 @@ def series_dependence(
         The largest lag of the autocorrelations and of ``Q̃``, in steps of the
         grid of each series, at least 1.
     replicates : int
-        The wild sets of the band and of the test of the factor, at least 1.
+        The permutations of the test of ``Q̃``, and the wild sets of the band
+        and of the test of the factor, at least 1. A p-value is at least
+        ``1 / (replicates + 1)``, so fewer than 19 never reject at 5 %. The
+        p-values depend on `replicates` and `seed`. Each series draws its
+        permutations from its own label, so the p-value of its ``Q̃`` does
+        not depend on the other series. The band of ``τ`` does: the signs
+        of all series come from one sequence.
     confidence_level : float
         The level of the band of ``τ``.
     seed : int
-        The seed of the signs, such as ``Calibrator.seed``.
+        The seed of the permutations and of the signs, such as
+        ``Calibrator.seed``.
 
     Returns
     -------

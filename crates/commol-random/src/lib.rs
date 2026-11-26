@@ -9,7 +9,7 @@
 //!   it implements the generator trait of `rand_core`, so the particle swarm
 //!   of a calibration draws with it;
 //! - [`replicate_seed`]: the seed of replicate `index` of a run seeded with
-//!   `seed`;
+//!   `seed`, and [`label_seed`]: the seed of a series of it, by its label;
 //! - [`Stream`]: the one registry of the seed streams of every method that
 //!   draws from a seed, the starts of a calibration and the inference
 //!   methods, each with its own number, method and purpose;
@@ -41,7 +41,7 @@ mod streams;
 mod sum_tree;
 
 pub use drawn::seed_or_drawn;
-pub use generator::{Generator, replicate_seed, splitmix64};
+pub use generator::{Generator, label_seed, replicate_seed, splitmix64};
 pub use hypercube::latin_hypercube;
 pub use streams::Stream;
 pub use sum_tree::SumTree;

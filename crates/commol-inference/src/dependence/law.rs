@@ -2,7 +2,6 @@
 //! statistics of replicate sets under independence, and the result an
 //! analysis returns.
 
-use commol_statistics::special::gamma_q;
 use commol_statistics::statistics;
 
 use super::grid::Layout;
@@ -10,17 +9,6 @@ use super::sets::{Summary, pairs};
 use super::{
     DrawPValues, ProblemDependence, SeriesCorrelation, SeriesDependence, SeriesStatistics,
 };
-
-/// The law of the portmanteau under the reference.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Portmanteau {
-    /// `χ²` of its degrees of freedom: the law of `Q̃` of one set of
-    /// independent values.
-    ChiSquare,
-    /// The portmanteau of the replicates: the law of a mean of sets, or of
-    /// the residuals of refits.
-    Replicates,
-}
 
 /// The test of one series.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -38,7 +26,7 @@ pub(crate) struct Test {
     /// Each series with statistics, None for the others.
     pub series: Vec<Option<SeriesTest>>,
     /// The p-value of the information factor; None when neither the set
-    /// nor any replicate has one.
+    /// nor any replicate has one, or when that of the set is NaN.
     pub problem: Option<f64>,
 }
 
@@ -48,10 +36,36 @@ fn or_below(value: Option<f64>) -> f64 {
     value.unwrap_or(f64::NEG_INFINITY)
 }
 
-/// The Monte Carlo p-value `(1 + #{x_b ≥ x}) / (B + 1)`.
-fn monte_carlo(observed: f64, replicates: &[f64]) -> f64 {
-    let above = replicates.iter().filter(|&&x| x >= observed).count();
-    (1 + above) as f64 / (replicates.len() + 1) as f64
+/// The relative distance within which a replicate statistic equals the
+/// observed one: `|x_b − x| ≤ TIE · (1 + |x|)` counts as `x_b ≥ x`. A
+/// permutation that reverses a series, or that moves only values whose
+/// products are equal, gives the observed `Q̃` with its sums in another
+/// order, so it differs from it only by rounding.
+const TIE: f64 = 1e-10;
+
+/// The Monte Carlo p-value `(1 + #{x_b ≥ x}) / (B + 1)`, a tie within
+/// [`TIE`] counted as `x_b ≥ x`; `−∞`, an undefined statistic, reads below
+/// every replicate. None when `observed` is NaN or `+∞`, the statistic of
+/// no comparison.
+fn monte_carlo(observed: f64, replicates: &[f64]) -> Option<f64> {
+    if observed.is_nan() || observed == f64::INFINITY {
+        return None;
+    }
+    let floor = observed - TIE * (1.0 + observed.abs());
+    let above = replicates.iter().filter(|&&x| x >= floor).count();
+    Some((1 + above) as f64 / (replicates.len() + 1) as f64)
+}
+
+/// The `Q̃` of each series in each replicate of a reference, as `[b][s]`;
+/// None for a series with no `Q̃`.
+pub(crate) type Portmanteaus = Vec<Vec<Option<f64>>>;
+
+/// The replicates of `Q̃` of a test.
+pub(crate) enum PortmanteauLaw {
+    /// Sets of their own, as the permutations of the values.
+    Sets(Portmanteaus),
+    /// The `Q̃` of the replicates of the test.
+    Replicates,
 }
 
 /// The central interval of `confidence_level` of `values`, with equal
@@ -64,36 +78,47 @@ fn band(values: &[f64], confidence_level: f64) -> (f64, f64) {
     (bound(q[0]), bound(q[1]))
 }
 
-/// Test `observed` against `replicates`: `Q̃` by `portmanteau`, the band of
-/// `τ` and the information factor by the replicates. An undefined statistic
-/// reads below every defined one; one that no replicate defines either, as
-/// of a constant series, has no test.
+/// Test `observed` against its reference: `Q̃` of each series by its Monte
+/// Carlo p-value over the replicates of `law`; the information factor by
+/// its Monte Carlo p-value over `replicates`, and the band of `τ` by their
+/// quantiles. An undefined statistic reads below every defined one; one
+/// that no replicate defines either, as of a constant series, has no test.
+/// A statistic that is NaN, of values whose products pass the largest
+/// number, has no p-value.
 ///
 /// # Panics
 ///
-/// Panics when `replicates` is empty.
+/// Panics when `replicates` or the sets of `law` are empty.
 pub(crate) fn test(
     observed: &Summary,
     replicates: &[Summary],
-    portmanteau: Portmanteau,
+    law: &PortmanteauLaw,
     confidence_level: f64,
 ) -> Test {
-    assert!(!replicates.is_empty(), "a test needs a replicate");
+    let portmanteau = |r: &Summary, s: usize| r.series[s].as_ref().and_then(|x| x.portmanteau);
+    let sets = match law {
+        PortmanteauLaw::Sets(sets) => sets.len(),
+        PortmanteauLaw::Replicates => replicates.len(),
+    };
+    assert!(
+        !replicates.is_empty() && sets > 0,
+        "a test needs a replicate"
+    );
     let series = observed
         .series
         .iter()
         .enumerate()
         .map(|(s, summary)| {
             let summary = summary.as_ref()?;
-            let p_value = summary.portmanteau.map(|q| match portmanteau {
-                Portmanteau::ChiSquare => gamma_q(summary.degrees_of_freedom as f64 / 2.0, q / 2.0),
-                Portmanteau::Replicates => {
-                    let law: Vec<f64> = replicates
+            let p_value = summary.portmanteau.and_then(|q| {
+                let replicates: Vec<f64> = match law {
+                    PortmanteauLaw::Sets(sets) => sets.iter().map(|r| or_below(r[s])).collect(),
+                    PortmanteauLaw::Replicates => replicates
                         .iter()
-                        .map(|r| or_below(r.series[s].as_ref().and_then(|x| x.portmanteau)))
-                        .collect();
-                    monte_carlo(q, &law)
-                }
+                        .map(|r| or_below(portmanteau(r, s)))
+                        .collect(),
+                };
+                monte_carlo(q, &replicates)
             });
             let taus: Vec<f64> = replicates
                 .iter()
@@ -114,7 +139,9 @@ pub(crate) fn test(
     let defined = observed.is_some() || factors.iter().any(|&f| f > f64::NEG_INFINITY);
     Test {
         series,
-        problem: defined.then(|| monte_carlo(or_below(observed), &factors)),
+        problem: defined
+            .then(|| monte_carlo(or_below(observed), &factors))
+            .flatten(),
     }
 }
 
@@ -231,5 +258,38 @@ pub(crate) fn result(
         draws,
         failed: Vec::new(),
         not_converged: 0,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use commol_statistics::dependence::{centered, robust_portmanteau};
+
+    use super::*;
+
+    #[test]
+    fn a_replicate_within_the_tie_reaches_the_observed_statistic() {
+        let values = [0.3, -1.2, 2.5, 0.7, -0.4, 1.9, -2.2, 0.1, 1.4, -0.8];
+        let q = |values: Vec<f64>| -> f64 {
+            let series: Vec<Option<f64>> = values.into_iter().map(Some).collect();
+            robust_portmanteau(&centered(&series), 3).statistic
+        };
+        let observed = q(values.to_vec());
+        // The identity and the reversal are permutations of the same Q̃.
+        let reversed = q(values.iter().rev().copied().collect());
+        assert_eq!(monte_carlo(observed, &[observed, reversed]), Some(1.0));
+        // A rounding below the observed value is a tie; a real difference is
+        // not.
+        let rounded = observed * (1.0 - 1e-13);
+        assert_eq!(monte_carlo(observed, &[rounded]), Some(1.0));
+        assert_eq!(monte_carlo(observed, &[observed * (1.0 - 1e-6)]), Some(0.5));
+    }
+
+    #[test]
+    fn a_statistic_that_is_not_a_number_has_no_p_value() {
+        assert_eq!(monte_carlo(f64::NAN, &[1.0, 2.0]), None);
+        assert_eq!(monte_carlo(f64::INFINITY, &[1.0, 2.0]), None);
+        // An undefined statistic reads below every replicate.
+        assert_eq!(monte_carlo(f64::NEG_INFINITY, &[1.0, 2.0]), Some(1.0));
     }
 }

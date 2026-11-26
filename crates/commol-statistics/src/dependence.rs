@@ -90,8 +90,8 @@ pub struct Portmanteau {
     /// `Q̃ = Σ_k (Σ_t e_t e_{t−k})² / Σ_t e_t² e_{t−k}²`.
     pub statistic: f64,
     /// The lags in the sum: those with [`PORTMANTEAU_PAIRS`] pairs or more
-    /// and a product other than 0. Under independence `Q̃` is `χ²` of this
-    /// many degrees of freedom.
+    /// and a product other than 0: the degrees of freedom of `χ²`, the law
+    /// of `Q̃` of a long series of independent values.
     pub lags: usize,
     /// Each lag of fewer than [`PORTMANTEAU_PAIRS`] pairs, left out of the
     /// sum, as `(lag, pairs)`.
@@ -105,15 +105,27 @@ pub struct Portmanteau {
 /// max_lag`, the diagonal form of the statistic of Dalla, Giraitis and
 /// Phillips (2022), for the null of independence: each lag's sum of products
 /// over the pairs that exist, standardized by its own sum of squared
-/// products, so heteroscedastic independent values are `χ²(h)` too. A lag
+/// products, so heteroscedastic independent values of a long series are
+/// `χ²(h)` too. A lag
 /// with fewer than [`PORTMANTEAU_PAIRS`] pairs, or whose products are all 0,
-/// is left out.
+/// is left out. `Q̃` does not change with the scale of the series, so the
+/// values are divided by the largest `|e|` first: their products neither
+/// pass the largest number nor fall to 0.
 pub fn robust_portmanteau(series: &[Option<f64>], max_lag: usize) -> Portmanteau {
+    let largest = series
+        .iter()
+        .flatten()
+        .fold(0.0, |m: f64, e| m.max(e.abs()));
+    let scaled: Vec<Option<f64>> = if largest > 0.0 && largest.is_finite() {
+        series.iter().map(|e| e.map(|e| e / largest)).collect()
+    } else {
+        series.to_vec()
+    };
     let mut statistic = 0.0;
     let mut lags = 0;
     let mut few_pairs = Vec::new();
     for lag in 1..=max_lag {
-        let (sum, squares, count) = pairs(series, lag)
+        let (sum, squares, count) = pairs(&scaled, lag)
             .fold((0.0, 0.0, 0usize), |(sum, squares, count), (a, b)| {
                 (sum + a * b, squares + (a * b) * (a * b), count + 1)
             });
@@ -251,6 +263,28 @@ mod tests {
         // The reasons name the minimum.
         let minimum = PORTMANTEAU_PAIRS.to_string();
         assert!(FEW_PAIRS.contains(&minimum) && NO_PRODUCT.contains(&minimum));
+    }
+
+    #[test]
+    fn the_portmanteau_does_not_read_the_scale() {
+        let values = [0.3, -1.2, 2.5, 0.7, -0.4, 1.9, -2.2, 0.1, 1.4, -0.8];
+        let q = |scale: f64| {
+            let series: Vec<f64> = values.iter().map(|v| v * scale).collect();
+            robust_portmanteau(&centered(&some(&series)), 3)
+        };
+        let base = q(1.0);
+        // Products near 1e300 pass the largest number, and those near
+        // 1e-400 are 0.
+        for scale in [1e-200, 1e80, 1e150, 1e300] {
+            let scaled = q(scale);
+            assert!(
+                (scaled.statistic - base.statistic).abs() <= 1e-12 * base.statistic,
+                "{scale}: {} against {}",
+                scaled.statistic,
+                base.statistic
+            );
+            assert_eq!(scaled.lags, base.lags);
+        }
     }
 
     #[test]
