@@ -1470,6 +1470,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="The statistics of a series">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#choose-the-largest-lag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose the largest lag
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4032,6 +4049,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="The statistics of a series">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#choose-the-largest-lag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose the largest lag
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4242,22 +4276,24 @@ observation about 2.6 times.</p>
 </span><span id="__span-0-48"><a id="__codelineno-0-48" name="__codelineno-0-48" href="#__codelineno-0-48"></a><span class="n">fit</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
 </span><span id="__span-0-49"><a id="__codelineno-0-49" name="__codelineno-0-49" href="#__codelineno-0-49"></a>
 </span><span id="__span-0-50"><a id="__codelineno-0-50" name="__codelineno-0-50" href="#__codelineno-0-50"></a><span class="c1"># The residuals of the fit, against refits of data built from the fit and</span>
-</span><span id="__span-0-51"><a id="__codelineno-0-51" name="__codelineno-0-51" href="#__codelineno-0-51"></a><span class="c1"># its residuals with signs ±1.</span>
-</span><span id="__span-0-52"><a id="__codelineno-0-52" name="__codelineno-0-52" href="#__codelineno-0-52"></a><span class="n">at_fit</span> <span class="o">=</span> <span class="n">Predictive</span><span class="p">(</span><span class="n">calibrator</span><span class="p">,</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">point_sample</span><span class="p">(</span><span class="n">fit</span><span class="p">),</span> <span class="n">positions</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
-</span><span id="__span-0-53"><a id="__codelineno-0-53" name="__codelineno-0-53" href="#__codelineno-0-53"></a><span class="n">result</span> <span class="o">=</span> <span class="n">residual_dependence</span><span class="p">(</span>
-</span><span id="__span-0-54"><a id="__codelineno-0-54" name="__codelineno-0-54" href="#__codelineno-0-54"></a>    <span class="n">at_fit</span><span class="p">,</span>
-</span><span id="__span-0-55"><a id="__codelineno-0-55" name="__codelineno-0-55" href="#__codelineno-0-55"></a>    <span class="n">problem</span><span class="o">.</span><span class="n">observed_data</span><span class="p">,</span>
-</span><span id="__span-0-56"><a id="__codelineno-0-56" name="__codelineno-0-56" href="#__codelineno-0-56"></a>    <span class="n">NoNoise</span><span class="p">(),</span>
-</span><span id="__span-0-57"><a id="__codelineno-0-57" name="__codelineno-0-57" href="#__codelineno-0-57"></a>    <span class="n">max_lag</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">,</span>
-</span><span id="__span-0-58"><a id="__codelineno-0-58" name="__codelineno-0-58" href="#__codelineno-0-58"></a>    <span class="n">randomizations</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
-</span><span id="__span-0-59"><a id="__codelineno-0-59" name="__codelineno-0-59" href="#__codelineno-0-59"></a>    <span class="n">reference</span><span class="o">=</span><span class="n">Refitted</span><span class="p">(</span><span class="n">replicates</span><span class="o">=</span><span class="mi">99</span><span class="p">),</span>
-</span><span id="__span-0-60"><a id="__codelineno-0-60" name="__codelineno-0-60" href="#__codelineno-0-60"></a>    <span class="n">confidence_level</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span>
-</span><span id="__span-0-61"><a id="__codelineno-0-61" name="__codelineno-0-61" href="#__codelineno-0-61"></a><span class="p">)</span>
-</span><span id="__span-0-62"><a id="__codelineno-0-62" name="__codelineno-0-62" href="#__codelineno-0-62"></a><span class="p">(</span><span class="n">series</span><span class="p">,)</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">series</span>
-</span><span id="__span-0-63"><a id="__codelineno-0-63" name="__codelineno-0-63" href="#__codelineno-0-63"></a><span class="nb">print</span><span class="p">(</span><span class="n">series</span><span class="o">.</span><span class="n">max_lag</span><span class="p">)</span>  <span class="c1"># 10</span>
-</span><span id="__span-0-64"><a id="__codelineno-0-64" name="__codelineno-0-64" href="#__codelineno-0-64"></a><span class="nb">print</span><span class="p">([</span><span class="nb">round</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">series</span><span class="o">.</span><span class="n">correlations</span><span class="p">[:</span><span class="mi">3</span><span class="p">]])</span>  <span class="c1"># [0.52, 0.17, 0.1]</span>
-</span><span id="__span-0-65"><a id="__codelineno-0-65" name="__codelineno-0-65" href="#__codelineno-0-65"></a><span class="nb">print</span><span class="p">(</span><span class="n">series</span><span class="o">.</span><span class="n">p_value</span><span class="p">)</span>  <span class="c1"># 0.02</span>
-</span><span id="__span-0-66"><a id="__codelineno-0-66" name="__codelineno-0-66" href="#__codelineno-0-66"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">series</span><span class="o">.</span><span class="n">tau</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="p">[</span><span class="nb">round</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">series</span><span class="o">.</span><span class="n">tau_band</span><span class="p">])</span>  <span class="c1"># 2.58 [0.38, 1.97]</span>
+</span><span id="__span-0-51"><a id="__codelineno-0-51" name="__codelineno-0-51" href="#__codelineno-0-51"></a><span class="c1"># its residuals with signs ±1. The noise carries over 0.6 from one step to</span>
+</span><span id="__span-0-52"><a id="__codelineno-0-52" name="__codelineno-0-52" href="#__codelineno-0-52"></a><span class="c1"># the next: its correlation is 0.6, 0.36 and 0.22 at lags 1 to 3, and then</span>
+</span><span id="__span-0-53"><a id="__codelineno-0-53" name="__codelineno-0-53" href="#__codelineno-0-53"></a><span class="c1"># fades. So the largest lag is 3.</span>
+</span><span id="__span-0-54"><a id="__codelineno-0-54" name="__codelineno-0-54" href="#__codelineno-0-54"></a><span class="n">at_fit</span> <span class="o">=</span> <span class="n">Predictive</span><span class="p">(</span><span class="n">calibrator</span><span class="p">,</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">point_sample</span><span class="p">(</span><span class="n">fit</span><span class="p">),</span> <span class="n">positions</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+</span><span id="__span-0-55"><a id="__codelineno-0-55" name="__codelineno-0-55" href="#__codelineno-0-55"></a><span class="n">result</span> <span class="o">=</span> <span class="n">residual_dependence</span><span class="p">(</span>
+</span><span id="__span-0-56"><a id="__codelineno-0-56" name="__codelineno-0-56" href="#__codelineno-0-56"></a>    <span class="n">at_fit</span><span class="p">,</span>
+</span><span id="__span-0-57"><a id="__codelineno-0-57" name="__codelineno-0-57" href="#__codelineno-0-57"></a>    <span class="n">problem</span><span class="o">.</span><span class="n">observed_data</span><span class="p">,</span>
+</span><span id="__span-0-58"><a id="__codelineno-0-58" name="__codelineno-0-58" href="#__codelineno-0-58"></a>    <span class="n">NoNoise</span><span class="p">(),</span>
+</span><span id="__span-0-59"><a id="__codelineno-0-59" name="__codelineno-0-59" href="#__codelineno-0-59"></a>    <span class="n">max_lag</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+</span><span id="__span-0-60"><a id="__codelineno-0-60" name="__codelineno-0-60" href="#__codelineno-0-60"></a>    <span class="n">randomizations</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+</span><span id="__span-0-61"><a id="__codelineno-0-61" name="__codelineno-0-61" href="#__codelineno-0-61"></a>    <span class="n">reference</span><span class="o">=</span><span class="n">Refitted</span><span class="p">(</span><span class="n">replicates</span><span class="o">=</span><span class="mi">99</span><span class="p">),</span>
+</span><span id="__span-0-62"><a id="__codelineno-0-62" name="__codelineno-0-62" href="#__codelineno-0-62"></a>    <span class="n">confidence_level</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span>
+</span><span id="__span-0-63"><a id="__codelineno-0-63" name="__codelineno-0-63" href="#__codelineno-0-63"></a><span class="p">)</span>
+</span><span id="__span-0-64"><a id="__codelineno-0-64" name="__codelineno-0-64" href="#__codelineno-0-64"></a><span class="p">(</span><span class="n">series</span><span class="p">,)</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">series</span>
+</span><span id="__span-0-65"><a id="__codelineno-0-65" name="__codelineno-0-65" href="#__codelineno-0-65"></a><span class="nb">print</span><span class="p">(</span><span class="n">series</span><span class="o">.</span><span class="n">pairs</span><span class="p">,</span> <span class="n">series</span><span class="o">.</span><span class="n">degrees_of_freedom</span><span class="p">)</span>  <span class="c1"># [59, 58, 57] 3</span>
+</span><span id="__span-0-66"><a id="__codelineno-0-66" name="__codelineno-0-66" href="#__codelineno-0-66"></a><span class="nb">print</span><span class="p">([</span><span class="nb">round</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">series</span><span class="o">.</span><span class="n">correlations</span><span class="p">])</span>  <span class="c1"># [0.52, 0.17, 0.1]</span>
+</span><span id="__span-0-67"><a id="__codelineno-0-67" name="__codelineno-0-67" href="#__codelineno-0-67"></a><span class="nb">print</span><span class="p">(</span><span class="n">series</span><span class="o">.</span><span class="n">p_value</span><span class="p">)</span>  <span class="c1"># 0.02</span>
+</span><span id="__span-0-68"><a id="__codelineno-0-68" name="__codelineno-0-68" href="#__codelineno-0-68"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">series</span><span class="o">.</span><span class="n">tau</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="p">[</span><span class="nb">round</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">series</span><span class="o">.</span><span class="n">tau_band</span><span class="p">])</span>  <span class="c1"># 2.58 [0.38, 1.97]</span>
 </span></code></pre></div>
 <h2 id="the-statistics-of-a-series">The statistics of a series<a class="headerlink" href="#the-statistics-of-a-series" title="Permanent link">&para;</a></h2>
 <p>A series is the values of one label in position order. Its statistics read
@@ -4305,9 +4341,9 @@ lag.</p>
 </tr>
 </tbody>
 </table>
-<p><code>max_lag</code> has no default: an integer, in steps of the grid of each series, or
-<code>"auto"</code>, <code>min(10, n/5)</code> for a series of <code>n</code> values, at least 1. <code>τ</code> does
-not read it: its sum stops where the sequence of Geyer stops.</p>
+<p><code>max_lag</code> has no default: you give a whole number of at least 1
+(<a href="#choose-the-largest-lag">Choose the largest lag</a>). <code>τ</code> does not read it:
+its sum stops where the sequence of Geyer stops.</p>
 <p>A series has no statistics, with the <code>reason</code>, when two of its observations
 share one position (give one of them a label of its own), a position is off
 its grid, such as 0, 2, 3 and 4.5, or its grid has more than 10 points per
@@ -4326,15 +4362,81 @@ of 19 positions on a grid of 35 and of 14 on a grid of 24, <code>Q̃</code> reje
 (<code>tests/uncertainty/test_dependence_coverage.py</code>).</p>
 <p>A lag of 4 pairs or more still pulls the rate down, less the more pairs
 it reads: one lag of 4 independent pairs alone rejects at 5 % in 0.2 % of
-the sets, of 6 in 1.2 %, of 10 in 3.1 % and of 20 in 4.4 %. So a short
-series, or one whose gaps leave few pairs at every lag, stays
-conservative: <code>"auto"</code> gives 5 values one lag of 4 pairs (0.2 %), 6
-values 1.0 % and 8 values 2.0 %. Many lags make the test liberal: 6.2 %
-at <code>max_lag=11</code> and 7.5 % at 17 with 35 values, 8.1 % at 33 with 100;
-<code>"auto"</code> reads at most 10 lags and a fifth of the values. A series whose
-every lag reads fewer than 4 pairs, such as one of 4 values, has no <code>Q̃</code>:
-<code>portmanteau</code> and <code>p_value</code> are <code>None</code>, and the <code>portmanteau_reason</code> says
-so.</p>
+the sets, of 6 in 1.2 %, of 10 in 3.1 % and of 20 in 4.4 %. So a series of
+a few values, or one whose gaps leave few pairs at every lag, stays
+conservative whatever its <code>max_lag</code>: 5 values have one lag of 4 pairs
+(0.2 %), and 8 values at most four lags, of 4 to 7 pairs (2.4 %). A series
+whose every lag reads fewer than 4 pairs, such as one of 4 values, has no
+<code>Q̃</code>: <code>portmanteau</code> and <code>p_value</code> are <code>None</code>, and the <code>portmanteau_reason</code>
+says so.</p>
+<h3 id="choose-the-largest-lag">Choose the largest lag<a class="headerlink" href="#choose-the-largest-lag" title="Permanent link">&para;</a></h3>
+<p><code>max_lag</code> says which dependence the autocorrelations and <code>Q̃</code> can show, and
+the p-value of <code>Q̃</code> depends on it. commol does not choose it.</p>
+<ul>
+<li><strong>It counts steps of the grid of each series.</strong> 7 is a week of a daily
+  series and 7 weeks of a weekly one.</li>
+<li><strong>It must reach the period to detect.</strong> A weekly pattern of a daily series
+  shows at lag 7, so a smaller number can miss it.</li>
+<li><strong>More lags cost power.</strong> Each lag that enters <code>Q̃</code> is one more degree of
+  freedom, and a lag with no dependence dilutes those that hold it.</li>
+<li><strong>Many lags for the length of the series make <code>Q̃</code> liberal</strong>, from about 20
+  values on. The table below gives the rates.</li>
+<li><strong>A common bound is 10 and a fifth of the values, the smaller of the two.</strong>
+  Hyndman and Athanasopoulos (2021, section 5.4) suggest 10 lags for data with
+  no season, <code>2m</code> for data with a season of <code>m</code> steps, and a fifth of the
+  values when that is fewer. It is a reference, not a rule of commol. The
+  bound of 10 does not know the period of your data.</li>
+</ul>
+<p>How often <code>Q̃</code> rejects independent normal values at 5 %, by the length of the
+series (40 000 simulated sets each, <code>Q̃</code> against <code>χ²</code>, each rate within about
+±0.2 points):</p>
+<table>
+<thead>
+<tr>
+<th>Values</th>
+<th><code>max_lag=4</code></th>
+<th><code>max_lag=7</code></th>
+<th><code>max_lag=10</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>12</td>
+<td>3.7 %</td>
+<td>4.9 %</td>
+<td>4.9 %</td>
+</tr>
+<tr>
+<td>20</td>
+<td>4.4 %</td>
+<td>5.5 %</td>
+<td>6.2 %</td>
+</tr>
+<tr>
+<td>35</td>
+<td>4.6 %</td>
+<td>5.4 %</td>
+<td>6.2 %</td>
+</tr>
+<tr>
+<td>100</td>
+<td>4.8 %</td>
+<td>5.3 %</td>
+<td>5.6 %</td>
+</tr>
+</tbody>
+</table>
+<p>Many lags can reject too often: 7.5 % at <code>max_lag=17</code> with 35 values, and
+8.1 % at 33 with 100.</p>
+<p>One number serves series of different lengths. The last lags of a short
+series leave its <code>Q̃</code> and are in its <code>few_pairs</code>, and the longer series read
+all of theirs. To read one series up to another lag, repeat the analysis with
+that number. <code>τ</code>, its band and the <code>problem</code> do not change with the same <code>seed</code>
+of <code>series_dependence</code>, or with the same predictive of <code>residual_dependence</code>.</p>
+<p>Choose each number before you read a p-value. The smallest p-value of several
+numbers rejects more often than its level. At 5 %, that of 4, 7 and 10 lags
+rejects 8 to 9 % of independent normal series of 20 to 100 values (40 000
+simulated sets each).</p>
 <h2 id="the-series-together">The series together<a class="headerlink" href="#the-series-together" title="Permanent link">&para;</a></h2>
 <p>Two series can share a shock at the same position, which no series shows
 alone. Over the series standardized by their own spread, <code>z</code>, the <code>problem</code>
@@ -4391,12 +4493,14 @@ twice.</p>
 </span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="k">for</span> <span class="n">output</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;north&quot;</span><span class="p">,</span> <span class="s2">&quot;south&quot;</span><span class="p">)</span>
 </span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">51</span><span class="p">)</span>
 </span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="p">]</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="n">together</span> <span class="o">=</span> <span class="n">series_dependence</span><span class="p">(</span>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    <span class="n">values</span><span class="p">,</span> <span class="n">observations</span><span class="p">,</span> <span class="n">max_lag</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">replicates</span><span class="o">=</span><span class="mi">199</span><span class="p">,</span> <span class="n">confidence_level</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">7</span>
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="p">)</span>
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="nb">print</span><span class="p">([</span><span class="nb">round</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">tau</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">together</span><span class="o">.</span><span class="n">series</span><span class="p">])</span>  <span class="c1"># [1.34, 1.2]</span>
-</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">together</span><span class="o">.</span><span class="n">correlations</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">correlation</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>  <span class="c1"># 0.54</span>
-</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">together</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">information_factor</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">together</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">p_value</span><span class="p">)</span>  <span class="c1"># 2.1 0.035</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="c1"># The shock carries over 0.7 from one step to the next, so its correlation</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="c1"># fades to 0.17 (0.7⁵) at lag 5, the largest lag.</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="n">together</span> <span class="o">=</span> <span class="n">series_dependence</span><span class="p">(</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>    <span class="n">values</span><span class="p">,</span> <span class="n">observations</span><span class="p">,</span> <span class="n">max_lag</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">replicates</span><span class="o">=</span><span class="mi">199</span><span class="p">,</span> <span class="n">confidence_level</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">7</span>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="p">)</span>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="nb">print</span><span class="p">([</span><span class="nb">round</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">tau</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">together</span><span class="o">.</span><span class="n">series</span><span class="p">])</span>  <span class="c1"># [1.34, 1.2]</span>
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">together</span><span class="o">.</span><span class="n">correlations</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">correlation</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>  <span class="c1"># 0.54</span>
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">together</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">information_factor</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">together</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">p_value</span><span class="p">)</span>  <span class="c1"># 2.1 0.035</span>
 </span></code></pre></div>
 <p><code>values</code> is one set: a list of lists raises a <code>TypeError</code> that points to
 <code>residual_dependence</code>, which reads the residuals of several draws or
@@ -4642,8 +4746,12 @@ each at least the one before.</p>
 <td><code>ValueError</code></td>
 </tr>
 <tr>
-<td><code>max_lag</code>, <code>replicates</code> or <code>randomizations</code> below 1, or <code>max_lag</code> a text other than <code>"auto"</code></td>
+<td><code>max_lag</code>, <code>replicates</code> or <code>randomizations</code> below 1</td>
 <td><code>ValueError</code> that names the rule</td>
+</tr>
+<tr>
+<td><code>max_lag</code>, <code>replicates</code> of <code>series_dependence</code> or <code>randomizations</code> not a whole number, such as a text or 7.0</td>
+<td><code>TypeError</code> that names it</td>
 </tr>
 <tr>
 <td><code>ResidualNoise(...)</code></td>
@@ -4673,6 +4781,7 @@ each at least the one before.</p>
 </table>
 <h2 id="checklist">Checklist<a class="headerlink" href="#checklist" title="Permanent link">&para;</a></h2>
 <ul>
+<li>[ ] <code>max_lag</code> reaches the period you look for, and you can say why it is that number.</li>
 <li>[ ] You test the residuals of a fit with <code>Refitted</code> and those of held-out data with <code>AtParameters</code>.</li>
 <li>[ ] A test of many draws reads <code>Calibrator.point_sample(fit)</code>.</li>
 <li>[ ] Several series are corrected for several tests.</li>
@@ -4715,6 +4824,8 @@ each at least the one before.</p>
   Science</em>, 7(4), 473–483.</li>
 <li>Holm, S. (1979). A simple sequentially rejective multiple test procedure.
   <em>Scandinavian Journal of Statistics</em>, 6(2), 65–70.</li>
+<li>Hyndman, R. J., &amp; Athanasopoulos, G. (2021). <em>Forecasting: Principles and
+  Practice</em> (3rd ed.). OTexts.</li>
 <li>Parzen, E. (1963). On spectral analysis with missing observations and
   amplitude modulation. <em>Sankhyā A</em>, 25, 383–392.</li>
 <li>Stoffer, D. S., &amp; Toloi, C. M. C. (1992). A note on the Ljung–Box–Pierce

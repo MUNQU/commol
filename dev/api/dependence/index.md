@@ -7,7 +7,7 @@ The module `commol.dependence`: the dependence of the values of each series, of 
 ## series_dependence
 
 ```python
-series_dependence(values: Sequence[float], observations: Sequence[ObservedDataPoint], max_lag: int | Literal['auto'], replicates: int, confidence_level: float, seed: int) -> SeriesDependence
+series_dependence(values: Sequence[float], observations: Sequence[ObservedDataPoint], max_lag: int, replicates: int, confidence_level: float, seed: int) -> SeriesDependence
 ```
 
 The dependence of one value per observation, series by series.
@@ -16,14 +16,14 @@ The values of each label, in position order, are read on the grid of the smalles
 
 Parameters:
 
-| Name               | Type                          | Description                                                                                                                            | Default                                                                                                               |
-| ------------------ | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `values`           | `Sequence[float]`             | One finite value per observation, in the order of observations: a quantile residual of held-out data, an additive residual, any score. | *required*                                                                                                            |
-| `observations`     | `Sequence[ObservedDataPoint]` | The observations the values belong to.                                                                                                 | *required*                                                                                                            |
-| `max_lag`          | \`int                         | auto\`                                                                                                                                 | The largest lag, in steps of the grid of each series; "auto" is min(10, n / 5), at least 1, for a series of n values. |
-| `replicates`       | `int`                         | The wild sets of the band and of the test of the factor, at least 1.                                                                   | *required*                                                                                                            |
-| `confidence_level` | `float`                       | The level of the band of τ.                                                                                                            | *required*                                                                                                            |
-| `seed`             | `int`                         | The seed of the signs, such as Calibrator.seed.                                                                                        | *required*                                                                                                            |
+| Name               | Type                          | Description                                                                                                                            | Default    |
+| ------------------ | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `values`           | `Sequence[float]`             | One finite value per observation, in the order of observations: a quantile residual of held-out data, an additive residual, any score. | *required* |
+| `observations`     | `Sequence[ObservedDataPoint]` | The observations the values belong to.                                                                                                 | *required* |
+| `max_lag`          | `int`                         | The largest lag of the autocorrelations and of Q̃, in steps of the grid of each series, at least 1.                                     | *required* |
+| `replicates`       | `int`                         | The wild sets of the band and of the test of the factor, at least 1.                                                                   | *required* |
+| `confidence_level` | `float`                       | The level of the band of τ.                                                                                                            | *required* |
+| `seed`             | `int`                         | The seed of the signs, such as Calibrator.seed.                                                                                        | *required* |
 
 Returns:
 
@@ -33,10 +33,10 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                           |
-| ------------ | ------------------------------------------------------------------------------------- |
-| `TypeError`  | If values holds lists: one set of values only.                                        |
-| `ValueError` | If a setting is outside its range, or values is not one finite value per observation. |
+| Type         | Description                                                                                                  |
+| ------------ | ------------------------------------------------------------------------------------------------------------ |
+| `TypeError`  | If values holds lists, since it is one set of values, or if a count, such as max_lag, is not a whole number. |
+| `ValueError` | If a setting is outside its range, or values is not one finite value per observation.                        |
 
 References
 
@@ -50,7 +50,7 @@ Source code in `commol/dependence/analysis.py`
 def series_dependence(
     values: Sequence[float],
     observations: Sequence[ObservedDataPoint],
-    max_lag: int | Literal["auto"],
+    max_lag: int,
     replicates: int,
     confidence_level: float,
     seed: int,
@@ -81,9 +81,9 @@ def series_dependence(
         quantile residual of held-out data, an additive residual, any score.
     observations : Sequence[ObservedDataPoint]
         The observations the values belong to.
-    max_lag : int | "auto"
-        The largest lag, in steps of the grid of each series; ``"auto"`` is
-        ``min(10, n / 5)``, at least 1, for a series of ``n`` values.
+    max_lag : int
+        The largest lag of the autocorrelations and of ``Q̃``, in steps of the
+        grid of each series, at least 1.
     replicates : int
         The wild sets of the band and of the test of the factor, at least 1.
     confidence_level : float
@@ -99,7 +99,8 @@ def series_dependence(
     Raises
     ------
     TypeError
-        If `values` holds lists: one set of values only.
+        If `values` holds lists, since it is one set of values, or if a
+        count, such as `max_lag`, is not a whole number.
     ValueError
         If a setting is outside its range, or `values` is not one finite
         value per observation.
@@ -138,7 +139,7 @@ def series_dependence(
 ## residual_dependence
 
 ```python
-residual_dependence(predictive: Predictive, observations: Sequence[ObservedDataPoint], noise: _ObservationNoise, max_lag: int | Literal['auto'], randomizations: int, reference: AtParameters | Refitted, confidence_level: float) -> SeriesDependence
+residual_dependence(predictive: Predictive, observations: Sequence[ObservedDataPoint], noise: _ObservationNoise, max_lag: int, randomizations: int, reference: AtParameters | Refitted, confidence_level: float) -> SeriesDependence
 ```
 
 The dependence of the residuals of a predictive, series by series.
@@ -154,7 +155,7 @@ Parameters:
 | `predictive`       | `Predictive`                  | The predictive of a Calibrator.                                                                      | *required*                                                                                                            |
 | `observations`     | `Sequence[ObservedDataPoint]` | The observations whose residuals are read: the problem's, for Refitted, or held-out data.            | *required*                                                                                                            |
 | `noise`            | \`NoNoise                     | DistributionNoise\`                                                                                  | DistributionNoise() for the quantile residuals of observation models, NoNoise() for the additive residuals of a loss. |
-| `max_lag`          | \`int                         | auto\`                                                                                               | The largest lag, as in series_dependence.                                                                             |
+| `max_lag`          | `int`                         | The largest lag, as in series_dependence.                                                            | *required*                                                                                                            |
 | `randomizations`   | `int`                         | The randomizations of the quantile residuals, at least 1; 1 with NoNoise.                            | *required*                                                                                                            |
 | `reference`        | \`AtParameters                | Refitted\`                                                                                           | The reference of the tests and the band of τ.                                                                         |
 | `confidence_level` | `float`                       | The level of the band of τ; a p-value of a draw is below the level at or below 1 − confidence_level. | *required*                                                                                                            |
@@ -169,7 +170,7 @@ Raises:
 
 | Type                   | Description                                                                                                                                                                                                                                                                                       |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TypeError`            | If noise is ResidualNoise.                                                                                                                                                                                                                                                                        |
+| `TypeError`            | If noise is ResidualNoise, or a count, such as max_lag, is not a whole number.                                                                                                                                                                                                                    |
 | `ValueError`           | If a setting is outside its range, the predictive is of a sensitivity analysis, quantile residuals have a loss or an observed value outside the support of its model, additive residuals have more than one randomization, or Refitted reads many draws or observations other than the problem's. |
 | `RuntimeError`         | If every refit fails, or the exact sum of an observation does not end within the counts of sum="exact" (NegativeBinomialObservations).                                                                                                                                                            |
 | `InfeasibleStateError` | If a draw leaves the values its model allows.                                                                                                                                                                                                                                                     |
@@ -185,7 +186,7 @@ def residual_dependence(
     predictive: Predictive,
     observations: Sequence[ObservedDataPoint],
     noise: _ObservationNoise,
-    max_lag: int | Literal["auto"],
+    max_lag: int,
     randomizations: int,
     reference: AtParameters | Refitted,
     confidence_level: float,
@@ -224,7 +225,7 @@ def residual_dependence(
     noise : NoNoise | DistributionNoise
         `DistributionNoise()` for the quantile residuals of observation
         models, `NoNoise()` for the additive residuals of a loss.
-    max_lag : int | "auto"
+    max_lag : int
         The largest lag, as in `series_dependence`.
     randomizations : int
         The randomizations of the quantile residuals, at least 1; 1 with
@@ -244,7 +245,8 @@ def residual_dependence(
     Raises
     ------
     TypeError
-        If `noise` is `ResidualNoise`.
+        If `noise` is `ResidualNoise`, or a count, such as `max_lag`, is not
+        a whole number.
     ValueError
         If a setting is outside its range, the predictive is of a
         sensitivity analysis, quantile residuals have a loss or an observed
@@ -727,15 +729,15 @@ The settings of a dependence analysis.
 
 Attributes:
 
-| Name               | Type           | Description                     |
-| ------------------ | -------------- | ------------------------------- |
-| `max_lag`          | \`int          | auto\`                          |
-| `confidence_level` | `float`        | The level of the band of τ.     |
-| `seed`             | `int`          | The seed of its random numbers. |
-| `replicates`       | \`int          | None\`                          |
-| `noise`            | \`NoNoise      | DistributionNoise               |
-| `randomizations`   | \`int          | None\`                          |
-| `reference`        | \`AtParameters | Refitted                        |
+| Name               | Type           | Description                                           |
+| ------------------ | -------------- | ----------------------------------------------------- |
+| `max_lag`          | `int`          | The largest lag of each series, in steps of its grid. |
+| `confidence_level` | `float`        | The level of the band of τ.                           |
+| `seed`             | `int`          | The seed of its random numbers.                       |
+| `replicates`       | \`int          | None\`                                                |
+| `noise`            | \`NoNoise      | DistributionNoise                                     |
+| `randomizations`   | \`int          | None\`                                                |
+| `reference`        | \`AtParameters | Refitted                                              |
 
 Source code in `commol/dependence/results.py`
 
@@ -746,8 +748,8 @@ class DependenceSettings(ResultModel):
 
     Attributes
     ----------
-    max_lag : int | "auto"
-        The largest lag of each series.
+    max_lag : int
+        The largest lag of each series, in steps of its grid.
     confidence_level : float
         The level of the band of ``τ``.
     seed : int
@@ -764,7 +766,7 @@ class DependenceSettings(ResultModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    max_lag: int | Literal["auto"]
+    max_lag: int
     confidence_level: float
     seed: int
     replicates: int | None = None

@@ -5451,6 +5451,8 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   and the integrated autocorrelation time <code>τ</code> by Geyer's initial monotone
   sequence with its band; the series together have their correlations and
   the factor by which the dependence multiplies the information. The
+  required <code>max_lag</code>, a whole number of at least 1, is the largest lag of the
+  autocorrelations and of <code>Q̃</code>, in steps of the grid of each series. The
   required <code>reference</code> is <code>AtParameters(replicates)</code>, for held-out data, or
   <code>Refitted(replicates, starts=1)</code>, which refits data drawn at the fit and
   holds for the data of the fit. <code>Q̃</code> sums only the lags of 4 pairs or

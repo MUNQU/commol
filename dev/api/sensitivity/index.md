@@ -217,7 +217,7 @@ class SensitivityAnalysis:
         sample: ParameterSample,  # noqa: ARG002
         observed_data: list[ObservedDataPoint],  # noqa: ARG002
         noise: _ObservationNoise,  # noqa: ARG002
-        max_lag: int | Literal["auto"],  # noqa: ARG002
+        max_lag: int,  # noqa: ARG002
         randomizations: int,  # noqa: ARG002
         reference: str,  # noqa: ARG002
         confidence_level: float,  # noqa: ARG002
@@ -233,7 +233,7 @@ class SensitivityAnalysis:
             The observations.
         noise : NoNoise | ResidualNoise | DistributionNoise
             The residuals.
-        max_lag : int | "auto"
+        max_lag : int
             The largest lag.
         randomizations : int
             The randomizations.

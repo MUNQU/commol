@@ -3325,6 +3325,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-user-gives-the-largest-lag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The user gives the largest lag
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-user-gives-the-length-of-a-block" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3923,6 +3934,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-user-gives-the-largest-lag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The user gives the largest lag
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-user-gives-the-length-of-a-block" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3956,7 +3978,7 @@
 <h1 id="dependence">Dependence<a class="headerlink" href="#dependence" title="Permanent link">&para;</a></h1>
 <p><a href="../../design-decisions/">Back to Design decisions</a></p>
 <p>How a series of values is read for dependence, which law its tests take, and
-who decides the length of a block from it.</p>
+who decides the largest lag and the length of a block.</p>
 <h2 id="a-test-of-dependence-takes-its-reference">A test of dependence takes its reference<a class="headerlink" href="#a-test-of-dependence-takes-its-reference" title="Permanent link">&para;</a></h2>
 <p><code>residual_dependence</code> and <code>series_dependence</code> (<code>crates/commol-inference/src/dependence/</code>)
 read the values of each series on the grid of its smallest spacing, each lag
@@ -4132,6 +4154,66 @@ conservative, and many lags make <code>Q̃</code> liberal (7.5 % at <code>max_la
 <p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_dependence.rs</code>
 (<code>a_lag_with_few_pairs_leaves_the_portmanteau</code>), <code>tests/uncertainty/test_dependence.py</code>,
 <code>tests/uncertainty/test_dependence_coverage.py::TestValues::test_lags_with_few_pairs_keep_the_level</code>.</p>
+<h2 id="the-user-gives-the-largest-lag">The user gives the largest lag<a class="headerlink" href="#the-user-gives-the-largest-lag" title="Permanent link">&para;</a></h2>
+<p>Both analyses take <code>max_lag</code>, required, and read every series at the lags
+<code>1 … max_lag</code>. The engine reads it as a <code>usize</code> with the rule <code>MAX_LAG</code> (at
+least 1, <code>crates/commol-inference/src/ranges.rs</code>), and a binding as any count
+(<code>py-commol/src/counts.rs</code>). The number says which dependence the test can
+see, and the p-value of <code>Q̃</code> depends on it, so the user writes it. A rule from
+the number of values, as the smaller of 10 and a fifth of them, reads at most
+10 days of a daily series whatever the period of its process, and a cycle of 7
+days only from 35 values on.</p>
+<p>One number serves series of different lengths, because a lag of fewer than 4
+pairs leaves <code>Q̃</code>. At 5 %, that rule rejects 2.6 % of independent normal series
+of 12 values, 4.4 % of 20 and 5.4 % of 35, and 10 lags reject 4.9, 6.2 and
+6.2 %. So one number is nearer 5 % with 12 values, and up to 1.8 points above
+the rule from 20 values on. The law of <code>Q̃</code> is
+<a href="https://github.com/MUNQU/commol/issues/530">#530</a>.</p>
+<p>These rates, and those of 4, 7 and 10 lags in
+<a href="../../../guide/uncertainty/dependence/#choose-the-largest-lag">Choose the largest lag</a>,
+are from <a href="https://github.com/MUNQU/commol/issues/561">#561</a>. Those of 17 and 33
+lags are from
+<a href="https://github.com/MUNQU/commol/issues/511#issuecomment-7009198279">M1 of #511</a>.
+The smallest p-value of 4, 7 and 10 lags rejects 8.4 % of independent normal
+series of 20 values, 9.1 % of those of 35 and 9.2 % of those of 100 (40 000 sets
+each of <code>series_dependence</code>).</p>
+<p><code>τ</code>, its band, <code>cut_lag</code> and the statistics of the problem do not read
+<code>max_lag</code>, so two analyses of one seed share them.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>An automatic number (<code>"auto"</code>), since it is a fixed rule and changes no interval</td>
+<td>It sets a p-value with a number nobody wrote.</td>
+</tr>
+<tr>
+<td>A number per series</td>
+<td>No caller, and two analyses give it.</td>
+</tr>
+<tr>
+<td>A function that suggests a number</td>
+<td>A second way to what the guide says.</td>
+</tr>
+<tr>
+<td>A message of its own for the text <code>"auto"</code></td>
+<td>No release has that text, and any text has the error of a whole-number argument, which names <code>max_lag</code>.</td>
+</tr>
+<tr>
+<td>An enum of one variant in the engine</td>
+<td><code>usize</code> with its rule says the same.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>tests/uncertainty/test_dependence.py::test_the_largest_lag_is_a_whole_number</code>,
+<code>tests/uncertainty/test_dependence.py::test_one_largest_lag_serves_series_of_different_lengths</code>,
+<code>tests/uncertainty/test_counts.py</code>, <code>crates/commol-inference/tests/test_errors.rs</code>
+(<code>a_setting_out_of_range_is_invalid_in_every_method</code>), and the example of the
+<a href="../../../guide/uncertainty/dependence/#quick-path">Quick path</a>.</p>
 <h2 id="the-user-gives-the-length-of-a-block">The user gives the length of a block<a class="headerlink" href="#the-user-gives-the-length-of-a-block" title="Permanent link">&para;</a></h2>
 <p>Every method that reads blocks takes <code>block_length</code>, a whole number of at
 least 1, required, and groups the observations with <code>BlockScheme::new</code>
