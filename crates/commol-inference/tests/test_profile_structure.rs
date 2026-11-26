@@ -12,8 +12,8 @@ use commol_calibration::{
 };
 use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
 use commol_inference::profiles::{
-    Profile, ProfileEnd, ProfileTracer, ProfileVerdict, ProfiledQuantity, StructuralReading,
-    Structure, Undetermined,
+    NoVerdict, Profile, ProfileEnd, ProfileTracer, ProfileVerdict, ProfiledQuantity,
+    StructuralReading, Structure, Undetermined,
 };
 
 type Formula = fn(&HashMap<String, f64>, f64) -> f64;
@@ -193,7 +193,7 @@ fn traced(
         .trace(&ProfiledQuantity::Parameter(index), threshold, 200)
         .unwrap();
     let structure = tracer.read_structure(index, &profile);
-    let verdict = tracer.verdict_with(&profile, Some(&structure));
+    let verdict = tracer.verdict_with(&profile, Some(&structure)).ok();
     (profile, verdict, structure, tracer.tolerance())
 }
 
@@ -764,4 +764,67 @@ fn the_floor_of_the_root_mean_squared_error_scales_the_squares() {
         (computed - floor).abs() <= 1e-6 * floor,
         "{computed} against {floor}"
     );
+}
+
+/// `a · t` plus an effect of `p` of `5e-14` at most, which saturates at
+/// `p = 0.02`: a rise of the profile between the tolerance and the
+/// evaluation floor.
+fn faint(p: &HashMap<String, f64>, t: f64) -> f64 {
+    let s = p["p"].clamp(0.0, 0.02) / 0.02;
+    p["a"] * t - 5e-14 * s * s
+}
+
+#[test]
+fn resets_within_the_floor_with_a_side_at_max_steps_give_no_verdict() {
+    let config = config();
+    let read = |parameters: &[(&str, f64, f64)], max_steps: usize| {
+        let problem = problem(faint, parameters, |t| t, 0.3, vec![], sse());
+        let mut fit = optimize(&problem, &config, 0).unwrap().best_parameters;
+        // `p` at 0, and `z`, which nothing reads, on its lower bound.
+        fit[1] = 0.0;
+        fit.truncate(2);
+        fit.resize(parameters.len(), 0.0);
+        let tracer = ProfileTracer::new(&problem, &config, &fit, 5).unwrap();
+        let profile = tracer
+            .trace(&ProfiledQuantity::Parameter(1), 1.0, max_steps)
+            .unwrap();
+        let structure = tracer.read_structure(1, &profile);
+        (
+            profile.ends,
+            profile.verdict(tracer.tolerance()),
+            structure.verdict,
+            tracer.verdict_with(&profile, Some(&structure)),
+        )
+    };
+    let free = [("a", -10.0, 10.0), ("p", -0.005, 1.0)];
+    let held = [("a", -10.0, 10.0), ("p", -0.005, 1.0), ("z", 0.0, 0.5)];
+    let practical = Some(ProfileVerdict::PracticallyNonIdentifiable);
+
+    // The profile rises above the tolerance and below the floor, and every
+    // reset stays within the floor: a longer side reads structural.
+    assert_eq!(
+        read(&free, 200),
+        (
+            [ProfileEnd::Bound; 2],
+            practical,
+            Ok(StructuralReading::NonIdentifiable),
+            Ok(ProfileVerdict::StructurallyNonIdentifiable)
+        )
+    );
+    assert_eq!(
+        read(&free, 2),
+        (
+            [ProfileEnd::Bound, ProfileEnd::MaxSteps],
+            practical,
+            Err(Undetermined::MaxSteps),
+            Err(NoVerdict::MaxSteps)
+        )
+    );
+    // With a free parameter on its bound at the fit, the resets never prove
+    // the profile flat, so no longer side changes the verdict of its shape.
+    for max_steps in [2, 200] {
+        let (_, _, structure, verdict) = read(&held, max_steps);
+        assert_eq!(structure, Err(Undetermined::OnBound(2)), "{max_steps}");
+        assert_eq!(verdict, Ok(ProfileVerdict::PracticallyNonIdentifiable));
+    }
 }

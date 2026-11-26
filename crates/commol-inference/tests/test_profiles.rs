@@ -15,7 +15,8 @@ use commol_calibration::StartEvent;
 use commol_core::{ModelValue, STOPPED, SimulationEngine, SimulationError, Steps, ValuePlan};
 use commol_inference::MethodError;
 use commol_inference::profiles::{
-    ProfileEnd, ProfileTracer, ProfiledQuantity, SideEvent, beale, bootstrap_thresholds, chi_square,
+    NoVerdict, ProfileEnd, ProfileTracer, ProfileVerdict, ProfiledQuantity, SideEvent, beale,
+    bootstrap_thresholds, chi_square,
 };
 use commol_inference::resampling::{
     Perturbation, ReplicateRunner, Resampler, RunnerEvent, RunnerStage, RunnerSteps,
@@ -1276,4 +1277,78 @@ fn no_start_of_a_replicate_runs_once_the_steps_stop() {
     pool.install(|| runner.fit_all(&perturbations));
 
     assert_eq!(kept.finished.load(Ordering::SeqCst), 1);
+}
+
+/// `a · t` plus a tent of `p` between 10 and 40: nothing the data read
+/// depends on `p` outside that range.
+fn gated(p: &HashMap<String, f64>, t: f64) -> f64 {
+    p["a"] * t + 0.5 * (p["p"] - 10.0).min(40.0 - p["p"]).max(0.0)
+}
+
+#[test]
+fn a_side_that_ends_at_max_steps_gives_no_verdict() {
+    let config = config();
+    let verdict =
+        |problem: &CalibrationProblem<ClosedForm>, fit: &[f64], index: usize, max_steps: usize| {
+            let tracer = ProfileTracer::new(problem, &config, fit, 7).unwrap();
+            let profile = tracer
+                .trace(&ProfiledQuantity::Parameter(index), 1.0, max_steps)
+                .unwrap();
+            let structure = tracer.read_structure(index, &profile);
+            (
+                profile.ends,
+                tracer.verdict_with(&profile, Some(&structure)),
+            )
+        };
+
+    // A side at `max_steps` could still cross the threshold.
+    let line = line_problem(&VALUES);
+    let (a, b) = least_squares(&VALUES);
+    assert_eq!(
+        verdict(&line, &[a, b], 1, 1),
+        ([ProfileEnd::MaxSteps; 2], Err(NoVerdict::MaxSteps))
+    );
+    assert_eq!(
+        verdict(&line, &[a, b], 1, 100),
+        ([ProfileEnd::Crossed; 2], Ok(ProfileVerdict::Identifiable))
+    );
+
+    // Flat up to `max_steps` above the fit, and flat at every reset: a
+    // longer side rises past p = 10.
+    let parameters = [("a", -10.0, 10.0), ("p", -5.0, 100.0)];
+    let gated_problem = CalibrationProblem::new(
+        ClosedForm {
+            formula: gated,
+            parameters: parameters
+                .iter()
+                .map(|(id, _, _)| (id.to_string(), 0.0))
+                .collect(),
+        },
+        (0..10)
+            .map(|t| ObservedDataPoint::new(t as f64, "x".to_string(), t as f64))
+            .collect(),
+        parameters
+            .iter()
+            .map(|(id, min, max)| CalibrationParameter::new(id.to_string(), *min, *max))
+            .collect(),
+        None,
+        vec![],
+        LossConfig::SumSquaredError,
+    )
+    .unwrap();
+    let fit = [1.0, -4.0];
+    assert_eq!(
+        verdict(&gated_problem, &fit, 1, 2),
+        (
+            [ProfileEnd::Bound, ProfileEnd::MaxSteps],
+            Err(NoVerdict::MaxSteps)
+        )
+    );
+    assert_eq!(
+        verdict(&gated_problem, &fit, 1, 200),
+        (
+            [ProfileEnd::Bound, ProfileEnd::Crossed],
+            Ok(ProfileVerdict::PracticallyNonIdentifiable)
+        )
+    );
 }

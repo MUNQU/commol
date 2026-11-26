@@ -119,18 +119,18 @@ any data of the design of the observations can determine) and a practical
 verdict (what these data determine). Only `StructuralRank` on the design of
 the observations gives the structural verdict; a dense design keeps its
 verdicts in its section. Merging reports keeps a verdict the reports agree
-on, and makes one they disagree on `conflicting`, with every reason.
+on, and makes one they disagree on `conflicting`, with every reason. A
+verdict of `None`, structural or practical, adds only its reasons: a profile
+with no verdict (`ProfileTracer::verdict_with`) gives a practical `None`.
 Thresholds and tolerances of the methods are required arguments: they are
 modelling judgments. Rust decides each verdict and gives its causes
 (`StructuralAnalysis::verdicts`; `Collinearity::verdicts`: insensitive, the
 parameters it is collinear with; `SampleIdentifiability::verdicts`: constant in
-every draw, a contraction below the threshold,
-the parameters it is correlated with, its number of modes, and the bounds
-that set a side, which do not set the verdict; `SampleIdentifiability::size`,
-an effective size below `p + 1`;
-`StartsIdentifiability::flagged`). The runners of
-`identifiability/runners.py` write the reasons from the causes and
-decide nothing.
+every draw, a contraction below the threshold, the parameters it is correlated
+with, its number of modes, and the bounds that set a side, which do not set the
+verdict; `SampleIdentifiability::size`, an effective size below `p + 1`;
+`StartsIdentifiability::flagged`). The runners of `identifiability/runners.py`
+write the reasons from the causes and decide nothing.
 
 | Alternative | Why not |
 |---|---|

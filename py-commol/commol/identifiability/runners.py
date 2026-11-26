@@ -35,7 +35,7 @@ from commol.identifiability.results import (
     SubsetIndex,
     TighterRank,
 )
-from commol.profiles.results import RESET_REASON
+from commol.profiles.results import RESET_REASON, Profile, max_steps_sides
 
 if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import (
@@ -474,6 +474,21 @@ def run_starts_identifiability(
     return _report(calibrator, practical_verdicts=practical, starts=[section])
 
 
+def _no_verdict_reason(profile: Profile, tolerance: float) -> str:
+    """Why `profile` gives no verdict, from `Profile.undetermined`."""
+    if profile.undetermined == "max_steps":
+        why = (
+            f"{max_steps_sides(profile.ends)} below the threshold, and a longer "
+            "side could change the verdict. Raise max_steps to read one"
+        )
+    else:
+        why = (
+            f"the threshold {profile.threshold:.3g} is at or below the numerical "
+            f"tolerance {tolerance:.3g}, so no rise can be told from numerical error"
+        )
+    return f"profile likelihood: no verdict: {why}."
+
+
 def run_profile_identifiability(
     calibrator: CalibrationPort, method: "ProfileIdentifiability"
 ) -> IdentifiabilityReport:
@@ -489,8 +504,14 @@ def run_profile_identifiability(
     structural: dict[str, StructuralVerdict] = {}
     practical: dict[str, PracticalVerdict] = {}
     for name in names:
-        verdict = result.verdicts.get(name)
+        if name not in result.verdicts:
+            continue
+        verdict = result.verdicts[name]
         if verdict is None:
+            practical[name] = PracticalVerdict(
+                verdict=None,
+                reasons=[_no_verdict_reason(result.profiles[name], result.tolerance)],
+            )
             continue
         reason = f"profile likelihood: {verdict}. {RESET_REASON}"
         if verdict == "structurally_non_identifiable":

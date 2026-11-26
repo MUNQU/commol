@@ -26,6 +26,7 @@ ConformalRunProtocol
 LocalRunProtocol
 MixtureRunProtocol
 EngineTypeProtocol
+ProfileProtocol
 ProfileRunProtocol
 ProfileStructureProtocol
 StartsProtocol

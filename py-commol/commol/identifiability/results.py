@@ -80,14 +80,17 @@ class PracticalVerdict(_FrozenResult):
 
     Attributes
     ----------
-    verdict : PracticalVerdictName
+    verdict : PracticalVerdictName | None
         ``determined`` or ``poorly_determined`` by these data, or
-        ``conflicting`` when two reports disagree.
+        ``conflicting`` when two reports disagree. ``None``: the evidence
+        gives no verdict, as for a profile whose threshold is at or below
+        its tolerance, or with a side that ends at `max_steps` where a longer
+        side could change the verdict. The reasons say why.
     reasons : list[str]
         Why, one per piece of evidence.
     """
 
-    verdict: PracticalVerdictName
+    verdict: PracticalVerdictName | None
     reasons: list[str] = Field(default_factory=list)
 
 
@@ -105,8 +108,10 @@ class ParameterVerdicts(_FrozenResult):
         the accuracy of the runs may set its rank, or the parameter is a
         noise parameter, which it leaves out; its reasons say why.
     practical : PracticalVerdict | None
-        From collinearity, a sample or the starts. Collinearity gives none to
-        a noise parameter.
+        From collinearity, a sample, the starts or a profile. Collinearity
+        gives none to a noise parameter. A `PracticalVerdict` whose
+        ``verdict`` is ``None`` is evidence with no verdict: a profile ran but
+        gives none. Its reasons say why.
     """
 
     structural: StructuralVerdict | None = None
@@ -499,8 +504,8 @@ class ProfileSection(_FrozenResult):
     tolerance : float
         The numerical tolerance of the statistic.
     verdicts : dict[str, ProfileVerdictName | None]
-        The verdict of each profiled parameter; None when its threshold is
-        below the tolerance.
+        The verdict of each profiled parameter; None when its profile gives
+        none (`Profile.undetermined` says why).
     intervals : dict[str, tuple[float | None, float | None]]
         The interval of each profiled parameter; None on a side that does not
         cross the threshold.
@@ -535,9 +540,11 @@ def _merge_structural(
 def _merge_practical(verdicts: list[PracticalVerdict]) -> PracticalVerdict | None:
     if not verdicts:
         return None
-    names = {verdict.verdict for verdict in verdicts}
+    names = {verdict.verdict for verdict in verdicts if verdict.verdict is not None}
     return PracticalVerdict(
-        verdict=names.pop() if len(names) == 1 else "conflicting",
+        verdict=(
+            None if not names else names.pop() if len(names) == 1 else "conflicting"
+        ),
         reasons=[reason for verdict in verdicts for reason in verdict.reasons],
     )
 
@@ -600,8 +607,9 @@ class IdentifiabilityReport(_FrozenResult):
 
         The sections are kept side by side. A verdict that the reports agree
         on stays, with the reasons of each; one they disagree on is
-        ``conflicting``, with every reason. A structural verdict of ``None``
-        adds its reasons and leaves the verdicts of the other reports.
+        ``conflicting``, with every reason. A structural or practical verdict
+        of ``None`` adds its reasons and leaves the verdicts of the other
+        reports.
 
         Parameters
         ----------

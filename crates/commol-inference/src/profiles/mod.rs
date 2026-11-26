@@ -25,4 +25,4 @@ pub use tracer::{
     Profile, ProfileEnd, ProfilePoint, ProfileTracer, ProfiledQuantity, SideEnd, SideEvent,
     SideSteps,
 };
-pub use verdict::ProfileVerdict;
+pub use verdict::{NoVerdict, ProfileVerdict};

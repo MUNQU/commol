@@ -114,8 +114,8 @@ is pointwise, for one quantity at a time.
 | `verdicts[name]` | What the shape says ([Verdicts](#verdicts-and-the-identifiability-report)) |
 | `fit` | The fit every profile starts from |
 | `tolerance` | The numerical tolerance of the statistic, `max(τ, ν)` ([Verdicts](#verdicts-and-the-identifiability-report)) |
-| `structure` | What resetting the other parameters says of each flat profile of a parameter (`ProfileStructure`) |
-| `notes` | A threshold below the tolerance, or a refit below the fit |
+| `structure` | What resetting the other parameters says of each profile of a parameter that gives `practically_non_identifiable` or `structurally_non_identifiable` before its resets (`ProfileStructure`) |
+| `notes` | A threshold below the tolerance, a side that ends at `max_steps`, or a refit below the fit |
 | `failed` | With `Threshold.bootstrap_calibrated`, each replicate that failed, `"Replicate <index> failed: <reason>"`, also logged as a warning; empty with any other threshold |
 | `not_converged` | With `Threshold.bootstrap_calibrated`, the replicates kept although their optimizer did not converge |
 
@@ -232,8 +232,22 @@ label is the name of its output).
 | Verdict | The profile | In the report |
 |---|---|---|
 | `identifiable` | Crosses the threshold on both sides | Practical `determined` |
-| `practically_non_identifiable` | Stays below on at least one side, up to a bound or `max_steps` | Practical `poorly_determined` |
+| `practically_non_identifiable` | Stays below on at least one side, up to a bound or a prediction no values within the bounds give, and is not shown flat over its whole range. With a stochastic engine, a flat profile too | Practical `poorly_determined` |
 | `structurally_non_identifiable` | Flat within `tolerance` over its whole range inside the box of the parameters, or proven flat by the resets below | Structural `in_combination` or `non_identifiable` from the resets; with no structural verdict, practical `poorly_determined` |
+| `None` | The threshold is at or below `tolerance`, or a side ends at `max_steps` and a longer side could change the verdict (`Profile.undetermined` says which) | Practical `None`, with the reason |
+
+A side that ends at `max_steps` stopped below the threshold, not at a bound.
+The profile has a verdict only when no longer side can change it: the other
+side ends at a bound or at a prediction no values within the bounds give, and
+the points already show that the profile is not flat, as when a side rises
+above `tolerance`. That verdict is
+`practically_non_identifiable`. So `["crossed", "max_steps"]` and
+`["max_steps", "max_steps"]` give no verdict, and neither does a profile that
+is flat so far. Resets below that would prove such a profile flat give no
+verdict either. With a stochastic engine a flat profile reads
+`practically_non_identifiable`, so a flat side at `max_steps` beside a side
+at a bound reads it too. A note
+names each side that ends at `max_steps`, with a verdict or without one.
 
 `tolerance` is `ε = max(τ, ν)`. `τ` is the `sd_tolerance` of Nelder-Mead, an
 absolute amount: argmin stops when the costs of its simplex spread by less.
@@ -281,9 +295,9 @@ the rounding of the sum of the `n` terms, with the constants of `−log L`.
 
 | Resets | Structural verdict |
 |---|---|
-| Every reset feasible and within the floor of `f̂` | `non_identifiable`, unless another parameter sits on its bound at the fit; the profile then reads `structurally_non_identifiable` |
+| Every reset feasible and within the floor of `f̂` | `non_identifiable`, unless another parameter sits on its bound at the fit, or a side ends at `max_steps` (then there is no verdict). With `non_identifiable`, the profile reads `structurally_non_identifiable` |
 | A flat profile with a feasible reset inside the box above `f̂ + T` | `in_combination` |
-| Otherwise, a profile below the fit by more than the floor, no floor (a loss with no term derivatives), or a stochastic engine | None: practical `poorly_determined` for a flat profile, and a note |
+| Otherwise, a profile below the fit by more than the floor, no floor (a loss with no term derivatives), or a stochastic engine | None: practical `poorly_determined` for a flat profile, and a note. On a stochastic engine this holds for a profile flat so far beside a bound too. One that rises reads `not_flat`, with no note |
 
 A reset whose evaluation fails counts as infeasible. The ends of the box only
 rule out `non_identifiable`. A parameter is named in the reason when resetting
@@ -397,13 +411,12 @@ figure = result.plot()
       `bootstrap_calibrated` otherwise.
 - [ ] No note says that a refit went below the fit; if one does, fit with
       more starts.
-- [ ] Every verdict is set; a threshold below the tolerance needs data with
-      noise, or a tighter `sd_tolerance`.
+- [ ] Every verdict is set. A threshold below the tolerance needs data with
+      noise, or a tighter `sd_tolerance`. A side at `max_steps` with no
+      verdict needs a larger `max_steps`.
 - [ ] For `in_combination` on a difference model, `sd_tolerance` is near
       the noise floor `ν` (`notes` says why a flat profile has no structural
       verdict, and when a refit is less accurate than the tolerance).
-- [ ] A side that ends at `max_steps` is open only because it stopped:
-      raise `max_steps`.
 - [ ] Read an open or flat profile with the [structural rank](identifiability.md#structural-rank)
       before you call a parameter non-identifiable.
 
