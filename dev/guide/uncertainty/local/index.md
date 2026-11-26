@@ -118,7 +118,7 @@ print(widths)  # [6.01, 12.01, 18.02]
 
 ## Sandwich
 
-`Sandwich(block_length, draws, curvature="gauss_newton", starts=1)` gives the covariance `H⁻¹ B H⁻¹`, where `B` sums the outer products of the **scores** of blocks of observations: `B = G/(G − 1) · Σ_b s_b s_bᵀ`, with `s_b` the sum of the gradients of the terms of block `b` (the clustered estimator CR1, Cameron and Miller 2015). The blocks hold every series in a window of `block_length` positions, as the [bootstraps](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#blocks-and-their-length) do, and you [choose the length](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#choose-the-length). It returns a `SandwichResult`: a `LaplaceResult` with `blocks` (`G`) and `block_length`.
+`Sandwich(block_length, draws, curvature="gauss_newton", starts=1)` gives the covariance `√(f_j f_k) · (H⁻¹ Σ_b s̃_b s̃_bᵀ H⁻¹)_jk`, which sums the outer products of the **scores** of blocks of observations, with `s_b` the sum of the gradients of the terms of block `b` (the clustered estimator, Cameron and Miller 2015), taken after one Gauss–Newton step to the zero of their sum `g`: `s̃_b = s_b − J_b J⁻¹ g`, with `J_b` the curvature of block `b` and `J` their sum. The blocks hold every series in a window of `block_length` positions, as the [bootstraps](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#blocks-and-their-length) do, and you [choose the length](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#choose-the-length). It returns a `SandwichResult`: a `LaplaceResult` with `degrees_of_freedom` (one per parameter), `blocks` (`G`, those with no curvature included) and `block_length`.
 
 What the sandwich protects against depends on `H`:
 
@@ -129,8 +129,8 @@ What the sandwich protects against depends on `H`:
 
 It needs no noise model: with a loss, `H` and the scores are those of the loss (the sum of squares and the root mean squared error share them, since rescaling the objective does not change the sandwich).
 
-- **A Student t with `G − 1` degrees of freedom.** With few blocks, `B` is a noisy estimate; the t widens the intervals by the right amount, instead of a warning at an arbitrary number of blocks. Intervals of the draws and `LocalResult.delta_band` both read it.
-- **`G ≤ p` is refused.** `B` sums `G` outer products whose sum has rank at most `G − 1` after the fit, so with no more blocks than parameters some directions would get zero variance. The `ValueError` suggests shorter blocks.
+- **A Student t per parameter, from the share of each block.** With few blocks, the sum of the scores is a noisy estimate; a t widens the intervals by the right amount, instead of a warning at an arbitrary number of blocks. The factor `f_j` and the degrees of freedom `ν_j` of each parameter come from the share of its Gauss–Newton curvature that each block holds (Bell and McCaffrey 2002), also with the Hessian: when every block holds the same share, `f_j = G/(G − 1)` (CR1) and `ν_j = G − 1`; a parameter that only a few blocks read has a larger factor and fewer degrees of freedom; a block with no curvature, such as a window of observations that carry no information, counts for nothing. The draws are a grouped t, whose margin for each parameter is the t of its `ν_j`; `LocalResult.delta_band` gives each output at each position the degrees of freedom of its own direction.
+- **Too few blocks with curvature are refused.** A block has curvature when it holds more than `10⁻¹⁰` of the curvature, so a window of observations of weight `1e-12` does not count. With no more blocks with curvature than parameters, the sum of their scores has rank below the parameters after the fit, so some directions would get zero variance; so are block scores whose rank is below the parameters for any other reason, as when the scores of two parameters move together in every block, and blocks that each hold all the curvature of a parameter, whose scores sum to zero at the fit. The `ValueError` suggests another block length. The rank holds for a fit an optimizer returns: each block's scores are read after one step to the zero of their sum, so the covariance does not follow the error of the fit.
 - **`loss_function="mae"` is refused.** The absolute error has no curvature: its sandwich would need the density of the residuals at 0, with a bandwidth that the library would choose for you. Use a [bootstrap](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md).
 
 ## Laplace mixture and importance sampling
@@ -198,7 +198,7 @@ An unreliable sample calls for a method that samples the posterior itself: `Baye
 - [ ] The fit is a minimum inside the bounds; no `ValueError` names a parameter on its bound.
 - [ ] `notes` is empty, or you know why an entry of the curvature is uncertain.
 - [ ] A Laplace approximation has a noise model you trust; otherwise use the sandwich.
-- [ ] A sandwich has more blocks than parameters, of a length that holds the dependence.
+- [ ] A sandwich has more blocks with curvature than parameters, of a length that holds the dependence, and `degrees_of_freedom` of each parameter that are not few.
 - [ ] A Laplace mixture has `k_hat` at most 0.7.
 
 ## Next steps

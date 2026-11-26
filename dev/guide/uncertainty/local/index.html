@@ -4390,14 +4390,18 @@ It reads only the fields of the result, so a result that
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">widths</span><span class="p">)</span>  <span class="c1"># [6.01, 12.01, 18.02]</span>
 </span></code></pre></div>
 <h2 id="sandwich">Sandwich<a class="headerlink" href="#sandwich" title="Permanent link">&para;</a></h2>
-<p><code>Sandwich(block_length, draws, curvature="gauss_newton", starts=1)</code> gives the covariance <code>H⁻¹ B H⁻¹</code>, where <code>B</code>
-sums the outer products of the <strong>scores</strong> of blocks of observations:
-<code>B = G/(G − 1) · Σ_b s_b s_bᵀ</code>, with <code>s_b</code> the sum of the gradients of the
-terms of block <code>b</code> (the clustered estimator CR1, Cameron and Miller 2015).
-The blocks hold every series in a window of <code>block_length</code> positions, as the
-<a href="../resampling/#blocks-and-their-length">bootstraps</a> do, and you
-<a href="../resampling/#choose-the-length">choose the length</a>. It returns a
-<code>SandwichResult</code>: a <code>LaplaceResult</code> with <code>blocks</code> (<code>G</code>) and <code>block_length</code>.</p>
+<p><code>Sandwich(block_length, draws, curvature="gauss_newton", starts=1)</code> gives the covariance
+<code>√(f_j f_k) · (H⁻¹ Σ_b s̃_b s̃_bᵀ H⁻¹)_jk</code>, which sums the outer products of
+the <strong>scores</strong> of blocks of observations, with <code>s_b</code> the sum of the
+gradients of the terms of block <code>b</code> (the clustered estimator, Cameron and
+Miller 2015), taken after one Gauss–Newton step to the zero of their sum
+<code>g</code>: <code>s̃_b = s_b − J_b J⁻¹ g</code>, with <code>J_b</code> the curvature of block <code>b</code> and <code>J</code>
+their sum. The blocks hold every series in a window of <code>block_length</code>
+positions, as the <a href="../resampling/#blocks-and-their-length">bootstraps</a> do,
+and you <a href="../resampling/#choose-the-length">choose the length</a>. It returns a
+<code>SandwichResult</code>: a <code>LaplaceResult</code> with <code>degrees_of_freedom</code> (one per
+parameter), <code>blocks</code> (<code>G</code>, those with no curvature included) and
+<code>block_length</code>.</p>
 <p>What the sandwich protects against depends on <code>H</code>:</p>
 <table>
 <thead>
@@ -4421,14 +4425,31 @@ The blocks hold every series in a window of <code>block_length</code> positions,
 loss (the sum of squares and the root mean squared error share them, since
 rescaling the objective does not change the sandwich).</p>
 <ul>
-<li><strong>A Student t with <code>G − 1</code> degrees of freedom.</strong> With few blocks, <code>B</code> is a
-  noisy estimate; the t widens the intervals by the right amount, instead of
-  a warning at an arbitrary number of blocks. Intervals of the draws and
-  <code>LocalResult.delta_band</code> both read it.</li>
-<li><strong><code>G ≤ p</code> is refused.</strong> <code>B</code> sums <code>G</code> outer products whose sum has rank at
-  most <code>G − 1</code> after the fit, so with no more blocks than parameters some
-  directions would get zero variance. The <code>ValueError</code> suggests shorter
-  blocks.</li>
+<li><strong>A Student t per parameter, from the share of each block.</strong> With few
+  blocks, the sum of the scores is a noisy estimate; a t widens the
+  intervals by the right amount, instead of a warning at an arbitrary number
+  of blocks. The factor <code>f_j</code> and the degrees of freedom <code>ν_j</code> of each
+  parameter come from the share of its Gauss–Newton curvature that each
+  block holds (Bell and McCaffrey 2002), also with the Hessian: when every
+  block holds the same share, <code>f_j = G/(G − 1)</code> (CR1) and <code>ν_j = G − 1</code>; a
+  parameter that only a few blocks read has a larger factor and fewer
+  degrees of freedom; a block with no curvature, such as a window of
+  observations that carry no information, counts for nothing. The draws
+  are a grouped t, whose margin for each parameter is the t of its <code>ν_j</code>;
+  <code>LocalResult.delta_band</code> gives each output at each position the
+  degrees of freedom of its own direction.</li>
+<li><strong>Too few blocks with curvature are refused.</strong> A block has curvature when
+  it holds more than <code>10⁻¹⁰</code> of the curvature, so a window of observations of
+  weight <code>1e-12</code> does not count. With no more blocks with curvature than
+  parameters, the sum of their scores has rank below the parameters after
+  the fit, so some directions would get zero variance; so are block scores
+  whose rank is below the parameters for any other reason, as when the
+  scores of two parameters move together in every block, and blocks that
+  each hold all the curvature of a parameter, whose scores sum to zero at
+  the fit. The <code>ValueError</code> suggests another block length. The rank holds
+  for a fit an optimizer returns: each block's scores are read after one
+  step to the zero of their sum, so the covariance does not follow the error
+  of the fit.</li>
 <li><strong><code>loss_function="mae"</code> is refused.</strong> The absolute error has no curvature:
   its sandwich would need the density of the residuals at 0, with a
   bandwidth that the library would choose for you. Use a <a href="../resampling/">bootstrap</a>.</li>
@@ -4555,7 +4576,7 @@ that lists each end and why.</p>
 <li>[ ] The fit is a minimum inside the bounds; no <code>ValueError</code> names a parameter on its bound.</li>
 <li>[ ] <code>notes</code> is empty, or you know why an entry of the curvature is uncertain.</li>
 <li>[ ] A Laplace approximation has a noise model you trust; otherwise use the sandwich.</li>
-<li>[ ] A sandwich has more blocks than parameters, of a length that holds the dependence.</li>
+<li>[ ] A sandwich has more blocks with curvature than parameters, of a length that holds the dependence, and <code>degrees_of_freedom</code> of each parameter that are not few.</li>
 <li>[ ] A Laplace mixture has <code>k_hat</code> at most 0.7.</li>
 </ul>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>

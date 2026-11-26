@@ -6499,7 +6499,7 @@ print(widths)  # [6.01, 12.01, 18.02]
 
 ## Sandwich
 
-`Sandwich(block_length, draws, curvature="gauss_newton", starts=1)` gives the covariance `H⁻¹ B H⁻¹`, where `B` sums the outer products of the **scores** of blocks of observations: `B = G/(G − 1) · Σ_b s_b s_bᵀ`, with `s_b` the sum of the gradients of the terms of block `b` (the clustered estimator CR1, Cameron and Miller 2015). The blocks hold every series in a window of `block_length` positions, as the [bootstraps](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#blocks-and-their-length) do, and you [choose the length](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#choose-the-length). It returns a `SandwichResult`: a `LaplaceResult` with `blocks` (`G`) and `block_length`.
+`Sandwich(block_length, draws, curvature="gauss_newton", starts=1)` gives the covariance `√(f_j f_k) · (H⁻¹ Σ_b s̃_b s̃_bᵀ H⁻¹)_jk`, which sums the outer products of the **scores** of blocks of observations, with `s_b` the sum of the gradients of the terms of block `b` (the clustered estimator, Cameron and Miller 2015), taken after one Gauss–Newton step to the zero of their sum `g`: `s̃_b = s_b − J_b J⁻¹ g`, with `J_b` the curvature of block `b` and `J` their sum. The blocks hold every series in a window of `block_length` positions, as the [bootstraps](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#blocks-and-their-length) do, and you [choose the length](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#choose-the-length). It returns a `SandwichResult`: a `LaplaceResult` with `degrees_of_freedom` (one per parameter), `blocks` (`G`, those with no curvature included) and `block_length`.
 
 What the sandwich protects against depends on `H`:
 
@@ -6510,8 +6510,8 @@ What the sandwich protects against depends on `H`:
 
 It needs no noise model: with a loss, `H` and the scores are those of the loss (the sum of squares and the root mean squared error share them, since rescaling the objective does not change the sandwich).
 
-- **A Student t with `G − 1` degrees of freedom.** With few blocks, `B` is a noisy estimate; the t widens the intervals by the right amount, instead of a warning at an arbitrary number of blocks. Intervals of the draws and `LocalResult.delta_band` both read it.
-- **`G ≤ p` is refused.** `B` sums `G` outer products whose sum has rank at most `G − 1` after the fit, so with no more blocks than parameters some directions would get zero variance. The `ValueError` suggests shorter blocks.
+- **A Student t per parameter, from the share of each block.** With few blocks, the sum of the scores is a noisy estimate; a t widens the intervals by the right amount, instead of a warning at an arbitrary number of blocks. The factor `f_j` and the degrees of freedom `ν_j` of each parameter come from the share of its Gauss–Newton curvature that each block holds (Bell and McCaffrey 2002), also with the Hessian: when every block holds the same share, `f_j = G/(G − 1)` (CR1) and `ν_j = G − 1`; a parameter that only a few blocks read has a larger factor and fewer degrees of freedom; a block with no curvature, such as a window of observations that carry no information, counts for nothing. The draws are a grouped t, whose margin for each parameter is the t of its `ν_j`; `LocalResult.delta_band` gives each output at each position the degrees of freedom of its own direction.
+- **Too few blocks with curvature are refused.** A block has curvature when it holds more than `10⁻¹⁰` of the curvature, so a window of observations of weight `1e-12` does not count. With no more blocks with curvature than parameters, the sum of their scores has rank below the parameters after the fit, so some directions would get zero variance; so are block scores whose rank is below the parameters for any other reason, as when the scores of two parameters move together in every block, and blocks that each hold all the curvature of a parameter, whose scores sum to zero at the fit. The `ValueError` suggests another block length. The rank holds for a fit an optimizer returns: each block's scores are read after one step to the zero of their sum, so the covariance does not follow the error of the fit.
 - **`loss_function="mae"` is refused.** The absolute error has no curvature: its sandwich would need the density of the residuals at 0, with a bandwidth that the library would choose for you. Use a [bootstrap](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md).
 
 ## Laplace mixture and importance sampling
@@ -6579,7 +6579,7 @@ An unreliable sample calls for a method that samples the posterior itself: `Baye
 - [ ] The fit is a minimum inside the bounds; no `ValueError` names a parameter on its bound.
 - [ ] `notes` is empty, or you know why an entry of the curvature is uncertain.
 - [ ] A Laplace approximation has a noise model you trust; otherwise use the sandwich.
-- [ ] A sandwich has more blocks than parameters, of a length that holds the dependence.
+- [ ] A sandwich has more blocks with curvature than parameters, of a length that holds the dependence, and `degrees_of_freedom` of each parameter that are not few.
 - [ ] A Laplace mixture has `k_hat` at most 0.7.
 
 ## Next steps
@@ -17444,16 +17444,16 @@ class Laplace(UncertaintyMethod[LaplaceResult], RangeChecked):
 
 Bases: `UncertaintyMethod[SandwichResult]`, `RangeChecked`
 
-The sandwich covariance `H⁻¹ B H⁻¹` at the fit, with the meat `B` summed over blocks of positions (the clustered estimator CR1): `B = G/(G − 1) · Σ_b s_b s_bᵀ`, with `s_b` the sum of the gradients of the terms of the observations of block `b`.
+The sandwich covariance at the fit, with the meat summed over blocks of positions: `√(f_j f_k) · (H⁻¹ Σ_b s̃_b s̃_bᵀ H⁻¹)_jk`, with `s_b` the sum of the gradients of the terms of the observations of block `b`, taken after one Gauss–Newton step to the zero of their sum `g`: `s̃_b = s_b − J_b J⁻¹ g`. The factor `f_j` and the degrees of freedom `ν_j` of each parameter come from the share `J_b` of its Gauss–Newton curvature `J` that each block holds (Bell and McCaffrey, 2002): with equal shares, `f_j = G/(G − 1)` and `ν_j = G − 1` for `G` blocks; a parameter that few blocks read has fewer, and a block with no curvature counts for nothing.
 
-It needs no noise model: with a loss, `H` is the curvature of the loss; with observation models, of `−log L`. It holds when the noise depends on its neighbours inside a block, when its size changes, and when the noise model is wrong but the mean is right. Intervals and draws read a Student t with `G − 1` degrees of freedom; with `G` blocks not above the parameters it is refused, since `B` would have rank below them. `loss_function="mae"` is refused: its sandwich needs a density of the residuals at 0 and a bandwidth (use a bootstrap).
+It needs no noise model: with a loss, `H` is the curvature of the loss; with observation models, of `−log L`. It holds when the noise depends on its neighbours inside a block, when its size changes, and when the noise model is wrong but the mean is right. Intervals read the Student t of each parameter, and draws a grouped t whose margins are those t. With no more blocks with curvature than parameters it is refused, since the meat would have rank below them; so it is when the blocks each hold all the curvature of a parameter. `loss_function="mae"` is refused: its sandwich needs a density of the residuals at 0 and a bandwidth (use a bootstrap).
 
 Attributes:
 
 | Name           | Type                      | Description                                                                                                 |
 | -------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `block_length` | `int`                     | Positions per block of the meat; they must make more blocks than parameters.                                |
-| `draws`        | `int`                     | Number of draws of the Student t, at least 1.                                                               |
+| `block_length` | `int`                     | Positions per block of the meat; they must make more blocks with curvature than parameters.                 |
+| `draws`        | `int`                     | Number of draws of the grouped t, at least 1.                                                               |
 | `curvature`    | `{gauss_newton, hessian}` | The curvature H (default "gauss_newton"). With the Hessian, the sandwich also holds when the mean is wrong. |
 | `starts`       | `int`                     | Starts of the fit (default 1): the initial guess, then rows of a Latin hypercube over the bounds.           |
 
@@ -17462,27 +17462,35 @@ Source code in `commol/local/methods.py`
 ```python
 class Sandwich(UncertaintyMethod[SandwichResult], RangeChecked):
     """
-    The sandwich covariance ``H⁻¹ B H⁻¹`` at the fit, with the meat ``B``
-    summed over blocks of positions (the clustered estimator CR1):
-    ``B = G/(G − 1) · Σ_b s_b s_bᵀ``, with ``s_b`` the sum of the gradients
-    of the terms of the observations of block ``b``.
+    The sandwich covariance at the fit, with the meat summed over blocks of
+    positions: ``√(f_j f_k) · (H⁻¹ Σ_b s̃_b s̃_bᵀ H⁻¹)_jk``, with ``s_b`` the
+    sum of the gradients of the terms of the observations of block ``b``,
+    taken after one Gauss–Newton step to the zero of their sum ``g``:
+    ``s̃_b = s_b − J_b J⁻¹ g``. The factor ``f_j`` and the degrees of freedom
+    ``ν_j`` of each parameter come from the share ``J_b`` of its Gauss–Newton
+    curvature ``J`` that each block holds (Bell and McCaffrey, 2002): with
+    equal shares, ``f_j = G/(G − 1)`` and ``ν_j = G − 1`` for ``G`` blocks; a
+    parameter that few blocks read has fewer, and a block with no curvature
+    counts for nothing.
 
     It needs no noise model: with a loss, ``H`` is the curvature of the loss;
     with observation models, of ``−log L``. It holds when the noise depends
     on its neighbours inside a block, when its size changes, and when the
-    noise model is wrong but the mean is right. Intervals and draws read a
-    Student t with ``G − 1`` degrees of freedom; with ``G`` blocks not above
-    the parameters it is refused, since ``B`` would have rank below them.
-    ``loss_function="mae"`` is refused: its sandwich needs a density of the
-    residuals at 0 and a bandwidth (use a bootstrap).
+    noise model is wrong but the mean is right. Intervals read the Student t
+    of each parameter, and draws a grouped t whose margins are those t. With
+    no more blocks with curvature than parameters it is refused, since the
+    meat would have rank below them; so it is when the blocks each hold all
+    the curvature of a parameter. ``loss_function="mae"`` is refused: its
+    sandwich needs a density of the residuals at 0 and a bandwidth (use a
+    bootstrap).
 
     Attributes
     ----------
     block_length : int
-        Positions per block of the meat; they must make more blocks than
-        parameters.
+        Positions per block of the meat; they must make more blocks with
+        curvature than parameters.
     draws : int
-        Number of draws of the Student t, at least 1.
+        Number of draws of the grouped t, at least 1.
     curvature : {"gauss_newton", "hessian"}
         The curvature ``H`` (default ``"gauss_newton"``). With the Hessian,
         the sandwich also holds when the mean is wrong.
@@ -17668,15 +17676,9 @@ class LocalResult(ResultModel):
     sample: ParameterSample
     notes: list[str]
 
-    def degrees_of_freedom(self) -> float | None:
-        """
-        The degrees of freedom of the distribution.
-
-        Returns
-        -------
-        float | None
-            Those of a Student t, or None for a normal.
-        """
+    def _block_length(self) -> int | None:
+        """The positions per block of the Student t of a sandwich, or None
+        for a normal."""
         return None
 
     def delta_band(
@@ -17691,10 +17693,16 @@ class LocalResult(ResultModel):
         The model is linearized at the fit: the variance of an output is
         ``J Σ Jᵀ``, with ``J`` its derivatives on the unbounded scale and
         ``Σ`` the covariance of this result. The band is the prediction at
-        the fit plus and minus the quantile of a normal, or of the Student t
-        of a `SandwichResult`, times its standard deviation. It runs the
-        model a few times per parameter, not once per draw, and reads only
-        the fields of this result, so a result read back from JSON works.
+        the fit plus and minus the quantile of a normal, or for a
+        `SandwichResult` of a Student t, times its standard deviation. The t
+        of each output at each position has the degrees of freedom that the
+        share of the curvature of each block gives its direction ``J``, read
+        at the fit as for the parameters (`SandwichResult`). It runs the
+        model a few times per parameter, not once per draw. It reads the
+        fields of this result, so a result read back from JSON works; for a
+        sandwich, the degrees of freedom also read the observations of the
+        problem, in blocks of `SandwichResult.block_length`, which must be
+        the observations of the fit.
 
         Parameters
         ----------
@@ -17716,7 +17724,10 @@ class LocalResult(ResultModel):
         ValueError
             If the parameters of this result are not those of the problem,
             the level is not strictly between 0 and 1, the engine is
-            stochastic, or the engine rejects a position.
+            stochastic, the engine rejects a position, or, for a sandwich,
+            its block length does not fit the positions of the problem or
+            the Gauss–Newton curvature of its blocks at the fit is
+            singular.
         RuntimeError
             If the derivatives fail at the fit.
         """
@@ -17726,7 +17737,7 @@ class LocalResult(ResultModel):
             self.sample.names,
             list(self.fit.best_parameters.items()),
             self.covariance,
-            self.degrees_of_freedom(),
+            self._block_length(),
             points,
             confidence_level,
         )
@@ -17741,35 +17752,6 @@ class LocalResult(ResultModel):
 
 ### Methods:
 
-#### degrees_of_freedom
-
-```python
-degrees_of_freedom() -> float | None
-```
-
-The degrees of freedom of the distribution.
-
-Returns:
-
-| Type    | Description |
-| ------- | ----------- |
-| \`float | None\`      |
-
-Source code in `commol/local/results.py`
-
-```python
-def degrees_of_freedom(self) -> float | None:
-    """
-    The degrees of freedom of the distribution.
-
-    Returns
-    -------
-    float | None
-        Those of a Student t, or None for a normal.
-    """
-    return None
-```
-
 #### delta_band
 
 ```python
@@ -17778,7 +17760,7 @@ delta_band(calibrator: CalibrationPort, positions: Sequence[float], confidence_l
 
 The band of every output of this approximation by the delta method.
 
-The model is linearized at the fit: the variance of an output is `J Σ Jᵀ`, with `J` its derivatives on the unbounded scale and `Σ` the covariance of this result. The band is the prediction at the fit plus and minus the quantile of a normal, or of the Student t of a `SandwichResult`, times its standard deviation. It runs the model a few times per parameter, not once per draw, and reads only the fields of this result, so a result read back from JSON works.
+The model is linearized at the fit: the variance of an output is `J Σ Jᵀ`, with `J` its derivatives on the unbounded scale and `Σ` the covariance of this result. The band is the prediction at the fit plus and minus the quantile of a normal, or for a `SandwichResult` of a Student t, times its standard deviation. The t of each output at each position has the degrees of freedom that the share of the curvature of each block gives its direction `J`, read at the fit as for the parameters (`SandwichResult`). It runs the model a few times per parameter, not once per draw. It reads the fields of this result, so a result read back from JSON works; for a sandwich, the degrees of freedom also read the observations of the problem, in blocks of `SandwichResult.block_length`, which must be the observations of the fit.
 
 Parameters:
 
@@ -17796,10 +17778,10 @@ Returns:
 
 Raises:
 
-| Type           | Description                                                                                                                                                           |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError`   | If the parameters of this result are not those of the problem, the level is not strictly between 0 and 1, the engine is stochastic, or the engine rejects a position. |
-| `RuntimeError` | If the derivatives fail at the fit.                                                                                                                                   |
+| Type           | Description                                                                                                                                                                                                                                                                                                           |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError`   | If the parameters of this result are not those of the problem, the level is not strictly between 0 and 1, the engine is stochastic, the engine rejects a position, or, for a sandwich, its block length does not fit the positions of the problem or the Gauss–Newton curvature of its blocks at the fit is singular. |
+| `RuntimeError` | If the derivatives fail at the fit.                                                                                                                                                                                                                                                                                   |
 
 Source code in `commol/local/results.py`
 
@@ -17816,10 +17798,16 @@ def delta_band(
     The model is linearized at the fit: the variance of an output is
     ``J Σ Jᵀ``, with ``J`` its derivatives on the unbounded scale and
     ``Σ`` the covariance of this result. The band is the prediction at
-    the fit plus and minus the quantile of a normal, or of the Student t
-    of a `SandwichResult`, times its standard deviation. It runs the
-    model a few times per parameter, not once per draw, and reads only
-    the fields of this result, so a result read back from JSON works.
+    the fit plus and minus the quantile of a normal, or for a
+    `SandwichResult` of a Student t, times its standard deviation. The t
+    of each output at each position has the degrees of freedom that the
+    share of the curvature of each block gives its direction ``J``, read
+    at the fit as for the parameters (`SandwichResult`). It runs the
+    model a few times per parameter, not once per draw. It reads the
+    fields of this result, so a result read back from JSON works; for a
+    sandwich, the degrees of freedom also read the observations of the
+    problem, in blocks of `SandwichResult.block_length`, which must be
+    the observations of the fit.
 
     Parameters
     ----------
@@ -17841,7 +17829,10 @@ def delta_band(
     ValueError
         If the parameters of this result are not those of the problem,
         the level is not strictly between 0 and 1, the engine is
-        stochastic, or the engine rejects a position.
+        stochastic, the engine rejects a position, or, for a sandwich,
+        its block length does not fit the positions of the problem or
+        the Gauss–Newton curvature of its blocks at the fit is
+        singular.
     RuntimeError
         If the derivatives fail at the fit.
     """
@@ -17851,7 +17842,7 @@ def delta_band(
         self.sample.names,
         list(self.fit.best_parameters.items()),
         self.covariance,
-        self.degrees_of_freedom(),
+        self._block_length(),
         points,
         confidence_level,
     )
@@ -17906,18 +17897,19 @@ class LaplaceResult(LocalResult):
 
 Bases: `LocalResult`
 
-The result of a sandwich: a Student t on the unbounded scale of the parameters, centred on the fit, of covariance `H⁻¹ B H⁻¹` and `blocks − 1` degrees of freedom.
+The result of a sandwich: a Student t on the unbounded scale of the parameters, centred on the fit, of covariance `√(f_j f_k) · (H⁻¹ Σ_b s̃_b s̃_bᵀ H⁻¹)_jk`, with the scores `s_b` of each block taken after one Gauss–Newton step to the zero of their sum `g`, `s̃_b = s_b − J_b J⁻¹ g`, and the factor `f_j` and the degrees of freedom `ν_j` of each parameter read from the share `J_b` of its Gauss–Newton curvature `J` that each block holds.
 
 Attributes:
 
-| Name           | Type                | Description                                                                          |
-| -------------- | ------------------- | ------------------------------------------------------------------------------------ |
-| `fit`          | `CalibrationResult` | The fit the sandwich is centred on: Calibrator.run(starts).                          |
-| `covariance`   | `list[list[float]]` | H⁻¹ B H⁻¹ on the unbounded scale of the parameters.                                  |
-| `sample`       | `ParameterSample`   | Draws of the Student t, mapped back to the parameters, with equal weights.           |
-| `notes`        | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale. |
-| `blocks`       | `int`               | The number of blocks G; intervals read a Student t with G − 1 degrees of freedom.    |
-| `block_length` | `int`               | The positions per block.                                                             |
+| Name                 | Type                | Description                                                                                                                                     |
+| -------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fit`                | `CalibrationResult` | The fit the sandwich is centred on: Calibrator.run(starts).                                                                                     |
+| `covariance`         | `list[list[float]]` | The sandwich on the unbounded scale of the parameters.                                                                                          |
+| `sample`             | `ParameterSample`   | Draws of a grouped t, mapped back to the parameters, with equal weights: the margin of each parameter is a Student t of its degrees of freedom. |
+| `notes`              | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale.                                                            |
+| `degrees_of_freedom` | `dict[str, float]`  | The degrees of freedom ν_j of each parameter: blocks − 1 when every block holds the same share of its curvature, fewer when few blocks hold it. |
+| `blocks`             | `int`               | The number of blocks G, those with no curvature included.                                                                                       |
+| `block_length`       | `int`               | The positions per block.                                                                                                                        |
 
 Source code in `commol/local/results.py`
 
@@ -17925,72 +17917,44 @@ Source code in `commol/local/results.py`
 class SandwichResult(LocalResult):
     """
     The result of a sandwich: a Student t on the unbounded scale of the
-    parameters, centred on the fit, of covariance ``H⁻¹ B H⁻¹`` and
-    ``blocks − 1`` degrees of freedom.
+    parameters, centred on the fit, of covariance
+    ``√(f_j f_k) · (H⁻¹ Σ_b s̃_b s̃_bᵀ H⁻¹)_jk``, with the scores ``s_b`` of
+    each block taken after one Gauss–Newton step to the zero of their sum
+    ``g``, ``s̃_b = s_b − J_b J⁻¹ g``, and the factor ``f_j`` and the degrees
+    of freedom ``ν_j`` of each parameter read from the share ``J_b`` of its
+    Gauss–Newton curvature ``J`` that each block holds.
 
     Attributes
     ----------
     fit : CalibrationResult
         The fit the sandwich is centred on: ``Calibrator.run(starts)``.
     covariance : list[list[float]]
-        ``H⁻¹ B H⁻¹`` on the unbounded scale of the parameters.
+        The sandwich on the unbounded scale of the parameters.
     sample : ParameterSample
-        Draws of the Student t, mapped back to the parameters, with equal
-        weights.
+        Draws of a grouped t, mapped back to the parameters, with equal
+        weights: the margin of each parameter is a Student t of its
+        degrees of freedom.
     notes : list[str]
         The entries of the curvature whose estimated error is not small
         against their scale.
+    degrees_of_freedom : dict[str, float]
+        The degrees of freedom ``ν_j`` of each parameter: ``blocks − 1`` when
+        every block holds the same share of its curvature, fewer when few
+        blocks hold it.
     blocks : int
-        The number of blocks ``G``; intervals read a Student t with
-        ``G − 1`` degrees of freedom.
+        The number of blocks ``G``, those with no curvature included.
     block_length : int
         The positions per block.
     """
 
+    degrees_of_freedom: dict[str, float]
     blocks: int
     block_length: int
 
-    def degrees_of_freedom(self) -> float | None:
-        """
-        The degrees of freedom of the Student t.
-
-        Returns
-        -------
-        float | None
-            ``blocks − 1``.
-        """
-        return float(self.blocks - 1)
-```
-
-### Methods:
-
-#### degrees_of_freedom
-
-```python
-degrees_of_freedom() -> float | None
-```
-
-The degrees of freedom of the Student t.
-
-Returns:
-
-| Type    | Description |
-| ------- | ----------- |
-| \`float | None\`      |
-
-Source code in `commol/local/results.py`
-
-```python
-def degrees_of_freedom(self) -> float | None:
-    """
-    The degrees of freedom of the Student t.
-
-    Returns
-    -------
-    float | None
-        ``blocks − 1``.
-    """
-    return float(self.blocks - 1)
+    def _block_length(self) -> int | None:
+        """The positions per block, whose curvature gives the degrees of
+        freedom of the band."""
+        return self.block_length
 ```
 
 ## ImportanceResult
@@ -40998,6 +40962,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
+- **Breaking:** `SandwichResult.degrees_of_freedom` is a field, a `dict[str, float]` of the degrees of freedom of each parameter, where it was a method that gave `blocks − 1` for all of them, and `LocalResult.degrees_of_freedom()` is gone. Each parameter reads its own from the share of its Gauss–Newton curvature that each block holds (Bell and McCaffrey 2002): `blocks − 1` when every block holds the same share, fewer when few blocks read it. The draws of a sandwich are a grouped t whose margin for each parameter is the t of its degrees of freedom, the same draws as before when they are all equal. Read `result.degrees_of_freedom["name"]` in place of `result.degrees_of_freedom()`. See [Sandwich](https://munqu.github.io/commol/latest/guide/uncertainty/local/#sandwich).
 - `commol.scores.pit(predictive, observations, DistributionNoise())` reads the distribution functions of the observation models: each value is `F(y⁻) + v · p(y)` of the mixture over the draws, exact for any sample, also a sample of one point such as `Calibrator.point_sample(fit)`, and `F(y)` whatever the seed for a model with no atoms. Before, it was the PIT of draws of the noise, a Monte Carlo estimate of the same value. With `NoNoise()` and `ResidualNoise(...)` the values do not change, up to rounding.
 - The incomplete gamma and beta functions read Stirling's series from a shape of 10, so the distribution functions, quantiles and draws by inversion of `Gamma` and `Beta` priors, the p-values of PRCC and the Student t quantiles of local bands change in their last digits, more accurate than before.
 - A multinomial draw gives the last category with a positive share the units left, with no draw, when the shares sum to 1 within rounding: in a bin split by `rounding="random"`, the last compartment, and in `StochasticSteps`, the last flow out of a compartment whose proportional rates sum to 1 within rounding. Before, that category drew a uniform or not by the last bit of the shares, so two shares one bit apart, such as an amount written back by `Model.apply_calibration_parameters`, gave another run of the same seed. The distribution of the draws is the same, but a seeded run of `StochasticEvents` or `StochasticSteps` with `rounding="random"`, or of `StochasticSteps` with such rates, can change from this version. See [Whole units](https://munqu.github.io/commol/latest/guide/stochastic/#whole-units).
@@ -41062,6 +41027,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- `Sandwich` reads its factor and its degrees of freedom from the curvature of each block, so a block with no curvature, such as a window of observations that carry no information, counts for nothing, and a parameter read in few blocks gets wide enough intervals. Before, a block of observations with no information counted as one that reads the parameters: two blocks with curvature and two without, for two parameters, gave a correlation of `−0.9999994`, and a parameter read in 2 of 8 blocks had intervals of 90 % that covered about 61 %, as every parameter read a t of `blocks − 1`. A sandwich with no more blocks with curvature than parameters (a block that holds more than `10⁻¹⁰` of the curvature), with blocks that each hold all the curvature of a parameter, or with block scores of rank below the parameters, which gave draws of correlation 1, is refused with a message that suggests another block length. The rank holds for a fit an optimizer returns: each block's scores are read after one step to the zero of their sum, so the covariance does not follow the error of the fit. `LocalResult.delta_band` of a sandwich gives each output at each position the degrees of freedom of its own direction. See [Sandwich](https://munqu.github.io/commol/latest/guide/uncertainty/local/#sandwich).
 - `curvature="hessian"` gives the covariance of a parameter whose curvature is so large that its steps moved the objective above the largest number: for a parameter in `[0, 100]` read by an observation of scale `1e156`, a variance of `4.0e-318`, as Gauss–Newton gives, where it raised a `RuntimeError` of an infeasible point whose objective is not a finite number. Its step is the shorter of `δ^{1/4} · dθ/du` (`δ^{1/4} · max(|θ|, 1)` without bounds) and the one that keeps the objective a number by the Gauss–Newton curvature. For a step of `δ^{1/4}` on the unbounded scale, the step is shorter only where the curvature there is within a factor of about 15 of the one at which the objective overflowed, from about `4e314` with an accuracy `δ` of machine precision and lower for a coarser engine (`6e309` at `δ = 1e-6`); the larger step of a parameter without bounds and `|θ|` above 1 is shorter from a smaller curvature. A Hessian there can change. When the shorter step is within the rounding of the parameter or of the predictions of the model at the fit, the `RuntimeError` names the parameter and says that its curvature is too large for the Hessian, and which rounding hides the step. See [The curvature and the unbounded scale](https://munqu.github.io/commol/latest/guide/uncertainty/local/#the-curvature-and-the-unbounded-scale).
 - The robust portmanteau `Q̃` of `series_dependence`, and of `residual_dependence` with `AtParameters` and `NoNoise()`, holds its level at every `max_lag`. Its p-value is `(1 + #{Q_b ≥ Q}) / (replicates + 1)` over `replicates` permutations of the values of each series over its positions, the exact law of `Q̃` for independent values of one law. A replicate within a relative `10⁻¹⁰` of `Q` counts as reaching it. This tie also changes the p-values of the information factor, of `Refitted` and of `DistributionNoise()`. The sets of signs all +1 or all −1 give the observed statistic up to rounding, and they now count as reaching it. At 5 %, independent normal and `t₃` values of 6 to 100 positions, with or without gaps, reject in 4.2 to 6.0 %, and skewed values in 4.4 to 5.4 %. Before, `Q̃` was read against `χ²`, which rejected 0.2 % of series of 5 values, 2 % of 8, 7.5 % of 35 at `max_lag=17`, 11 % of skewed values at 100 positions and 11 % of values 0 or 1. The p-value now depends on `replicates` and `seed`, and fewer than 19 replicates never reject at 5 %. A spread that grows 30 times along a series still rejects up to 10.4 % below 20 values, and more with gaps or skewed values. The guide gives the cases in [The law of `Q̃`](https://munqu.github.io/commol/latest/guide/uncertainty/dependence/#the-law-of-q). In Rust, the stream `Stream::DependencePermutations` draws the permutations, and each series draws from a generator of its own label (`commol_random::label_seed`). So the p-value of a series does not change when other series join the call or change order.
 - `robust_portmanteau` divides the values of a series by the largest of them before it reads their products. `Q̃` does not change with the scale, and values above about `10⁷⁷` or below about `10⁻⁸¹` read the `Q̃` of any other scale. Before, their products passed the largest number, which made `Q̃` and its p-value NaN, or fell to 0, which left `Q̃` with no lag. A statistic that is NaN has no p-value.

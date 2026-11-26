@@ -5691,6 +5691,20 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
+<p><strong>Breaking:</strong> <code>SandwichResult.degrees_of_freedom</code> is a field, a
+  <code>dict[str, float]</code> of the degrees of freedom of each parameter, where it was
+  a method that gave <code>blocks − 1</code> for all of them, and
+  <code>LocalResult.degrees_of_freedom()</code> is gone. Each parameter reads its own
+  from the share of its Gauss–Newton curvature that each block holds (Bell and
+  McCaffrey 2002): <code>blocks − 1</code> when every block holds the same share, fewer
+  when few blocks read it. The draws of a sandwich are a grouped t whose
+  margin for each parameter is the t of its degrees of freedom, the same
+  draws as before when they are all equal. Read
+  <code>result.degrees_of_freedom["name"]</code> in place of
+  <code>result.degrees_of_freedom()</code>. See
+  <a href="../../guide/uncertainty/local/#sandwich">Sandwich</a>.</p>
+</li>
+<li>
 <p><code>commol.scores.pit(predictive, observations, DistributionNoise())</code> reads the
   distribution functions of the observation models: each value is
   <code>F(y⁻) + v · p(y)</code> of the mixture over the draws, exact for any sample, also
@@ -6344,7 +6358,29 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
-<li><code>curvature="hessian"</code> gives the covariance of a parameter whose curvature is
+<li>
+<p><code>Sandwich</code> reads its factor and its degrees of freedom from the curvature
+  of each block, so a block with no curvature, such as a window of
+  observations that carry no information, counts for nothing, and a parameter
+  read in few blocks gets wide enough intervals. Before, a block of
+  observations with no information counted as one that reads the
+  parameters: two blocks with curvature and two without, for two parameters,
+  gave a correlation of <code>−0.9999994</code>, and a parameter read in 2 of 8 blocks
+  had intervals of 90 % that covered about 61 %, as every parameter read a t
+  of <code>blocks − 1</code>. A sandwich with no more blocks
+  with curvature than parameters (a block that holds more than <code>10⁻¹⁰</code> of the
+  curvature), with blocks that each hold all the curvature of a parameter, or
+  with block scores of rank below the parameters, which gave draws of
+  correlation 1, is refused with a message that suggests another block
+  length. The rank holds for a fit an optimizer returns: each block's scores
+  are read after one step to the zero of their sum, so the covariance does
+  not follow the error of the fit. <code>LocalResult.delta_band</code> of a sandwich
+  gives each output at each position the degrees of freedom of its own
+  direction. See
+  <a href="../../guide/uncertainty/local/#sandwich">Sandwich</a>.</p>
+</li>
+<li>
+<p><code>curvature="hessian"</code> gives the covariance of a parameter whose curvature is
   so large that its steps moved the objective above the largest number: for a
   parameter in <code>[0, 100]</code> read by an observation of scale <code>1e156</code>, a variance
   of <code>4.0e-318</code>, as Gauss–Newton gives, where it raised a <code>RuntimeError</code> of an
@@ -6361,7 +6397,8 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   the fit, the <code>RuntimeError</code> names the parameter and says that its curvature
   is too large for the Hessian, and which rounding hides the step. See <a href="../../guide/uncertainty/local/#the-curvature-and-the-unbounded-scale">The
   curvature and the unbounded
-  scale</a>.</li>
+  scale</a>.</p>
+</li>
 <li>The robust portmanteau <code>Q̃</code> of <code>series_dependence</code>, and of
   <code>residual_dependence</code> with <code>AtParameters</code> and <code>NoNoise()</code>, holds its level
   at every <code>max_lag</code>. Its p-value is <code>(1 + #{Q_b ≥ Q}) / (replicates + 1)</code>

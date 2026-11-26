@@ -4339,16 +4339,16 @@ be too large or too small for a number
 <code>tests/uncertainty/test_singular_curvature.py::test_a_sandwich_does_not_depend_on_the_scale_of_a_parameter</code>,
 <code>tests/uncertainty/test_local.py::TestSandwich::test_a_sandwich_reads_scores_whose_squares_overflow</code>.</p>
 <h2 id="one-rule-says-what-the-data-do-not-determine">One rule says what the data do not determine<a class="headerlink" href="#one-rule-says-what-the-data-do-not-determine" title="Permanent link">&para;</a></h2>
-<p><code>Curvature::inverse</code> (<code>InverseCurvature</code>, <code>local/inverse.rs</code>) is the one
-inverse of a curvature, for the Laplace approximation, the sandwich, the
-mixture and information matching, on <code>symmetric_inverse</code>
-(<code>commol_statistics::linear_algebra</code>): the matrix is scaled to a diagonal of
-1, and it is singular when its smallest eigenvalue is at most <code>p·ε</code> times the
-largest (<code>singular</code>, which <code>collinearity_index</code> also reads), the size of the
-rounding of an eigenvalue of 0. A singular curvature is a
-<code>MethodError::Invalid</code> with one message, and the mixture words it in the note
-of the end that gives no component. The rule reads neither the scale of a
-parameter nor the estimated error of the derivatives.</p>
+<p><code>Curvature::inverse</code> (<code>InverseCurvature</code>, <code>local/inverse.rs</code>) inverts the
+curvature for the Laplace approximation, the sandwich, the mixture and
+information matching, on <code>symmetric_inverse</code> of <code>commol_statistics</code>: the matrix
+is scaled to a diagonal of 1, and it is singular when its smallest eigenvalue is
+at most <code>p·ε</code> times the largest (<code>singular</code>, which <code>collinearity_index</code> also
+reads), the size of the rounding of an eigenvalue of 0. A singular curvature is
+a <code>MethodError::Invalid</code> with one message, and the mixture words it in the note
+of the end that gives no component. <code>BlockShares::new</code> inverts the Gauss–Newton
+curvature of the blocks by it, with its own message. The rule reads neither the
+scale of a parameter nor the estimated error of the derivatives.</p>
 <p>Two parameters that the model reads only through their product have an
 eigenvalue of 0 but for the rounding of the sums, which grows with the number
 of observations. With exact derivatives of <code>a·b·(1 + t)</code>, a Poisson model and

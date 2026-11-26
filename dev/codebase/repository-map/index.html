@@ -4491,8 +4491,8 @@
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/local/</code></td>
-<td>Local approximations at a fit: <code>Curvature</code> (Gauss–Newton or the stepped Hessian of the <code>finitediff</code> crate of the argmin fork, on the unbounded scale, in units of the parameters, with the term gradients and the curvature of each block), <code>InverseCurvature</code> (<code>inverse.rs</code>), <code>CurvatureKind</code> and <code>laplace_approximation</code> (<code>approximation.rs</code>), <code>Gaussian</code> and <code>laplace</code> (<code>gaussian.rs</code>), <code>delta_band</code> (<code>band.rs</code>), <code>sandwich</code>, <code>scaled_block_scores</code> and <code>sandwich_approximation</code> (<code>sandwich.rs</code>), <code>laplace_mixture</code> (<code>mixture.rs</code>).</td>
-<td>Finite-difference formulas of their own; samplers; a second inverse of a curvature.</td>
+<td>Local approximations at a fit: <code>Curvature</code> (Gauss–Newton or the stepped Hessian of the <code>finitediff</code> crate of the argmin fork, on the unbounded scale, in units of the parameters, with the term gradients and the curvature of each block), <code>InverseCurvature</code> (<code>inverse.rs</code>), <code>CurvatureKind</code> and <code>laplace_approximation</code> (<code>approximation.rs</code>), <code>Gaussian</code> and <code>laplace</code> (<code>gaussian.rs</code>), <code>delta_band</code> (<code>band.rs</code>), <code>sandwich</code>, <code>scaled_block_scores</code> and <code>sandwich_approximation</code> (<code>sandwich.rs</code>), <code>BlockShares</code> (<code>shares.rs</code>), <code>laplace_mixture</code> (<code>mixture.rs</code>).</td>
+<td>Finite-difference formulas of their own; samplers; a second rule of what an inverse of a curvature refuses.</td>
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/psis.rs</code>, <code>importance.rs</code></td>
