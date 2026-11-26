@@ -4,36 +4,16 @@
 
 use commol_calibration::observed_data;
 use commol_inference::dependence::{
-    self, DrawPValues, MaxLag, ResidualKind, ResidualSettings, SeriesDependence,
+    self, DrawPValues, ResidualKind, ResidualSettings, SeriesDependence,
 };
 use commol_inference::ranges::{MAX_LAG, RANDOMIZATIONS, REPLICATES};
 use commol_inference::settings::dependence::Reference;
 use commol_inference::settings::resampling::NoiseSettings;
 use pyo3::prelude::*;
 
-use crate::inference::{PyCalibrationProblem, PyParameterSample, method_error, value_error};
+use crate::inference::{PyCalibrationProblem, PyParameterSample, method_error};
 use crate::parallelism::{parallel, parallel_logged};
 use crate::records::StepLog;
-
-/// Read `max_lag`, a whole number or `"auto"`, with the rule of its setting.
-///
-/// # Errors
-///
-/// A `ValueError` for a text other than `"auto"` or a number outside the
-/// rule, and a `TypeError` for another type.
-fn max_lag(value: &Bound<'_, PyAny>) -> PyResult<MaxLag> {
-    if let Ok(text) = value.extract::<String>() {
-        return if text == "auto" {
-            Ok(MaxLag::Auto)
-        } else {
-            Err(value_error(format!(
-                "max_lag is a whole number of at least 1 or \"auto\", got '{text}'"
-            )))
-        };
-    }
-    let lags: i64 = value.extract()?;
-    crate::counts::count(&MAX_LAG, lags).map(MaxLag::Lags)
-}
 
 /// The spread of the p-values of the draws, as `(median, share_below)`.
 fn spread(values: Option<DrawPValues>) -> Option<(f64, f64)> {
@@ -160,7 +140,7 @@ fn python(py: Python<'_>, analysis: SeriesDependence) -> PyResult<PySeriesDepend
 /// Args:
 ///     observations: The JSON of the observations
 ///     values: One value per observation
-///     max_lag: The largest lag, or "auto"
+///     max_lag: The largest lag of each series
 ///     replicates: The wild sets of the band
 ///     confidence_level: The level of the band
 ///     seed: The seed of the signs
@@ -173,13 +153,13 @@ fn series_dependence(
     py: Python<'_>,
     observations: &str,
     values: Vec<f64>,
-    max_lag: &Bound<'_, PyAny>,
+    max_lag: i64,
     replicates: i64,
     confidence_level: f64,
     seed: i128,
 ) -> PyResult<PySeriesDependence> {
     let observations = observed_data(&crate::json::read::<Vec<_>>(observations)?);
-    let max_lag = self::max_lag(max_lag)?;
+    let max_lag: usize = crate::counts::count(&MAX_LAG, max_lag)?;
     let replicates: usize = crate::counts::count(&REPLICATES, replicates)?;
     let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
     let analysis = parallel(py, || {
@@ -205,7 +185,7 @@ fn series_dependence(
 ///     observations: The JSON of the observations
 ///     noise: The JSON of `DistributionNoise` (quantile residuals) or
 ///         `NoNoise` (additive residuals)
-///     max_lag: The largest lag, or "auto"
+///     max_lag: The largest lag of each series
 ///     randomizations: The randomizations of the quantile residuals
 ///     reference: The JSON of `AtParameters` or `Refitted`
 ///     confidence_level: The level of the band of `τ`
@@ -227,7 +207,7 @@ fn residual_dependence(
     sample: &PyParameterSample,
     observations: &str,
     noise: &str,
-    max_lag: &Bound<'_, PyAny>,
+    max_lag: i64,
     randomizations: i64,
     reference: &str,
     confidence_level: f64,
@@ -247,7 +227,7 @@ fn residual_dependence(
         }
     };
     let settings = ResidualSettings {
-        max_lag: self::max_lag(max_lag)?,
+        max_lag: crate::counts::count(&MAX_LAG, max_lag)?,
         randomizations: crate::counts::count(&RANDOMIZATIONS, randomizations)?,
         reference: crate::json::read::<Reference>(reference)?,
         confidence_level,

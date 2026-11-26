@@ -3,7 +3,6 @@ of the residuals of a predictive."""
 
 import logging
 from collections.abc import Sequence
-from typing import Literal
 
 from commol._data.engine_json import engine_json
 from commol._problem.problem import ObservedDataPoint
@@ -19,7 +18,7 @@ logger = logging.getLogger("commol.dependence")
 def series_dependence(
     values: Sequence[float],
     observations: Sequence[ObservedDataPoint],
-    max_lag: int | Literal["auto"],
+    max_lag: int,
     replicates: int,
     confidence_level: float,
     seed: int,
@@ -50,9 +49,9 @@ def series_dependence(
         quantile residual of held-out data, an additive residual, any score.
     observations : Sequence[ObservedDataPoint]
         The observations the values belong to.
-    max_lag : int | "auto"
-        The largest lag, in steps of the grid of each series; ``"auto"`` is
-        ``min(10, n / 5)``, at least 1, for a series of ``n`` values.
+    max_lag : int
+        The largest lag of the autocorrelations and of ``Q̃``, in steps of the
+        grid of each series, at least 1.
     replicates : int
         The wild sets of the band and of the test of the factor, at least 1.
     confidence_level : float
@@ -68,7 +67,8 @@ def series_dependence(
     Raises
     ------
     TypeError
-        If `values` holds lists: one set of values only.
+        If `values` holds lists, since it is one set of values, or if a
+        count, such as `max_lag`, is not a whole number.
     ValueError
         If a setting is outside its range, or `values` is not one finite
         value per observation.
@@ -108,7 +108,7 @@ def residual_dependence(
     predictive: Predictive,
     observations: Sequence[ObservedDataPoint],
     noise: _ObservationNoise,
-    max_lag: int | Literal["auto"],
+    max_lag: int,
     randomizations: int,
     reference: AtParameters | Refitted,
     confidence_level: float,
@@ -147,7 +147,7 @@ def residual_dependence(
     noise : NoNoise | DistributionNoise
         `DistributionNoise()` for the quantile residuals of observation
         models, `NoNoise()` for the additive residuals of a loss.
-    max_lag : int | "auto"
+    max_lag : int
         The largest lag, as in `series_dependence`.
     randomizations : int
         The randomizations of the quantile residuals, at least 1; 1 with
@@ -167,7 +167,8 @@ def residual_dependence(
     Raises
     ------
     TypeError
-        If `noise` is `ResidualNoise`.
+        If `noise` is `ResidualNoise`, or a count, such as `max_lag`, is not
+        a whole number.
     ValueError
         If a setting is outside its range, the predictive is of a
         sensitivity analysis, quantile residuals have a loss or an observed

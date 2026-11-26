@@ -11,6 +11,7 @@ constant flow, the quantile residuals and the additive residuals are both
 
 import logging
 import math
+from collections.abc import Callable
 
 import pytest
 
@@ -126,6 +127,7 @@ def test_any_values_of_one_set() -> None:
 
     (x,) = result.series
     assert x.values == 6
+    assert x.max_lag == 2
     variance = 17.5 / 6
     assert x.correlations == pytest.approx([5.75 / 5 / variance, -1 / 4 / variance])
     assert x.pairs == [5, 4]
@@ -147,8 +149,6 @@ def test_any_values_of_one_set() -> None:
     assert _values(values, observations) == result
     other = _values(values, observations, seed=4).series[0].tau_band
     assert other != x.tau_band
-    # "auto" is n / 5 = 1 lag, at least 1.
-    assert _values(values, observations, max_lag="auto").series[0].max_lag == 1
 
 
 def test_values_are_one_set() -> None:
@@ -166,8 +166,39 @@ def test_values_are_one_set() -> None:
         _values([1.0, 2.0, 3.0], observations)
     with pytest.raises(ValueError, match="finite"):
         _values([1.0, 2.0, math.nan, 4.0], observations)
-    with pytest.raises(ValueError, match="max_lag"):
-        _values([1.0, 2.0, 3.0, 4.0], observations, max_lag="all")
+
+
+def test_one_largest_lag_serves_series_of_different_lengths() -> None:
+    long = _points("long", list(range(35)))
+    short = _points("short", list(range(6)))
+    values = [math.cos(t * t) for t in range(35 + 6)]
+
+    both = _values(values, long + short, max_lag=10)
+
+    of_long, of_short = both.series
+    assert of_long.max_lag == of_short.max_lag == both.settings.max_lag == 10
+    # The long series reads all of its lags.
+    assert of_long.pairs == list(range(34, 24, -1))
+    assert of_long.few_pairs == []
+    assert of_long.degrees_of_freedom == 10
+    # The short series reads lags 1 and 2; its last lags leave Q̃.
+    assert of_short.pairs == [5, 4, 3, 2, 1, 0, 0, 0, 0, 0]
+    assert of_short.few_pairs == list(enumerate([3, 2, 1, 0, 0, 0, 0, 0], start=3))
+    assert of_short.degrees_of_freedom == 2
+    # Each one has the statistics of the lags it reads.
+    for series, alone in (
+        (of_long, _values(values[:35], long, max_lag=10).series[0]),
+        (of_short, _values(values[35:], short, max_lag=2).series[0]),
+    ):
+        assert series.correlations[: alone.max_lag] == alone.correlations
+        assert series.portmanteau == alone.portmanteau
+        assert series.p_value == alone.p_value
+    # τ, its band and the series together do not read max_lag.
+    other = _values(values, long + short, max_lag=2)
+    assert other.problem == both.problem
+    for series, same in zip(both.series, other.series, strict=True):
+        assert (series.tau, series.tau_band) == (same.tau, same.tau_band)
+        assert series.cut_lag == same.cut_lag
 
 
 def _normal(**models):
@@ -184,12 +215,13 @@ def _residuals(
     noise,
     reference=None,
     randomizations: int = 1,
+    max_lag: int = 3,
 ) -> SeriesDependence:
     return residual_dependence(
         predictive,
         observations,
         noise,
-        max_lag=3,
+        max_lag=max_lag,
         randomizations=randomizations,
         reference=reference or AtParameters(replicates=9),
         confidence_level=0.9,
@@ -198,6 +230,47 @@ def _residuals(
 
 def _at_fit(calibrator) -> Predictive:
     return Predictive(calibrator, calibrator.point_sample(calibrator.run()), [1.0])
+
+
+def _of_values(**settings) -> SeriesDependence:
+    return _values(FLOWS, _points("x", list(range(12))), **settings)
+
+
+def _of_residuals(**settings) -> SeriesDependence:
+    calibrator = flow_calibrator(FLOWS, windowed=True)
+    observations = calibrator.problem.observed_data
+    return _residuals(_at_fit(calibrator), observations, NoNoise(), **settings)
+
+
+@pytest.mark.parametrize(
+    ("value", "error"),
+    [
+        ("auto", TypeError),
+        ("7", TypeError),
+        (7.0, TypeError),
+        (7.5, TypeError),
+        (None, TypeError),
+        (0, ValueError),
+    ],
+)
+@pytest.mark.parametrize(
+    ("analysis", "count"),
+    [(_of_values, "replicates"), (_of_residuals, "randomizations")],
+)
+def test_the_largest_lag_is_a_whole_number(
+    analysis: Callable[..., SeriesDependence],
+    count: str,
+    value: object,
+    error: type[Exception],
+) -> None:
+    with pytest.raises(error, match="max_lag") as of_lag:
+        analysis(max_lag=value)
+
+    # It is read as the other count of the function: the same error, which
+    # names the argument in its message or in its note.
+    with pytest.raises(error, match=count) as of_count:
+        analysis(**{count: value})
+    assert str(of_lag.value).replace("max_lag", count) == str(of_count.value)
 
 
 class TestResiduals:

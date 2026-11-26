@@ -30,39 +30,6 @@ pub(crate) mod sets;
 pub use of_residuals::{ResidualKind, ResidualSettings, residual_dependence};
 pub use of_values::series_dependence;
 
-use crate::ranges::MAX_LAG;
-
-/// The largest lag of each series.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MaxLag {
-    /// `min(10, n / 5)` lags, at least 1, for a series of `n` values.
-    Auto,
-    /// This many lags for every series.
-    Lags(usize),
-}
-
-impl MaxLag {
-    /// The lags of a series of `values` values.
-    pub fn of(self, values: usize) -> usize {
-        match self {
-            Self::Auto => (values / 5).clamp(1, 10),
-            Self::Lags(lags) => lags,
-        }
-    }
-
-    /// Check the number of lags with its rule ([`MAX_LAG`]).
-    ///
-    /// # Errors
-    ///
-    /// Returns the message of the rule.
-    pub fn check(self) -> Result<(), String> {
-        match self {
-            Self::Auto => Ok(()),
-            Self::Lags(lags) => MAX_LAG.check(lags),
-        }
-    }
-}
-
 /// The spread of the p-values of the draws of a sample.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DrawPValues {

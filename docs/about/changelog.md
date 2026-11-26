@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the integrated autocorrelation time `τ` by Geyer's initial monotone
   sequence with its band; the series together have their correlations and
   the factor by which the dependence multiplies the information. The
+  required `max_lag`, a whole number of at least 1, is the largest lag of the
+  autocorrelations and of `Q̃`, in steps of the grid of each series. The
   required `reference` is `AtParameters(replicates)`, for held-out data, or
   `Refitted(replicates, starts=1)`, which refits data drawn at the fit and
   holds for the data of the fit. `Q̃` sums only the lags of 4 pairs or

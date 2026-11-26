@@ -1,7 +1,7 @@
 """The predictive of a parameter sample: the run of every draw and its bands."""
 
 from collections.abc import Iterable, Sequence
-from typing import TYPE_CHECKING, Literal, Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from pydantic import ConfigDict, Field
 
@@ -78,7 +78,7 @@ class PredictiveSource(Protocol):
         sample: ParameterSample,
         observed_data: list[ObservedDataPoint],
         noise: _ObservationNoise,
-        max_lag: int | Literal["auto"],
+        max_lag: int,
         randomizations: int,
         reference: str,
         confidence_level: float,

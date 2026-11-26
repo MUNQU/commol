@@ -3,7 +3,7 @@
 [Back to Design decisions](../design-decisions.md)
 
 How a series of values is read for dependence, which law its tests take, and
-who decides the length of a block from it.
+who decides the largest lag and the length of a block.
 
 ## A test of dependence takes its reference
 
@@ -91,6 +91,50 @@ conservative, and many lags make `Q̃` liberal (7.5 % at `max_lag=17` of
 **Guards:** `crates/commol-inference/tests/test_dependence.rs`
 (`a_lag_with_few_pairs_leaves_the_portmanteau`), `tests/uncertainty/test_dependence.py`,
 `tests/uncertainty/test_dependence_coverage.py::TestValues::test_lags_with_few_pairs_keep_the_level`.
+
+## The user gives the largest lag
+
+Both analyses take `max_lag`, required, and read every series at the lags
+`1 … max_lag`. The engine reads it as a `usize` with the rule `MAX_LAG` (at
+least 1, `crates/commol-inference/src/ranges.rs`), and a binding as any count
+(`py-commol/src/counts.rs`). The number says which dependence the test can
+see, and the p-value of `Q̃` depends on it, so the user writes it. A rule from
+the number of values, as the smaller of 10 and a fifth of them, reads at most
+10 days of a daily series whatever the period of its process, and a cycle of 7
+days only from 35 values on.
+
+One number serves series of different lengths, because a lag of fewer than 4
+pairs leaves `Q̃`. At 5 %, that rule rejects 2.6 % of independent normal series
+of 12 values, 4.4 % of 20 and 5.4 % of 35, and 10 lags reject 4.9, 6.2 and
+6.2 %. So one number is nearer 5 % with 12 values, and up to 1.8 points above
+the rule from 20 values on. The law of `Q̃` is
+[#530](https://github.com/MUNQU/commol/issues/530).
+
+These rates, and those of 4, 7 and 10 lags in
+[Choose the largest lag](../../guide/uncertainty/dependence.md#choose-the-largest-lag),
+are from [#561](https://github.com/MUNQU/commol/issues/561). Those of 17 and 33
+lags are from
+[M1 of #511](https://github.com/MUNQU/commol/issues/511#issuecomment-7009198279).
+The smallest p-value of 4, 7 and 10 lags rejects 8.4 % of independent normal
+series of 20 values, 9.1 % of those of 35 and 9.2 % of those of 100 (40 000 sets
+each of `series_dependence`).
+
+`τ`, its band, `cut_lag` and the statistics of the problem do not read
+`max_lag`, so two analyses of one seed share them.
+
+| Alternative | Why not |
+|---|---|
+| An automatic number (`"auto"`), since it is a fixed rule and changes no interval | It sets a p-value with a number nobody wrote. |
+| A number per series | No caller, and two analyses give it. |
+| A function that suggests a number | A second way to what the guide says. |
+| A message of its own for the text `"auto"` | No release has that text, and any text has the error of a whole-number argument, which names `max_lag`. |
+| An enum of one variant in the engine | `usize` with its rule says the same. |
+
+**Guards:** `tests/uncertainty/test_dependence.py::test_the_largest_lag_is_a_whole_number`,
+`tests/uncertainty/test_dependence.py::test_one_largest_lag_serves_series_of_different_lengths`,
+`tests/uncertainty/test_counts.py`, `crates/commol-inference/tests/test_errors.rs`
+(`a_setting_out_of_range_is_invalid_in_every_method`), and the example of the
+[Quick path](../../guide/uncertainty/dependence.md#quick-path).
 
 ## The user gives the length of a block
 

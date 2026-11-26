@@ -1,7 +1,7 @@
 """Calibration of a model against observed data."""
 
 import logging
-from typing import TYPE_CHECKING, Literal, TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 from pydantic import BaseModel
 
@@ -253,7 +253,7 @@ class Calibrator:
         sample: ParameterSample,
         observed_data: list[ObservedDataPoint],
         noise: _ObservationNoise,
-        max_lag: int | Literal["auto"],
+        max_lag: int,
         randomizations: int,
         reference: str,
         confidence_level: float,
@@ -271,7 +271,7 @@ class Calibrator:
         noise : NoNoise | ResidualNoise | DistributionNoise
             The residuals: `DistributionNoise` reads the quantile residuals,
             `NoNoise` the additive ones.
-        max_lag : int | "auto"
+        max_lag : int
             The largest lag.
         randomizations : int
             The randomizations of the quantile residuals.

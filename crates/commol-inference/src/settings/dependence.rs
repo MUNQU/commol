@@ -1,6 +1,5 @@
 //! The settings of a dependence analysis: its reference, as the Python
-//! classes `AtParameters` and `Refitted` write it, and the union
-//! `int | "auto"` of its largest lag.
+//! classes `AtParameters` and `Refitted` write it.
 
 use commol_calibration::ranges::STARTS;
 use commol_core::{Rule, checked, tagged};

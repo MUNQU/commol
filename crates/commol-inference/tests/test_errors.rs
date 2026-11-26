@@ -14,6 +14,9 @@ use commol_inference::conformal::{
     ConformalSettings, NonconformityScore, Pooling, Predictor, adaptive_conformal, enbpi,
     jackknife_plus, rolling_conformal, split_conformal,
 };
+use commol_inference::dependence::{
+    ResidualKind, ResidualSettings, residual_dependence, series_dependence,
+};
 use commol_inference::design::InputSpace;
 use commol_inference::global_sensitivity::ForwardAnalysis;
 use commol_inference::identifiability::structural_rank;
@@ -24,8 +27,9 @@ use commol_inference::resampling::{
     Residuals, block_jackknife, bootstrap,
 };
 use commol_inference::sensitivity::{Design, FiniteDifferences};
+use commol_inference::settings::dependence::{AtParametersSettings, Reference};
 use commol_inference::smc::{RandomWalk, SmcSampler, bootstrap_coverage_eta, gibbs_posterior};
-use commol_inference::{ErrorKind, MethodError, Priors};
+use commol_inference::{ErrorKind, MethodError, ParameterSample, Priors};
 use commol_random::Generator;
 
 type Formula = fn(&HashMap<String, f64>, f64) -> f64;
@@ -217,6 +221,14 @@ fn a_setting_out_of_range_is_invalid_in_every_method() {
     .unwrap();
     let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
     let held = [ProfiledQuantity::Parameter(0)];
+    let point = ParameterSample::new(
+        problem.parameter_names(),
+        problem.parameter_bounds(),
+        vec![FIT.to_vec()],
+        &[0.0],
+        None,
+    )
+    .unwrap();
 
     let errors = [
         // needs nine.
@@ -274,6 +286,29 @@ fn a_setting_out_of_range_is_invalid_in_every_method() {
             0.01,
             spread(),
         )),
+        kind_of(series_dependence(
+            problem.observed_data(),
+            &VALUES,
+            0,
+            9,
+            0.9,
+            5,
+        )),
+        kind_of(residual_dependence(
+            &problem,
+            &config,
+            &point,
+            problem.observed_data(),
+            ResidualKind::Additive,
+            &ResidualSettings {
+                max_lag: 0,
+                randomizations: 1,
+                reference: Reference::AtParameters(AtParametersSettings { replicates: 9 }),
+                confidence_level: 0.9,
+            },
+            5,
+            &NoSteps,
+        )),
     ];
 
     let expected = [
@@ -288,6 +323,8 @@ fn a_setting_out_of_range_is_invalid_in_every_method() {
         "points is a whole number of at least 1, got 0",
         "give a sample",
         "give a sample",
+        "max_lag is a whole number of at least 1, got 0",
+        "max_lag is a whole number of at least 1, got 0",
     ];
     for ((kind, message), expected) in errors.iter().zip(expected) {
         assert_eq!(*kind, ErrorKind::Invalid, "{message}");
