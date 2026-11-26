@@ -3505,6 +3505,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/windows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/files/" class="md-nav__link">
         
   
@@ -4176,7 +4204,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-core/src/position.rs</code></td>
-<td>When two positions on the axis are one (<code>same_position</code>, <code>POSITION_TOLERANCE</code>), for every crate.</td>
+<td>When two positions on the axis are one (<code>same_position</code>, <code>POSITION_TOLERANCE</code>), and the position from which they cannot tell two steps apart (<code>STEP_POSITION_LIMIT</code>), for every crate.</td>
 <td>A tolerance of positions of its own.</td>
 </tr>
 <tr>
@@ -4291,8 +4319,13 @@
 </tr>
 <tr>
 <td><code>crates/commol-model/src/system.rs</code></td>
-<td>The flows every engine reads: <code>flow_rates</code> (the value of each flow), <code>transition_rates</code> (its rate), <code>flow_changes</code> (the change of one event of each flow), the right-hand side <code>derivatives</code> built on them; impulses (<code>apply_impulses</code>, <code>impulse_rates</code>, <code>impulse_changes</code>, <code>impulse_positions</code>); the positions where a rate can jump (<code>breakpoints</code>, <code>reads_time</code>); the parameters a caller sets (<code>set_parameter</code>, <code>check_parameter</code>: a constant or a parameter to calibrate); the values a run needs (<code>check_values</code>); the accessors the engines use.</td>
+<td>The flows every engine reads: <code>flow_rates</code> (the value of each flow), <code>transition_rates</code> (its rate), <code>flow_changes</code> (the change of one event of each flow), the right-hand side <code>derivatives</code> built on them; impulses (<code>impulses_at</code>, <code>apply_impulses</code>, <code>impulse_rates</code>, <code>impulse_changes</code>); the points where a rate can jump (<code>breakpoints</code>, <code>reads_time</code>); the parameters a caller sets (<code>set_parameter</code>, <code>check_parameter</code>: a constant or a parameter to calibrate); the values a run needs (<code>check_values</code>); the accessors the engines use.</td>
 <td>Stepping along the axis.</td>
+</tr>
+<tr>
+<td><code>crates/commol-model/src/stops.rs</code></td>
+<td>Where an engine in continuous time stops: the points of a model that <code>same_position</code> calls one are one <code>Stop</code> (an integer of a model that reads <code>step</code> holds the points next to it), with its earliest point (<code>cut</code>) and its impulses; the stops of a run from one stop to its end (<code>Breakpoints</code>), and where a position is reported (<code>place</code>).</td>
+<td>The points of a model (<code>CompiledModel::breakpoints</code>).</td>
 </tr>
 <tr>
 <td><code>crates/commol-model/src/types.rs</code></td>
@@ -5000,7 +5033,7 @@ results.</p>
 <tr>
 <td>Change which positions a model type accepts, or how results, windows and reports read them</td>
 <td><code>crates/commol-core/src/types/engine.rs</code> (<code>EngineType::check_position</code>); <code>py-commol/commol/_simulation/results.py</code></td>
-<td><code>crates/commol-core/src/position.rs</code> (<code>same_position</code>), <code>crates/commol-calibration/src/observation.rs</code> (<code>index_at</code>, <code>window_increments</code>, the grid of windows), each engine's <code>check_position</code>, <code>crates/commol-calibration/src/calibration_problem.rs</code> (<code>check_positions</code>), <code>_simulation/windows.py</code>, <code>_simulation/reports.py</code>, <code>_simulation/panels.py</code>, <code>uncertainty/panels.py</code>, <code>uncertainty/predictive.py</code></td>
+<td><code>crates/commol-core/src/position.rs</code> (<code>same_position</code>, <code>STEP_POSITION_LIMIT</code>), <code>crates/commol-model/src/stops.rs</code> (<code>Breakpoints</code>, <code>Stop</code>), <code>crates/commol-calibration/src/observation.rs</code> (<code>index_at</code>, <code>window_increments</code>, the grid of windows), each engine's <code>check_position</code>, <code>crates/commol-calibration/src/calibration_problem.rs</code> (<code>check_positions</code>), <code>_simulation/windows.py</code>, <code>_simulation/reports.py</code>, <code>_simulation/panels.py</code>, <code>uncertainty/panels.py</code>, <code>uncertainty/predictive.py</code></td>
 </tr>
 <tr>
 <td>Change axis units, the calendar of an axis or axis patterns</td>

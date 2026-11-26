@@ -3512,6 +3512,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/windows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/files/" class="md-nav__link">
         
   
@@ -4507,7 +4535,11 @@ with the message of the engine, <code>epsilon is strictly between 0 and 1, got
 <li><strong>Breakpoints.</strong> The engine stops at every position where a rate can jump
   (the impulses, the values a rate compares <code>t</code> with, the points of a series
   read at <code>t</code>, and every integer when a rate reads <code>step</code>), so no wait and no
-  leap crosses one (<code>CompiledModel::breakpoints</code>).</li>
+  leap crosses one (<code>CompiledModel::breakpoints</code>). Every event between two
+  stops reads the step of the first. Positions next to an integer are a stop
+  at that integer, as in a
+  <a href="../simulations/#time-inside-a-step">differential model</a>, and a row there
+  shows the state after the impulses of the stop.</li>
 <li><strong>Impulses.</strong> At its positions, before the events there, a proportional
   impulse moves a binomial draw of its source (its rate is the probability
   that one unit moves, between 0 and 1); an absolute impulse moves its rate,

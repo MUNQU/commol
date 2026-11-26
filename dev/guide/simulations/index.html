@@ -3629,6 +3629,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/windows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/files/" class="md-nav__link">
         
   
@@ -4947,6 +4975,12 @@ the solver cannot step over a short window. This works when the value reads
 only numbers, <code>pi</code>, <code>e</code> and parameters with a constant or calibrated value, and
 <code>t</code> is one side of the comparison: write <code>t &gt;= 10</code>, not <code>t - 10 &gt;= 0</code>. A jump
 that depends on the state, such as <code>if(t &gt;= A, ...)</code>, is not found.</p>
+<p>In a model that reads <code>step</code>, a position within a relative <code>1e-9</code> of an
+integer is that integer. So a threshold, an impulse or a point of a series just
+below step <code>n</code>, such as <code>0.3 / 0.1</code> for 3, acts at <code>n</code>: the rate of step <code>n</code>
+acts on the whole step, and an impulse there acts once. A run that ends at
+such a position ends at <code>n</code>, and the next run goes on from <code>n</code>. Such a model
+runs below <code>5e8</code>, where that tolerance is half a step.</p>
 <p>A rate of a differential model is continuous, not a fraction per step; see
 <a href="../core-concepts/#what-a-rate-means">What a rate means</a>.
 <code>Model.axis_units()</code> gives the rate that the engine of a model reads from a mean

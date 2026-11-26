@@ -3468,6 +3468,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../windows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../files/" class="md-nav__link">
         
   
@@ -4148,8 +4176,8 @@ accumulator. Every engine reads them, and none has flow logic of its own:</p>
 fixed order; another order changes the last bits of a deterministic run. The
 deterministic engines are the mean-field limits of the stochastic ones, which
 gives the main test oracle. The positions where a rate can jump come from the
-same model (<code>CompiledModel::breakpoints</code>), so the differential
-and the continuous-time stochastic engines stop at the same positions.</p>
+model (<code>CompiledModel::breakpoints</code>), so both engines in continuous time stop at
+the same positions and read the same <code>step</code> there.</p>
 <p>A rate that is not a number stops the run in every engine, with a
 <code>RuntimeError</code> that names the flow and the position: a calibration fails with
 the cause instead of a penalty for a run of NaN. <code>derivatives</code> checks the flows

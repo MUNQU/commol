@@ -3353,6 +3353,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/windows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/files/" class="md-nav__link">
         
   
@@ -4211,12 +4239,12 @@ full run takes hours:</p>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>cargo<span class="w"> </span>mutants<span class="w"> </span>-j<span class="w"> </span><span class="m">2</span><span class="w"> </span>--timeout<span class="w"> </span><span class="m">120</span><span class="w"> </span>-p<span class="w"> </span>commol-model<span class="w"> </span>--test-package<span class="w"> </span>commol-model<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--test-package<span class="w"> </span>commol-difference<span class="w"> </span>--test-package<span class="w"> </span>commol-differential<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span>--test-package<span class="w"> </span>commol-stochastic<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span>--exclude-re<span class="w"> </span><span class="s1">&#39;replace \+= with .* in CompiledModel::breakpoints&#39;</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span>--exclude-re<span class="w"> </span><span class="s1">&#39;replace \+= with .* in Breakpoints::new&#39;</span>
 </span></code></pre></div>
-<p>A mutant can loop without end and fill the memory: the loop of
-<code>CompiledModel::breakpoints</code> never ends when its step does not grow, so the
-command leaves those mutants out, and <code>--timeout</code> stops the others. Run
-<code>cargo-mutants</code> and <code>mutmut</code> one at a time.</p>
+<p>A mutant can loop without end and fill the memory: the loop over the
+integers in <code>Breakpoints::new</code> (<code>crates/commol-model/src/stops.rs</code>) never ends
+when its step does not grow, so the command leaves those mutants out, and
+<code>--timeout</code> stops the others. Run <code>cargo-mutants</code> and <code>mutmut</code> one at a time.</p>
 <p>For Python, <code>mutmut</code> (<code>uv pip install mutmut</code>) with <code>[tool.mutmut]</code>
 <code>paths_to_mutate = ["commol/"]</code> in a copy of
 <code>py-commol/</code>. A missed mutant gets a test that fails on it, or a reason: an

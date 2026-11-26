@@ -3520,6 +3520,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/windows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/files/" class="md-nav__link">
         
   
@@ -4351,7 +4379,7 @@ never a variable.</p>
 </tr>
 <tr>
 <td><code>step</code></td>
-<td>The step that holds the current position, <code>floor(t)</code>: 0, 1, 2, … It is constant on each unit interval of a differential model; see <a href="../simulations/#time-inside-a-step">Time inside a step</a></td>
+<td>The step that holds the current position, <code>floor(t)</code>: 0, 1, 2, … It is constant on each unit interval of a differential model, and a position within a relative <code>1e-9</code> of an integer is in the step of that integer; see <a href="../simulations/#time-inside-a-step">Time inside a step</a></td>
 </tr>
 <tr>
 <td><code>pi</code>, <code>e</code></td>

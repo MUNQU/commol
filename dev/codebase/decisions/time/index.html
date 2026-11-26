@@ -2994,17 +2994,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#windowed-observations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Windowed observations
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#the-engine-owns-positions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3470,6 +3459,34 @@
     
   
     Descriptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../windows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows
   
 
     
@@ -4067,17 +4084,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#windowed-observations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Windowed observations
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#the-engine-owns-positions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4121,7 +4127,7 @@
 
 <h1 id="time">Time<a class="headerlink" href="#time" title="Permanent link">&para;</a></h1>
 <p><a href="../../design-decisions/">Back to Design decisions</a></p>
-<p>How the axis works: its units, the time inside a step, impulses, windows and positions.</p>
+<p>How the axis works: its units, the time inside a step, impulses and positions.</p>
 <h2 id="physical-units-are-not-in-the-model">Physical units are not in the model<a class="headerlink" href="#physical-units-are-not-in-the-model" title="Permanent link">&para;</a></h2>
 <p>A <code>Model</code> records no step length: rates are per step and positions and periods
 are step counts. The axis of a model is its independent variable, whatever
@@ -4218,7 +4224,7 @@ reads <code>step</code> or a <code>"pulse"</code> series (and so <code>AxisPatte
 <code>periodic</code>) is therefore constant on its unit interval. When the right-hand
 side reads one of them (<code>CompiledModel::depends_on_step</code>), the engine ends a
 piece of integration at every integer, so each jump of the rate is the start of
-a piece (<code>breakpoints</code> in <code>crates/commol-differential/src/solve.rs</code>).
+a piece (<code>CompiledModel::breakpoints</code>, <code>crates/commol-model/src/stops.rs</code>).
 A series compares its positions as numbers, so a pulse at <code>-0.0</code> is at step 0.</p>
 <p>A <code>"step_function"</code> or <code>"linear"</code> series reads <code>t</code>
 (<code>SeriesParameter::evaluate</code>), so it holds or interpolates from any position.
@@ -4233,9 +4239,19 @@ that do not change during a run (<code>time_thresholds</code> in
 current parameters and ends a piece there. Without that, an adaptive solver
 whose rate is 0 before a short window grows its step and steps over the window.
 A comparison with the state is a state event, which the engine does not detect.</p>
-<p>On a piece <code>[start, end)</code> the right-hand side sees <code>t</code> no larger than the float
-just below <code>end</code> (<code>RightHandSide::last_t</code>). A Runge–Kutta step evaluates it at
-the end of its interval, where a value that jumps at <code>end</code> would already act.</p>
+<p>Points that <code>same_position</code> calls one are one stop (<code>stops.rs</code>). An integer of a
+model that reads <code>step</code> is a fixed stop that holds every point and run end
+within the tolerance. Another stop is its earliest point. A run ends at the stop
+that holds its last position, or else at that position, and the next run resumes
+there, so a split run, also with <code>set_seed</code> or <code>set_parameter</code>, has the stops of
+the whole run. Before a stop the rates see <code>t</code> below its earliest point
+(<code>Stop::cut</code>, <code>RightHandSide::last_t</code>): a Runge–Kutta step evaluates them at the
+end of its interval. Its impulses act once, before its rows (<code>Stop::impulses</code>).</p>
+<p><strong>Alternatives:</strong> (a) <code>step_of</code>, the integer that <code>same_position</code> calls the same
+or else the floor, at every rate: far out an event before <code>n</code> reads <code>n</code>. (a+)
+<code>step_of</code> at the start of a piece: a run that ends just below <code>n</code> resumes with
+<code>n − 1</code> and drops an impulse at <code>n</code>, and a chain of stops acts it twice. With an
+absolute band, a second rule, far out no floats are that close.</p>
 <p>Whether an expression reads <code>step</code> comes from <code>reads_variable</code>: <code>get_variables</code>
 lists the variables a model must define, so it leaves out the special ones.</p>
 <p><strong>Consequence:</strong> a proportional pulse <code>p</code> moves <code>p</code> of its source in a difference
@@ -4250,6 +4266,14 @@ The alternative, <code>step = t</code>, makes a pulse act on a set of zero lengt
 <code>crates/commol-model/src/types.rs::a_pulse_at_minus_zero_is_read_at_step_zero</code>,
 <code>crates/commol-stochastic/tests/test_state.rs::a_seed_set_at_minus_zero_acts_the_pulse_of_step_zero</code>,
 <code>crates/commol-model/src/builder.rs::a_comparison_of_t_with_a_fixed_value_is_a_threshold</code>,
+<code>crates/commol-differential/src/tests.rs::test_a_threshold_just_below_a_step_keeps_the_step</code>,
+<code>a_rate_before_a_stop_sees_t_below_its_earliest_point</code>, <code>an_impulse_in_a_chain_of_points_acts_once</code>,
+<code>a_run_split_next_to_a_stop_far_out_is_the_run_split_at_the_stop</code>, <code>a_model_that_reads_the_step_runs_below_5e8</code>,
+<code>crates/commol-stochastic/tests/test_state.rs::a_threshold_just_below_a_step_keeps_the_step</code>,
+<code>a_run_split_next_to_a_step_resumes_from_that_step</code>, <code>a_row_next_to_an_impulse_shows_the_state_after_it</code>,
+<code>a_run_split_next_to_a_step_far_out_resumes_from_that_step</code>, <code>an_impulse_next_to_the_end_of_a_run_acts_before_a_new_seed</code>,
+<code>crates/commol-model/tests/schedules.rs::a_point_next_to_a_step_is_in_the_stop_of_that_step</code>, <code>a_point_the_same_as_a_point_of_a_stop_is_in_that_stop</code>,
+<code>tests/stochastic/test_engines.py::TestPositions::test_a_stop_next_to_a_step_keeps_the_step</code>,
 <code>tests/axis_patterns/test_pattern_runs.py::TestDifferentialIntegration</code>.</p>
 <h2 id="impulses-come-before-the-flows-of-their-step">Impulses come before the flows of their step<a class="headerlink" href="#impulses-come-before-the-flows-of-their-step" title="Permanent link">&para;</a></h2>
 <p>At step <code>n</code> the state jumps first, then the flows of the step run from the new
@@ -4263,24 +4287,6 @@ needs integer impulse steps; a differential model stops its integration at each
 impulse step and restarts from the new state, so <code>diffsol</code> needs no event.</p>
 <p><strong>Guards:</strong> <code>tests/transitions/test_impulses.py::TestJump</code>,
 <code>crates/commol-differential/src/tests.rs::an_impulse_moves_its_fraction_at_once_in_both_engines</code>.</p>
-<h2 id="windowed-observations">Windowed observations<a class="headerlink" href="#windowed-observations" title="Permanent link">&para;</a></h2>
-<p>An observation at <code>at</code> with <code>window = W</code> is compared with
-<code>output(at) - output(at - W)</code>, anchored at its own position. The Rust loss and
-<code>windowed_totals</code> (<code>_simulation/windows.py</code>) give the same number from one rule
-(<code>window_increments</code>), and the predictive reads windows through the observation operator
-(<a href="../observations/#one-observation-operator">One observation operator</a>). With
-<code>parts=K</code> the window splits at <code>start + k · W / K</code>, each boundary a position
-of the engine (<a href="../observations/#the-parts-of-a-window-are-observations-of-every-reader">parts</a>).
-Window <code>w</code> covers <code>(w · W, (w + 1) · W]</code>; <code>window_index</code> places a position with
-<code>max(ceil(at / W) − 1, 0)</code>, and the <code>observed</code> block of a report (<code>_observed_report</code> in <code>_simulation/reports.py</code>) calls it.
-<code>plot.series</code> of results reads a windowed observation through its own window at its own position, never on a
-grid of windows from 0: an observation at 10.5 with a window of 7 falls on no window end of that grid.</p>
-<p><strong>Guards:</strong> <code>tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss</code> (the loss at
-the generating parameters is zero),
-<code>tests/reporting/test_simulation_report.py::test_observed_report_places_each_observation_by_window_index</code>,
-<code>tests/plotting/test_band_figures.py::TestPredictiveSeries::test_a_windowed_band_of_one_draw_is_its_windowed_run</code>,
-<code>tests/plotting/test_figures.py::test_each_observed_point_is_read_through_its_own_window_and_position</code>,
-<code>crates/commol-calibration/tests/test_parts.rs::boundaries_come_from_the_start_and_the_end</code>.</p>
 <h2 id="the-engine-owns-positions">The engine owns positions<a class="headerlink" href="#the-engine-owns-positions" title="Permanent link">&para;</a></h2>
 <p>A position on the axis is an <code>f64</code> in every engine call and a <code>float</code> in every
 public Python name (<code>at</code>); a length is <code>window</code> or <code>period</code>; a count of steps
@@ -4293,7 +4299,9 @@ and each engine's <code>check_position</code> and the builder read it: an engine
 rate is per step (<code>DifferenceEquations</code>, <code>StochasticSteps</code>,
 <code>EngineType::reports_at_integer_steps</code>) non-negative integers, the others
 (<code>DifferentialEquations</code>, <code>StochasticEvents</code>) any finite, non-negative
-position. Its message starts with "The <engine> engine". The engine checks every
+position. For a model that reads <code>step</code> these also read <code>CompiledModel::check_reach</code>,
+as <code>breakpoints</code> does: below <code>5e8</code>, where the tolerance is half a step.
+Its message starts with "The <engine> engine". The engine checks every
 position where it receives it, and its message names the object that holds a
 rejected one: the observation or constraint (<code>check_positions</code> in
 <code>crates/commol-calibration/src/calibration_problem.rs</code>), the impulse transition

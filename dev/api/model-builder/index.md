@@ -453,8 +453,9 @@ class ModelBuilder:
             - total_<category>…: The sum of the compartments with these
               categories, in the declaration order of the stratifications
             - t: The current position on the axis
-            - step: The step that holds it, ``floor(t)``; in a
-              DifferenceEquations model ``t`` and ``step`` are equal
+            - step: The step that holds it, ``floor(t)``; a position within
+              a relative 1e-9 of an integer is in the step of that integer,
+              and in a DifferenceEquations model ``t`` and ``step`` are equal
             - pi, e: Mathematical constants
             - $compartment: Expands to each source compartment name (only with
               multiple sources)
@@ -1524,8 +1525,9 @@ def add_transition(
         - total_<category>…: The sum of the compartments with these
           categories, in the declaration order of the stratifications
         - t: The current position on the axis
-        - step: The step that holds it, ``floor(t)``; in a
-          DifferenceEquations model ``t`` and ``step`` are equal
+        - step: The step that holds it, ``floor(t)``; a position within
+          a relative 1e-9 of an integer is in the step of that integer,
+          and in a DifferenceEquations model ``t`` and ``step`` are equal
         - pi, e: Mathematical constants
         - $compartment: Expands to each source compartment name (only with
           multiple sources)
