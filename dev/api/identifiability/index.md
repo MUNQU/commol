@@ -271,7 +271,7 @@ Bases: `IdentifiabilityMethod[IdentifiabilityReport]`
 
 Identifiability from the profiles of a `ProfileLikelihood`: the verdict of the shape of each profile, with a `profile` section.
 
-`identifiable` gives the practical verdict `determined` and `practically_non_identifiable` the practical verdict `poorly_determined`. `structurally_non_identifiable` gives the structural verdict of its `structure`, `in_combination` or `non_identifiable`, with no combination: the reason names the compensating parameters. A flat profile with no structural verdict gives the practical verdict `poorly_determined`. Every reason says that the verdict holds with the other parameters at their fitted values. A parameter with no profile, or no verdict, gets neither.
+`identifiable` gives the practical verdict `determined` and `practically_non_identifiable` the practical verdict `poorly_determined`. `structurally_non_identifiable` gives the structural verdict of its `structure`, `in_combination` or `non_identifiable`, with no combination: the reason names the compensating parameters. A flat profile with no structural verdict gives the practical verdict `poorly_determined`. Every reason says that the verdict holds with the other parameters at their fitted values. A profile with no verdict gives a practical verdict of `None`, whose reason says why: its threshold is at or below the tolerance, or it names each side that ends at `max_steps` where a longer side could change the verdict. A parameter with no profile gets neither.
 
 Attributes:
 
@@ -300,8 +300,11 @@ class ProfileIdentifiability(IdentifiabilityMethod[IdentifiabilityReport]):
     ``non_identifiable``, with no combination: the reason names the
     compensating parameters. A flat profile with no structural verdict gives
     the practical verdict ``poorly_determined``. Every reason says that the
-    verdict holds with the other parameters at their fitted values. A
-    parameter with no profile, or no verdict, gets neither.
+    verdict holds with the other parameters at their fitted values. A profile
+    with no verdict gives a practical verdict of ``None``, whose reason says
+    why: its threshold is at or below the tolerance, or it names each side
+    that ends at `max_steps` where a longer side could change the verdict. A
+    parameter with no profile gets neither.
 
     Attributes
     ----------
@@ -407,8 +410,9 @@ class IdentifiabilityReport(_FrozenResult):
 
         The sections are kept side by side. A verdict that the reports agree
         on stays, with the reasons of each; one they disagree on is
-        ``conflicting``, with every reason. A structural verdict of ``None``
-        adds its reasons and leaves the verdicts of the other reports.
+        ``conflicting``, with every reason. A structural or practical verdict
+        of ``None`` adds its reasons and leaves the verdicts of the other
+        reports.
 
         Parameters
         ----------
@@ -503,7 +507,7 @@ merge(*others: IdentifiabilityReport) -> IdentifiabilityReport
 
 Join this report with others of the same parameters.
 
-The sections are kept side by side. A verdict that the reports agree on stays, with the reasons of each; one they disagree on is `conflicting`, with every reason. A structural verdict of `None` adds its reasons and leaves the verdicts of the other reports.
+The sections are kept side by side. A verdict that the reports agree on stays, with the reasons of each; one they disagree on is `conflicting`, with every reason. A structural or practical verdict of `None` adds its reasons and leaves the verdicts of the other reports.
 
 Parameters:
 
@@ -532,8 +536,9 @@ def merge(self, *others: "IdentifiabilityReport") -> "IdentifiabilityReport":
 
     The sections are kept side by side. A verdict that the reports agree
     on stays, with the reasons of each; one they disagree on is
-    ``conflicting``, with every reason. A structural verdict of ``None``
-    adds its reasons and leaves the verdicts of the other reports.
+    ``conflicting``, with every reason. A structural or practical verdict
+    of ``None`` adds its reasons and leaves the verdicts of the other
+    reports.
 
     Parameters
     ----------
@@ -617,8 +622,10 @@ class ParameterVerdicts(_FrozenResult):
         the accuracy of the runs may set its rank, or the parameter is a
         noise parameter, which it leaves out; its reasons say why.
     practical : PracticalVerdict | None
-        From collinearity, a sample or the starts. Collinearity gives none to
-        a noise parameter.
+        From collinearity, a sample, the starts or a profile. Collinearity
+        gives none to a noise parameter. A `PracticalVerdict` whose
+        ``verdict`` is ``None`` is evidence with no verdict: a profile ran but
+        gives none. Its reasons say why.
     """
 
     structural: StructuralVerdict | None = None
@@ -679,10 +686,10 @@ The practical verdict of one parameter.
 
 Attributes:
 
-| Name      | Type                   | Description                                                                              |
-| --------- | ---------------------- | ---------------------------------------------------------------------------------------- |
-| `verdict` | `PracticalVerdictName` | determined or poorly_determined by these data, or conflicting when two reports disagree. |
-| `reasons` | `list[str]`            | Why, one per piece of evidence.                                                          |
+| Name      | Type                   | Description                     |
+| --------- | ---------------------- | ------------------------------- |
+| `verdict` | \`PracticalVerdictName | None\`                          |
+| `reasons` | `list[str]`            | Why, one per piece of evidence. |
 
 Source code in `commol/identifiability/results.py`
 
@@ -693,14 +700,17 @@ class PracticalVerdict(_FrozenResult):
 
     Attributes
     ----------
-    verdict : PracticalVerdictName
+    verdict : PracticalVerdictName | None
         ``determined`` or ``poorly_determined`` by these data, or
-        ``conflicting`` when two reports disagree.
+        ``conflicting`` when two reports disagree. ``None``: the evidence
+        gives no verdict, as for a profile whose threshold is at or below
+        its tolerance, or with a side that ends at `max_steps` where a longer
+        side could change the verdict. The reasons say why.
     reasons : list[str]
         Why, one per piece of evidence.
     """
 
-    verdict: PracticalVerdictName
+    verdict: PracticalVerdictName | None
     reasons: list[str] = Field(default_factory=list)
 ```
 
@@ -1329,8 +1339,8 @@ class ProfileSection(_FrozenResult):
     tolerance : float
         The numerical tolerance of the statistic.
     verdicts : dict[str, ProfileVerdictName | None]
-        The verdict of each profiled parameter; None when its threshold is
-        below the tolerance.
+        The verdict of each profiled parameter; None when its profile gives
+        none (`Profile.undetermined` says why).
     intervals : dict[str, tuple[float | None, float | None]]
         The interval of each profiled parameter; None on a side that does not
         cross the threshold.
@@ -1408,15 +1418,16 @@ class StructuralVerdictEntry(TypedDict):
 
 Bases: `TypedDict`
 
-The practical verdict of a parameter and its reasons.
+The practical verdict of a parameter (None when the evidence gives none) and its reasons.
 
 Source code in `commol/identifiability/report.py`
 
 ```python
 class PracticalVerdictEntry(TypedDict):
-    """The practical verdict of a parameter and its reasons."""
+    """The practical verdict of a parameter (None when the evidence gives
+    none) and its reasons."""
 
-    verdict: str
+    verdict: str | None
     reasons: list[str]
 ```
 

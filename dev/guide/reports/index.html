@@ -4395,7 +4395,9 @@ A predictive takes no point estimate: each number comes from the draws only.</p>
 <code>parameters</code> (each parameter, in problem order, with its <code>structural</code> and
 <code>practical</code> verdicts, their reasons and combinations, or <code>None</code>; a
 structural <code>verdict</code> is <code>None</code>, with its reasons, when the solver tolerance
-may set the rank or the parameter is a noise parameter) and <code>sections</code> (the
+may set the rank or the parameter is a noise parameter, and a practical
+<code>verdict</code> is <code>None</code>, with its reasons, when a profile gives no verdict) and
+<code>sections</code> (the
 evidence of each method that ran, by section name; the sections of
 <code>structural</code> and <code>collinearity</code> name in <code>left_out</code> the noise parameters they
 leave out).</p>

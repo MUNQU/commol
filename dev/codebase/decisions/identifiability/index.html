@@ -4227,18 +4227,18 @@ any data of the design of the observations can determine) and a practical
 verdict (what these data determine). Only <code>StructuralRank</code> on the design of
 the observations gives the structural verdict; a dense design keeps its
 verdicts in its section. Merging reports keeps a verdict the reports agree
-on, and makes one they disagree on <code>conflicting</code>, with every reason.
+on, and makes one they disagree on <code>conflicting</code>, with every reason. A
+verdict of <code>None</code>, structural or practical, adds only its reasons: a profile
+with no verdict (<code>ProfileTracer::verdict_with</code>) gives a practical <code>None</code>.
 Thresholds and tolerances of the methods are required arguments: they are
 modelling judgments. Rust decides each verdict and gives its causes
 (<code>StructuralAnalysis::verdicts</code>; <code>Collinearity::verdicts</code>: insensitive, the
 parameters it is collinear with; <code>SampleIdentifiability::verdicts</code>: constant in
-every draw, a contraction below the threshold,
-the parameters it is correlated with, its number of modes, and the bounds
-that set a side, which do not set the verdict; <code>SampleIdentifiability::size</code>,
-an effective size below <code>p + 1</code>;
-<code>StartsIdentifiability::flagged</code>). The runners of
-<code>identifiability/runners.py</code> write the reasons from the causes and
-decide nothing.</p>
+every draw, a contraction below the threshold, the parameters it is correlated
+with, its number of modes, and the bounds that set a side, which do not set the
+verdict; <code>SampleIdentifiability::size</code>, an effective size below <code>p + 1</code>;
+<code>StartsIdentifiability::flagged</code>). The runners of <code>identifiability/runners.py</code>
+write the reasons from the causes and decide nothing.</p>
 <table>
 <thead>
 <tr>

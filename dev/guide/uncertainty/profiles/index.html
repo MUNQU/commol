@@ -4274,11 +4274,11 @@ is pointwise, for one quantity at a time.</p>
 </tr>
 <tr>
 <td><code>structure</code></td>
-<td>What resetting the other parameters says of each flat profile of a parameter (<code>ProfileStructure</code>)</td>
+<td>What resetting the other parameters says of each profile of a parameter that gives <code>practically_non_identifiable</code> or <code>structurally_non_identifiable</code> before its resets (<code>ProfileStructure</code>)</td>
 </tr>
 <tr>
 <td><code>notes</code></td>
-<td>A threshold below the tolerance, or a refit below the fit</td>
+<td>A threshold below the tolerance, a side that ends at <code>max_steps</code>, or a refit below the fit</td>
 </tr>
 <tr>
 <td><code>failed</code></td>
@@ -4456,7 +4456,7 @@ label is the name of its output).</p>
 </tr>
 <tr>
 <td><code>practically_non_identifiable</code></td>
-<td>Stays below on at least one side, up to a bound or <code>max_steps</code></td>
+<td>Stays below on at least one side, up to a bound or a prediction no values within the bounds give, and is not shown flat over its whole range. With a stochastic engine, a flat profile too</td>
 <td>Practical <code>poorly_determined</code></td>
 </tr>
 <tr>
@@ -4464,8 +4464,25 @@ label is the name of its output).</p>
 <td>Flat within <code>tolerance</code> over its whole range inside the box of the parameters, or proven flat by the resets below</td>
 <td>Structural <code>in_combination</code> or <code>non_identifiable</code> from the resets; with no structural verdict, practical <code>poorly_determined</code></td>
 </tr>
+<tr>
+<td><code>None</code></td>
+<td>The threshold is at or below <code>tolerance</code>, or a side ends at <code>max_steps</code> and a longer side could change the verdict (<code>Profile.undetermined</code> says which)</td>
+<td>Practical <code>None</code>, with the reason</td>
+</tr>
 </tbody>
 </table>
+<p>A side that ends at <code>max_steps</code> stopped below the threshold, not at a bound.
+The profile has a verdict only when no longer side can change it: the other
+side ends at a bound or at a prediction no values within the bounds give, and
+the points already show that the profile is not flat, as when a side rises
+above <code>tolerance</code>. That verdict is
+<code>practically_non_identifiable</code>. So <code>["crossed", "max_steps"]</code> and
+<code>["max_steps", "max_steps"]</code> give no verdict, and neither does a profile that
+is flat so far. Resets below that would prove such a profile flat give no
+verdict either. With a stochastic engine a flat profile reads
+<code>practically_non_identifiable</code>, so a flat side at <code>max_steps</code> beside a side
+at a bound reads it too. A note
+names each side that ends at <code>max_steps</code>, with a verdict or without one.</p>
 <p><code>tolerance</code> is <code>ε = max(τ, ν)</code>. <code>τ</code> is the <code>sd_tolerance</code> of Nelder-Mead, an
 absolute amount: argmin stops when the costs of its simplex spread by less.
 For a particle swarm with the improvement stop rule, <code>τ</code> is the improvement
@@ -4517,7 +4534,7 @@ the rounding of the sum of the <code>n</code> terms, with the constants of <code
 <tbody>
 <tr>
 <td>Every reset feasible and within the floor of <code>f̂</code></td>
-<td><code>non_identifiable</code>, unless another parameter sits on its bound at the fit; the profile then reads <code>structurally_non_identifiable</code></td>
+<td><code>non_identifiable</code>, unless another parameter sits on its bound at the fit, or a side ends at <code>max_steps</code> (then there is no verdict). With <code>non_identifiable</code>, the profile reads <code>structurally_non_identifiable</code></td>
 </tr>
 <tr>
 <td>A flat profile with a feasible reset inside the box above <code>f̂ + T</code></td>
@@ -4525,7 +4542,7 @@ the rounding of the sum of the <code>n</code> terms, with the constants of <code
 </tr>
 <tr>
 <td>Otherwise, a profile below the fit by more than the floor, no floor (a loss with no term derivatives), or a stochastic engine</td>
-<td>None: practical <code>poorly_determined</code> for a flat profile, and a note</td>
+<td>None: practical <code>poorly_determined</code> for a flat profile, and a note. On a stochastic engine this holds for a profile flat so far beside a bound too. One that rises reads <code>not_flat</code>, with no note</td>
 </tr>
 </tbody>
 </table>
@@ -4633,13 +4650,12 @@ every figure of commol, it returns the matplotlib <code>Figure</code> and takes
       <code>bootstrap_calibrated</code> otherwise.</li>
 <li>[ ] No note says that a refit went below the fit; if one does, fit with
       more starts.</li>
-<li>[ ] Every verdict is set; a threshold below the tolerance needs data with
-      noise, or a tighter <code>sd_tolerance</code>.</li>
+<li>[ ] Every verdict is set. A threshold below the tolerance needs data with
+      noise, or a tighter <code>sd_tolerance</code>. A side at <code>max_steps</code> with no
+      verdict needs a larger <code>max_steps</code>.</li>
 <li>[ ] For <code>in_combination</code> on a difference model, <code>sd_tolerance</code> is near
       the noise floor <code>ν</code> (<code>notes</code> says why a flat profile has no structural
       verdict, and when a refit is less accurate than the tolerance).</li>
-<li>[ ] A side that ends at <code>max_steps</code> is open only because it stopped:
-      raise <code>max_steps</code>.</li>
 <li>[ ] Read an open or flat profile with the <a href="../identifiability/#structural-rank">structural rank</a>
       before you call a parameter non-identifiable.</li>
 </ul>

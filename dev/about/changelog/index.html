@@ -6390,6 +6390,35 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   other scale. Before, their products passed the largest number, which made
   <code>Q̃</code> and its p-value NaN, or fell to 0, which left <code>Q̃</code> with no lag. A
   statistic that is NaN has no p-value.</li>
+<li>A profile with a side that ends at <code>max_steps</code> gives a verdict only when
+  no longer side can change it: the other side ends at a bound or at an
+  unreachable prediction, and the points already show that the profile is
+  not flat, as when a side rises above the tolerance. That verdict is
+  <code>practically_non_identifiable</code>. <code>["crossed", "max_steps"]</code>,
+  <code>["max_steps", "max_steps"]</code> and a profile flat so far give no verdict
+  (<code>None</code>). Before, any side at <code>max_steps</code> gave
+  <code>practically_non_identifiable</code>, which the identifiability report read as
+  <code>poorly_determined</code>, so the limit of the computation set the verdict: the
+  quick path of the guide gave it with <code>max_steps</code> from 1 to 5, and
+  <code>identifiable</code> with 100. Resets of the other parameters that would prove
+  <code>non_identifiable</code> give no verdict with a side at <code>max_steps</code>
+  (<code>ProfileStructure.undetermined</code> is <code>"max_steps"</code>). With a stochastic
+  engine, a flat profile with a side at <code>max_steps</code> and a side at a bound
+  still reads <code>practically_non_identifiable</code>, but its
+  <code>ProfileStructure.undetermined</code> is now <code>"stochastic"</code>, not <code>"not_flat"</code>,
+  and a note says that a stochastic engine gives no structural verdict.
+  <code>Profile.undetermined</code> says
+  why a profile has no verdict: <code>"below_tolerance"</code> or <code>"max_steps"</code>. A note
+  names each side that ends at <code>max_steps</code>, with a verdict or without one.
+  <code>PracticalVerdict.verdict</code> may be <code>None</code>: <code>ProfileIdentifiability</code> gives
+  it, with the reason, to a profile with no verdict, which had no entry
+  before, and <code>merge</code> adds its reasons and leaves the verdicts of the other
+  reports. In Rust, <code>ProfileTracer::verdict</code> and <code>ProfileTracer::verdict_with</code>
+  return the verdict or its reason, a <code>NoVerdict</code>, <code>Profile::reading</code> gives
+  the same for the shape, <code>Undetermined::MaxSteps</code> is new, and
+  <code>Structure::non_identifiable</code> is gone.
+  See
+  <a href="../../guide/uncertainty/profiles/#verdicts-and-the-identifiability-report">Verdicts</a>.</li>
 <li>
 <p>Every method that refits around a fit refuses a fit that is not feasible,
   with a <code>ValueError</code> that says why: <code>BayesianBootstrap</code>, <code>ResidualBootstrap</code>,
