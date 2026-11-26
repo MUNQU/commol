@@ -777,7 +777,11 @@ fn a_calibration_of_eta_needs_a_fit_inside_the_support() {
     // The run at 0.6 is not a number.
     assert_eq!(
         calibrated(false, 0.6),
-        MethodError::Invalid("The fit has no run: Infeasible point: NonFinite".to_string())
+        MethodError::Invalid(
+            "The fit has no run: Infeasible point: the run, the loss or the likelihood is not a \
+             finite number"
+                .to_string()
+        )
     );
     let (problem, _) = brittle_problem(false);
     let error = information_matching_eta(&problem, &[0.6], 1)

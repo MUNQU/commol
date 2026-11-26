@@ -154,7 +154,7 @@ fn a_draw_without_a_run_is_named_with_its_reason() {
     };
     assert_eq!(
         infeasible.to_string(),
-        "Draw 2: Infeasible point: NonFinite"
+        "Draw 2: Infeasible point: the run, the loss or the likelihood is not a finite number"
     );
 }
 

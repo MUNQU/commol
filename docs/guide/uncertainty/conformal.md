@@ -171,6 +171,12 @@ print(widths)  # [6.3, 5.2]
 | `EnbPI` | None | `replicates` | Near `1 − α`, approximately, under stationary and strongly mixing errors | Time series with dependent errors |
 | `AdaptiveConformal` | The `stream` of new observations | One | The long-run share of misses tends to `α`, with no assumption | Data that arrive one by one and can change regime |
 
+`RollingConformal`, `JackknifePlus` and `EnbPI` start each refit from the fit,
+so they refuse a fit that is not feasible with a `ValueError`, as a bootstrap
+does ([How replicates run](resampling.md#how-replicates-run)).
+`SplitConformal` and `AdaptiveConformal` only score the predictions of the
+fit, and take it as it is.
+
 ## How to hold data out
 
 | Variant | What to hold out |

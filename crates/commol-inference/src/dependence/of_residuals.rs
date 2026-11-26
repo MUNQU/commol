@@ -420,9 +420,10 @@ fn check<E: SimulationEngine>(
 /// observation models or an observed value outside the support of its
 /// model, additive residuals have more than one randomization, or a refit
 /// reference reads many draws or observations that are not the problem's;
-/// a prediction error when a draw has no run; [`MethodError::Failed`] when
-/// every refit fails, or the exact sum of an observation does not end, at a
-/// draw, a data set drawn at it or a refit
+/// as [`ReplicateRunner::new`] when the draw of a refit reference is not
+/// feasible; a prediction error when a draw has no run;
+/// [`MethodError::Failed`] when every refit fails, or the exact sum of an
+/// observation does not end, at a draw, a data set drawn at it or a refit
 /// ([`commol_calibration::UnendedSum`]).
 #[allow(clippy::too_many_arguments)]
 pub fn residual_dependence<E>(

@@ -452,13 +452,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         self.feasibility.check_parameters(&mut context)?;
         self.forward.run_schedule(values, workspace)?;
         if self.feasibility.reads_rows() {
-            let mut amount = 0.0;
-            for rows in &workspace.rows {
-                amount += self.feasibility.row_violation(&mut context, rows);
-            }
-            if amount > 0.0 {
-                return Err(Violation::Constraint { amount }.into());
-            }
+            self.feasibility.check_rows(&mut context, &workspace.rows)?;
         }
         self.forward.observe(values, workspace);
         let discrepancy =
@@ -514,12 +508,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         self.feasibility.check_parameters(&mut context)?;
         self.forward.run_once(values, seed, workspace)?;
         if self.feasibility.reads_rows() {
-            let amount = self
-                .feasibility
-                .row_violation(&mut context, &workspace.rows[0]);
-            if amount > 0.0 {
-                return Err(Violation::Constraint { amount }.into());
-            }
+            self.feasibility.check_rows(&mut context, &workspace.rows)?;
         }
         self.forward.observe(values, workspace);
         Ok(())

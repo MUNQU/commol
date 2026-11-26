@@ -2,9 +2,9 @@
 
 [Back to Design decisions](../design-decisions.md)
 
-How intervals, descriptions and reports are made from a model and its runs.
-Figures have [a page of their own](figures.md), and the files of models and
-results [one too](files.md).
+How intervals and reports are made from a model and its runs. Descriptions,
+figures and the files of models and results have pages of their own:
+[Descriptions](descriptions.md), [Figures](figures.md) and [Files](files.md).
 
 ## One confidence-interval convention
 
@@ -157,58 +157,39 @@ no source, as `series_dependence` of any values, takes the seed, such as
 
 ## Fits that fail have one place
 
-Six methods fit one perturbation of the data per replicate: the bootstraps,
-the jackknife, jackknife+, rolling conformal, EnbPI and a bootstrap threshold.
-They share one loop, `ReplicateRunner::fit_all` (`resampling/runner.rs`),
-which returns `ReplicateFits`, and one check, `FitUnit::require`, whose message
-says how many of how many fits of a replicate, block or origin succeeded and
-how many the method needs. Every Python result of several fits has `failed`,
-entries `"<Start|Replicate|Block|Origin> <index> failed: <reason>"` logged as
+Seven methods fit one perturbation of the data per replicate: the bootstraps,
+the jackknife, jackknife+, rolling conformal, EnbPI, a bootstrap threshold and
+the `Refitted` reference of a dependence analysis. They share one loop,
+`ReplicateRunner::fit_all` (`resampling/runner.rs`), which returns
+`ReplicateFits`, and one check, `FitUnit::require`, whose message says how many
+of how many fits of a replicate, block or origin succeeded and how many the
+method needs. Every Python result of several fits has `failed`, entries
+`"<Start|Replicate|Block|Origin> <index> failed: <reason>"` logged as
 warnings, and, for fits of replicates, `not_converged`, at its top.
+
+Every refit starts from the fit, so `ReplicateRunner::new` refuses a fit that
+has no run or is not feasible (`CalibrationProblem::evaluate`). The message
+names the violated constraints of the first check that fails: the constraints
+on the parameters come before those at positions. `ResidualNoise`,
+`SplitConformal` and `AdaptiveConformal` do not refit, so they take a fit that
+runs and is not feasible.
 
 | Alternative | Why not |
 |---|---|
 | One loop per method, or `diagnostics.failed` | Counts and messages drift apart; three results have no diagnostics. |
+| Refits from a fit that is not feasible | With no feasible point in the bounds, the fit ends on the penalty, and every refit starts and stays there: an interval of width 0, with no message. |
+| The check in `fitted_values` | `ResidualNoise` reads a fit through it and must take one that is not feasible, and `RollingConformal` and `Refitted` with `NoNoise()` do not call it. |
 
 **Guards:** `crates/commol-inference/tests/test_resampling.rs::every_replicate_method_counts_the_same_fits`,
-`tests/uncertainty/test_resampling.py::test_every_method_lists_its_failed_replicates_in_failed`.
-
-## A description is data, rendered apart
-
-`Model.describe(layout)` returns a `ModelDescription`
-(`description/blocks.py`): sections with a key, a title and blocks from a
-closed set of Pydantic models (`Text`, `Table`, `Equations`, `StateGraph`,
-`Matrix`). The sections every kind shares come from `Model`
-(`_model/describe.py`); a kind adds its own through
-`ModelStructure.describe` (`Aggregate`: `_model/aggregate_description.py`).
-The renderers (`description/render.py`) read only blocks, so a new kind renders
-in every format with no new renderer. The form of the dynamics and the
-schedule come from the engine's list (`EngineType::dynamics_form`), because
-one structure runs as equations or as events depending on its engine.
-
-| Part | Rule |
-|---|---|
-| Equations | Computed by the code of the planner's flows (`transition_flows`), so a description shows what the engine simulates. The text rendering keeps the compact and expanded forms line by line. |
-| Diagrams | Mermaid in the Markdown rendering, only for a graph that is not `expanded`; Graphviz DOT for every graph in a `.dot` file. Text, LaTeX and JSON draw none. |
-| State graphs | Built from the flows of the engine (`DynamicsDescription.state_graph`, `strata_graph`). The graph of the bins holds the moves between bins, the inflows and the outflows; the graph of the strata, only when a move changes categories, holds the categories that each move changes, joined when a move changes several stratifications. One edge per pair of nodes, one node `none` per side. A label is the formula of the one rate of one transition, and otherwise the parameters that the rates read, in declaration order. |
-| Layouts | `"default"`: overview, entities, dynamics, schedule, initialization, parameters, outputs. `"odd"`: the ODD protocol; an element commol cannot fill is marked `TO_BE_WRITTEN`. A section with no blocks is left out of every rendering. |
-
-| Alternative | Why not |
-|---|---|
-| A printer per kind and per format | Every kind writes every format, and no caller can read or export the description. |
-| A free-form dict | The renderers would guess its shape; typed blocks are checked by Pydantic and `ty`. |
-| An image (PNG, SVG) of a graph | Needs Graphviz or a browser at run time, a dependency for a view. |
-| One graph of the bins and the categories | A move between categories crosses every bin: it is an edge from a bin to itself, which hides the categories, or one edge per bin and category. |
-| A graph per stratification | A move can change several stratifications at once; one graph of the strata draws it as one edge. |
-| The formulas, or the transition ids, as the label of a shared edge | The formulas are one per stratum, too long for an edge, and the graph of the compartments and the equations hold them; an id names a transition, not what drives it. |
-| A node `none` per inflow or outflow | A model with an outflow from every bin draws as many `none` nodes as bins. |
-| TikZ in the LaTeX rendering | Needs node coordinates, so a layout algorithm; a PDF made from the DOT file does the same. |
-
-**Guards:** `tests/description/` (`test_equations*.py` check the lines of the
-equations through `equation_forms`; `test_rendering.py` checks the snapshots of
-`description/snapshots/`, parses the DOT with `pydot` and compiles the LaTeX
-with `latexmk` when they are installed), `tests/building/test_engine.py`
-(every engine gives a form).
+`tests/uncertainty/test_resampling.py::test_every_method_lists_its_failed_replicates_in_failed`,
+`crates/commol-inference/tests/test_errors.rs::a_method_that_refits_refuses_a_fit_that_is_not_feasible`,
+`tests/uncertainty/test_resampling.py::test_a_fit_that_violates_a_constraint_is_refused`,
+`tests/uncertainty/test_conformal.py::TestFailures::test_a_variant_that_refits_refuses_a_fit_that_is_not_feasible`,
+`tests/uncertainty/test_dependence.py::TestReferences::test_refits_refuse_a_fit_that_is_not_feasible`,
+`tests/uncertainty/test_resampling.py::TestResidualNoise::test_residual_noise_reads_a_fit_that_is_not_feasible`,
+`tests/uncertainty/test_conformal.py::TestFailures::test_a_variant_that_reads_the_fit_takes_one_that_is_not_feasible`,
+`tests/uncertainty/test_conformal.py::TestFailures::test_rolling_settings_come_before_the_check_of_the_fit`,
+`tests/uncertainty/test_block_length.py::test_a_bootstrap_checks_the_length_before_the_run_of_the_fit`.
 
 ## Reports
 

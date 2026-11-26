@@ -6,8 +6,8 @@ use commol_core::NoSteps;
 use std::collections::HashMap;
 
 use commol_calibration::{
-    CalibrationParameter, CalibrationProblem, LossConfig, NelderMeadConfig, ObservedDataPoint,
-    OptimizationConfig,
+    CalibrationConstraint, CalibrationParameter, CalibrationProblem, LossConfig, NelderMeadConfig,
+    ObservedDataPoint, OptimizationConfig,
 };
 use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
 use commol_inference::conformal::{
@@ -125,9 +125,23 @@ fn broken(_: &HashMap<String, f64>, _: f64) -> f64 {
     f64::NAN
 }
 
+/// A run whose square is above the largest float.
+fn huge(_: &HashMap<String, f64>, _: f64) -> f64 {
+    1e200
+}
+
 /// The problem of fitting `formula` with `a` and `b` to `values` at
 /// positions 0, 1, 2, ….
 fn problem(formula: Formula, values: &[f64]) -> CalibrationProblem<ClosedForm> {
+    constrained(formula, values, vec![])
+}
+
+/// The problem of [`problem`] under `constraints`.
+fn constrained(
+    formula: Formula,
+    values: &[f64],
+    constraints: Vec<CalibrationConstraint>,
+) -> CalibrationProblem<ClosedForm> {
     CalibrationProblem::new(
         ClosedForm {
             formula,
@@ -140,7 +154,7 @@ fn problem(formula: Formula, values: &[f64]) -> CalibrationProblem<ClosedForm> {
             .collect(),
         parameters(),
         None,
-        vec![],
+        constraints,
         LossConfig::SumSquaredError,
     )
     .unwrap()
@@ -336,18 +350,16 @@ fn a_setting_out_of_range_is_invalid_in_every_method() {
 fn a_method_that_refits_refuses_a_fit_with_no_run() {
     let problem = problem(broken, &VALUES);
     let config = config();
-    let runner = ReplicateRunner::new(&problem, &config, &FIT, 1, 4).unwrap();
     let blocks = BlockScheme::new(problem.observed_data(), 2).unwrap();
     let priors =
         Priors::uniform_on_bounds(&problem.parameter_names(), &problem.parameter_bounds()).unwrap();
     let mut sampler = SmcSampler::new(20, RandomWalk::new(), 0.5, 0.5, 0.01).unwrap();
 
+    // Every method that refits takes its fit from a runner.
     let errors = [
+        kind_of(ReplicateRunner::new(&problem, &config, &FIT, 1, 4)),
         kind_of(BayesianBootstrap::new(&problem, &FIT, &blocks)),
         kind_of(Residuals::new(&problem, &FIT, ResidualScale::Additive)),
-        kind_of(block_jackknife(&runner, &blocks)),
-        kind_of(jackknife_plus(&runner, &blocks, &[8.0], settings())),
-        kind_of(enbpi(&runner, &blocks, 4, &[8.0], settings())),
         kind_of(bootstrap_coverage_eta(
             &problem,
             &priors,
@@ -364,6 +376,44 @@ fn a_method_that_refits_refuses_a_fit_with_no_run() {
     for (kind, message) in errors {
         assert_eq!(kind, ErrorKind::Failed, "{message}");
         assert!(message.starts_with("The fit has no run: "), "{message}");
+    }
+}
+
+#[test]
+fn a_method_that_refits_refuses_a_fit_that_is_not_feasible() {
+    let config = config();
+    // `a` is at most 50, and `x = a + b·t` at most 80 at 3.
+    let above = |id: &str, expression: &str| {
+        CalibrationConstraint::new(id.to_string(), expression.to_string())
+    };
+    let cases = [
+        (
+            constrained(line, &VALUES, vec![above("a_above_100", "a - 100")]),
+            "the constraint 'a_above_100' is below zero",
+        ),
+        (
+            constrained(
+                line,
+                &VALUES,
+                vec![above("x_above_1000", "x - 1000").with_positions(vec![3.0])],
+            ),
+            "the constraint 'x_above_1000' is below zero",
+        ),
+        (
+            problem(huge, &VALUES),
+            "the run, the loss or the likelihood is not a finite number",
+        ),
+    ];
+
+    for (problem, reason) in cases {
+        let (kind, message) = kind_of(ReplicateRunner::new(&problem, &config, &FIT, 1, 4));
+        assert_eq!(kind, ErrorKind::Invalid, "{message}");
+        assert_eq!(
+            message,
+            format!("The refits cannot start from the fit: Infeasible point: {reason}")
+        );
+        // Residual noise reads the residuals of the fit, with no refit.
+        assert!(Residuals::new(&problem, &FIT, ResidualScale::Additive).is_ok());
     }
 }
 

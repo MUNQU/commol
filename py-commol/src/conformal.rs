@@ -10,7 +10,7 @@ use crate::parallelism::{parallel, parallel_logged};
 use crate::records::StepLog;
 use commol_calibration::observed_data;
 use commol_inference::conformal::{self, ConformalRun, Predictor};
-use commol_inference::resampling::{BlockScheme, FitUnit, ReplicateRunner};
+use commol_inference::resampling::{BlockScheme, FitUnit};
 use commol_inference::settings::conformal::{
     AdaptiveConformalSettings, EnbPiSettings, JackknifePlusSettings, RollingConformalSettings,
     ScoreAndPooling, SplitConformalSettings,
@@ -88,19 +88,6 @@ fn predictor<'a>(
     }
 }
 
-/// The fit of a method that refits, with a record of each start in `log`,
-/// and the runner of its refits.
-fn refits<'a>(
-    py: Python<'_>,
-    problem: &'a PyCalibrationProblem,
-    starts: usize,
-    log: &StepLog,
-) -> PyResult<(PyStarts, ReplicateRunner<'a, crate::engine::Engine>)> {
-    let fitted = problem.fit_logged(py, starts, log)?;
-    let runner = problem.runner(&best_values(&fitted), starts)?;
-    Ok((PyStarts { inner: fitted }, runner))
-}
-
 /// Check the score and the pooling of a conformal method
 ///
 /// Args:
@@ -175,9 +162,10 @@ fn split_conformal(
 ///     The starts of the fit of every observation, and the intervals
 ///
 /// Raises:
-///     ValueError: If a setting is not valid, a position is not after the
-///         data, or an origin has no observation before or after it
-///     RuntimeError: If the fit or every refit fails
+///     ValueError: If a setting is not valid, the fit is not feasible, a
+///         position is not after the data, or an origin has no observation
+///         before or after it
+///     RuntimeError: If the fit, the run at the fit or every refit fails
 #[pyfunction]
 fn rolling_conformal(
     py: Python<'_>,
@@ -188,17 +176,29 @@ fn rolling_conformal(
     let settings: RollingConformalSettings = crate::json::read(settings)?;
     let conformal = settings.conformal().map_err(method_error)?;
     let log = StepLog::new(logger).with_unit(FitUnit::Origin);
-    let (starts, runner) = refits(py, problem, settings.starts, &log)?;
+    let starts = problem.fit_logged(py, settings.starts, &log)?;
+    // The settings come before the check of the fit, which the runner runs.
+    conformal::check_rolling_settings(
+        problem.inner.observed_data(),
+        &settings.origins,
+        &settings.positions,
+        conformal,
+    )
+    .map_err(method_error)?;
+    let fit = best_values(&starts);
     let run = parallel_logged(py, &log, |steps| {
         conformal::rolling_conformal(
-            &runner.with_steps(steps),
+            &problem.runner(&fit, settings.starts)?.with_steps(steps),
             &settings.origins,
             &settings.positions,
             conformal,
         )
     })?
     .map_err(method_error)?;
-    Ok((starts, PyConformalRun::of(run, FitUnit::Origin)))
+    Ok((
+        PyStarts { inner: starts },
+        PyConformalRun::of(run, FitUnit::Origin),
+    ))
 }
 
 /// Jackknife+ intervals at the positions of the settings, for each series
@@ -231,10 +231,11 @@ fn jackknife_plus(
     let scheme = BlockScheme::new(problem.inner.observed_data(), settings.block_length)
         .map_err(method_error)?;
     let log = StepLog::new(logger).with_unit(FitUnit::Block);
-    let (starts, runner) = refits(py, problem, settings.starts, &log)?;
+    let starts = problem.fit_logged(py, settings.starts, &log)?;
+    let fit = best_values(&starts);
     let run = parallel_logged(py, &log, |steps| {
         conformal::jackknife_plus(
-            &runner.with_steps(steps),
+            &problem.runner(&fit, settings.starts)?.with_steps(steps),
             &scheme,
             &settings.positions,
             conformal,
@@ -247,7 +248,7 @@ fn jackknife_plus(
         block_length: Some(scheme.length()),
         ..PyConformalRun::of(run.run, FitUnit::Block)
     };
-    Ok((starts, run))
+    Ok((PyStarts { inner: starts }, run))
 }
 
 /// EnbPI intervals at the positions of the settings, for each series of the
@@ -279,10 +280,11 @@ fn enbpi(
     let scheme = BlockScheme::new(problem.inner.observed_data(), settings.block_length)
         .map_err(method_error)?;
     let log = StepLog::new(logger);
-    let (starts, runner) = refits(py, problem, settings.starts, &log)?;
+    let starts = problem.fit_logged(py, settings.starts, &log)?;
+    let fit = best_values(&starts);
     let run = parallel_logged(py, &log, |steps| {
         conformal::enbpi(
-            &runner.with_steps(steps),
+            &problem.runner(&fit, settings.starts)?.with_steps(steps),
             &scheme,
             settings.replicates,
             &settings.positions,
@@ -295,7 +297,7 @@ fn enbpi(
         block_length: Some(scheme.length()),
         ..PyConformalRun::of(run, FitUnit::Replicate)
     };
-    Ok((starts, run))
+    Ok((PyStarts { inner: starts }, run))
 }
 
 /// Adaptive conformal intervals at each point of the stream of the

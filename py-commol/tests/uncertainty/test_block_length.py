@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from commol import CalibrationProblem, Calibrator, NelderMeadConfig, Simulation
+from commol import Calibrator
 from commol._calibration.method import UncertaintyMethod
 from commol._data.result_model import ResultModel
 from commol.conformal import EnbPI, JackknifePlus
@@ -27,12 +27,9 @@ from commol.resampling.results import JackknifeResult, BootstrapResult
 from commol.smc import BootstrapCoverageEta, GibbsPosterior, InformationMatchingEta
 from commol.smc.results import GibbsResult
 from tests.support import (
-    a_to_b_builder,
-    bounded,
-    build,
     flow_calibrator,
+    no_run_calibrator,
     normal_values,
-    observed,
 )
 
 Build = Callable[[int], UncertaintyMethod[ResultModel]]
@@ -188,34 +185,19 @@ def test_a_block_longer_than_the_positions_is_an_error_before_the_fit(
     assert not [r for r in caplog.messages if r.startswith("Fitting")]
 
 
-def _infeasible() -> Calibrator:
-    """A fit on the plateau of the penalty: the first step moves 5000 out of
-    the 1000 of A, at every point the optimizer reads."""
-    truth = Simulation(build(a_to_b_builder(amounts={"A": 1000, "B": 0}))).run(20)
-    problem = CalibrationProblem(
-        observed_data=observed(truth, "B", range(1, 21)),
-        parameters=[bounded("k", 0.0, 10.0, initial_guess=5.0)],
-        loss_function="sse",
-        optimization_config=NelderMeadConfig(max_iterations=300),
-        seed=1,
-    )
-    model = a_to_b_builder(parameters={"k": None}, amounts={"A": 1000, "B": 0})
-    return Calibrator(Simulation(build(model)), problem)
-
-
 @pytest.mark.parametrize(
     "name", ["BayesianBootstrap", "ResidualBootstrap", "WildBootstrap"]
 )
 def test_a_bootstrap_checks_the_length_before_the_run_of_the_fit(name: str) -> None:
     with pytest.raises(ValueError, match="^block_length is 21"):
-        _infeasible().uncertainty(METHODS[name](21))
+        no_run_calibrator().uncertainty(METHODS[name](21))
 
 
 @pytest.mark.parametrize(
     "name", [n for n in METHODS if n not in ("Sandwich", "InformationMatchingEta")]
 )
 def test_a_fit_with_no_run_is_an_error_of_every_method_that_refits(name: str) -> None:
-    calibrator = _infeasible()
+    calibrator = no_run_calibrator()
     assert calibrator.run().best_parameters["k"] > 1.0
 
     with pytest.raises(ValueError, match="^The fit has no run: .*compartment 'A'"):

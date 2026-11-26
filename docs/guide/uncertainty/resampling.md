@@ -379,6 +379,19 @@ index `b`: two runs with one seed give one result. A replicate changes only the 
 (`CalibrationProblem::with_data`); with `normalize_observations` its
 normalization comes from its own values, as the fit's does.
 
+Since every replicate starts from the fit, the fit must run and be feasible.
+When no point of the bounds meets the constraints, the fit ends on the penalty
+([How a violation counts](../calibration-constraints.md#how-a-violation-counts))
+and can still say it converged, and each replicate would stay there: an
+interval of width 0. So a bootstrap and the jackknife raise a `ValueError` for
+a fit that:
+
+- violates a constraint, which the message names by its `id`,
+- has a predicted mean outside the means its observation model allows,
+- or has a loss or a likelihood that is not a finite number.
+
+`ResidualNoise` does not refit, so it reads the residuals of such a fit.
+
 ## Prediction intervals
 
 The draws of a bootstrap give a band of the model. `ResidualNoise` adds moving

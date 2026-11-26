@@ -80,7 +80,7 @@ fn feasibility_of(
 fn violation(feasibility: &Feasibility, k: f64, a1: f64) -> f64 {
     match feasibility.check_parameters(&mut feasibility.context(&[k, a1])) {
         Ok(()) => 0.0,
-        Err(EvaluationError::Violation(Violation::Constraint { amount })) => amount,
+        Err(EvaluationError::Violation(Violation::Constraint { amount, .. })) => amount,
         Err(other) => panic!("{other}"),
     }
 }
@@ -130,7 +130,7 @@ fn the_constraint_and_the_rate_read_one_radius() {
     )
     .unwrap();
     let mut workspace = Workspace::default();
-    let Err(EvaluationError::Violation(Violation::Constraint { amount })) =
+    let Err(EvaluationError::Violation(Violation::Constraint { amount, .. })) =
         problem.evaluate(&[0.5, 2.0], &mut workspace)
     else {
         panic!("the radius violates -M_radius");
@@ -166,7 +166,7 @@ fn a_matrix_that_no_calibrated_parameter_scales_keeps_its_radius() {
 
     for k in [0.1, 0.9] {
         let amount = match radius.check_parameters(&mut radius.context(&[k])) {
-            Err(EvaluationError::Violation(Violation::Constraint { amount })) => amount,
+            Err(EvaluationError::Violation(Violation::Constraint { amount, .. })) => amount,
             other => panic!("{other:?}"),
         };
         close(amount, 5.0);
@@ -175,7 +175,7 @@ fn a_matrix_that_no_calibrated_parameter_scales_keeps_its_radius() {
     // radius 5.
     let two = feasibility_of(&engine, &only_k, "M_g1_g1 - M_radius").unwrap();
     match two.check_parameters(&mut two.context(&[0.5])) {
-        Err(EvaluationError::Violation(Violation::Constraint { amount })) => close(amount, 1.0),
+        Err(EvaluationError::Violation(Violation::Constraint { amount, .. })) => close(amount, 1.0),
         other => panic!("{other:?}"),
     }
 }

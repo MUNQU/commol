@@ -42,6 +42,7 @@ from commol.smc import BootstrapCoverageEta, GibbsPosterior
 from commol.smc.results import GibbsResult
 from commol.uncertainty import Predictive
 from tests.support import (
+    INFEASIBLE_FITS,
     a_to_b_builder,
     bounded,
     build,
@@ -295,6 +296,29 @@ class TestBlockJackknife:
             calibrator.uncertainty(BlockJackknife(block_length=4))
 
 
+_RESAMPLERS = {
+    "BayesianBootstrap": BayesianBootstrap(replicates=5, block_length=2),
+    "ResidualBootstrap": ResidualBootstrap(
+        replicates=5, block_length=2, residual_scale="additive", scheme="moving"
+    ),
+    "WildBootstrap": WildBootstrap(replicates=5, block_length=2, multipliers="mammen"),
+    "BlockJackknife": BlockJackknife(block_length=2),
+}
+"""Each method of this page whose runner checks the fit it refits around.
+`ParametricBootstrap` refits too, but refuses such a fit earlier, through
+its own evaluation of the fit."""
+
+
+@pytest.mark.parametrize("kind", INFEASIBLE_FITS)
+@pytest.mark.parametrize("method", _RESAMPLERS)
+def test_a_fit_that_violates_a_constraint_is_refused(method: str, kind: str) -> None:
+    """Every kind of fit that is not feasible: a violated constraint, a mean
+    outside its observation model, or a loss that is not finite."""
+    calibrator, message = INFEASIBLE_FITS[kind]
+    with pytest.raises(ValueError, match=message):
+        calibrator().uncertainty(_RESAMPLERS[method])
+
+
 def _total_beside_its_steps() -> Calibrator:
     """
     The flow ``c`` of ``flow_calibrator``, observed as the flow of each of
@@ -347,6 +371,22 @@ class TestResidualNoise:
         with pytest.raises(ValueError, match=shared):
             predictive.at_observations(held_out, noise)
         assert len(predictive.at_observations(held_out, NoNoise()).values[0]) == 2
+
+    @pytest.mark.parametrize(
+        "kind", ["constraint", "constraint_at_positions", "mean_outside_model"]
+    )
+    def test_residual_noise_reads_a_fit_that_is_not_feasible(self, kind: str) -> None:
+        calibrator = INFEASIBLE_FITS[kind][0]()
+        fit = calibrator.run()
+        observations = calibrator.problem.observed_data
+        noise = ResidualNoise(fit=fit, block_length=1, residual_scale="additive")
+        predictive = Predictive(calibrator, calibrator.point_sample(fit), [1.0])
+
+        (values,) = predictive.at_observations(observations, noise).values
+        # The fit predicts c for every flow: c plus any residual of the fit is
+        # an observed value.
+        observed = [o.value for o in observations]
+        assert np.isclose(np.asarray(values)[:, None], observed).any(axis=1).all()
 
     def test_residual_noise_widens_the_band_of_held_out_observations(self) -> None:
         values = _noisy(30, 4)

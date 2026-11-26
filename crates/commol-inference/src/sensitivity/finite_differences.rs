@@ -16,7 +16,7 @@ use std::collections::BTreeSet;
 
 use commol_calibration::{
     CalibrationParameter, CalibrationProblem, EvaluationError, ForwardModel, ObservedDataPoint,
-    Violation, Workspace,
+    Workspace,
 };
 use commol_core::{Accuracy, AccuracySettings, SimulationEngine};
 use rayon::prelude::*;
@@ -194,7 +194,7 @@ impl<E: SimulationEngine + Send + Sync> FiniteDifferences<E> {
                 .map_err(|error| match error {
                     EvaluationError::Violation(violation) => SensitivityError::Infeasible {
                         parameter: parameter.id.clone(),
-                        reason: reason(&violation),
+                        reason: violation.to_string(),
                     },
                     EvaluationError::Failed(message) => SensitivityError::Failed(message),
                 })?;
@@ -249,7 +249,7 @@ impl<E: SimulationEngine + Send + Sync> SensitivitySource for FiniteDifferences<
             .run(values, &mut workspace)
             .map_err(|error| match error {
                 EvaluationError::Violation(violation) => {
-                    SensitivityError::InfeasiblePoint(reason(&violation))
+                    SensitivityError::InfeasiblePoint(violation.to_string())
                 }
                 EvaluationError::Failed(message) => SensitivityError::Failed(message),
             })?;
@@ -311,26 +311,6 @@ impl<E: SimulationEngine + Send + Sync> SensitivitySource for FiniteDifferences<
             observed_data: self.observed_data.clone(),
             design: self.design,
         })
-    }
-}
-
-/// Why a run of the forward model is infeasible, in words.
-fn reason(violation: &Violation) -> String {
-    match violation {
-        Violation::InfeasibleStart { excess, .. } => {
-            format!("the starting state is infeasible (excess {excess})")
-        }
-        Violation::InfeasibleRun { .. } => "the run leaves the values the model allows".to_string(),
-        Violation::NonFinite => "a value of the run is not finite".to_string(),
-        Violation::OutOfBounds { .. }
-        | Violation::Constraint { .. }
-        | Violation::MeanOutsideModel { .. } => {
-            // coverage: invariant, a run of the forward model returns only the violations above
-            unreachable!(
-                "a run of the forward model checks no bounds, no constraint and no observation \
-                 model"
-            )
-        }
     }
 }
 
