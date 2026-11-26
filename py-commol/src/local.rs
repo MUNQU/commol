@@ -10,7 +10,7 @@
 use crate::parallelism::{parallel, parallel_logged};
 use crate::records::StepLog;
 use commol_inference::importance::TemperedPosterior;
-use commol_inference::local::{self, Gaussian, MixtureRun};
+use commol_inference::local::{self, Curvature, Gaussian, MixtureRun};
 use commol_inference::sensitivity::Matrix;
 use commol_inference::settings::local::{
     LaplaceMixtureSettings, LaplaceSettings, MixtureTarget, SandwichSettings,
@@ -38,12 +38,15 @@ pub struct PyLocalRun {
     center: Vec<f64>,
     /// The covariance on the unbounded scale
     covariance: Vec<Vec<f64>>,
-    /// The curvature entries whose error is not small, in words
+    /// The curvature entries whose error is not small, then the bounds less
+    /// than 3 sd from the fit, in words
     notes: Vec<String>,
 }
 
 impl PyLocalRun {
-    fn of(gaussian: &Gaussian, draws: usize, seed: u64, notes: Vec<String>) -> Self {
+    fn of(curvature: &Curvature, gaussian: &Gaussian, draws: usize, seed: u64) -> Self {
+        let mut notes = curvature.notes().to_vec();
+        notes.extend(gaussian.bound_notes(curvature.names()));
         Self {
             values: gaussian.draws(draws, seed),
             center: gaussian.center().to_vec(),
@@ -82,12 +85,7 @@ fn laplace(
         local::laplace_approximation(&problem.inner, &fit, settings.curvature)
     })?
     .map_err(method_error)?;
-    let run = PyLocalRun::of(
-        &gaussian,
-        settings.draws,
-        problem.seed,
-        curvature.notes().to_vec(),
-    );
+    let run = PyLocalRun::of(&curvature, &gaussian, settings.draws, problem.seed);
     Ok((PyStarts { inner: starts }, run))
 }
 
@@ -133,12 +131,7 @@ fn sandwich(
         )
     })?
     .map_err(method_error)?;
-    let local = PyLocalRun::of(
-        &run.gaussian,
-        settings.draws,
-        problem.seed,
-        run.curvature.notes().to_vec(),
-    );
+    let local = PyLocalRun::of(&run.curvature, &run.gaussian, settings.draws, problem.seed);
     let degrees_of_freedom = run
         .gaussian
         .degrees_of_freedom()
@@ -238,7 +231,8 @@ pub struct PyMixtureRun {
     /// Whether k_hat is at most 0.7 and no end that gives no component fits at
     /// least as well as the worst component
     reliable: bool,
-    /// Ends that gave no component, and an unreliable sample, in words
+    /// Ends that gave no component, components near a bound, and an
+    /// unreliable sample, in words
     notes: Vec<String>,
 }
 

@@ -226,6 +226,7 @@ nav:
               - Scores and Distribution Functions: codebase/decisions/scores.md
               - Curvature: codebase/decisions/curvature.md
               - Local approximations: codebase/decisions/local-approximations.md
+              - Fits Near a Bound: codebase/decisions/bounds.md
               - Profiles: codebase/decisions/profiles.md
               - Dependence: codebase/decisions/dependence.md
               - Results: codebase/decisions/results.md

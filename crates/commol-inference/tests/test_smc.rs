@@ -1073,6 +1073,15 @@ fn line_problem(values: &[f64]) -> (CalibrationProblem<Line>, Vec<f64>) {
 /// [`line_problem`] with the slope in units of `unit`: `k1` and its bounds are
 /// divided by it, and the line is the same.
 fn line_problem_in_units(values: &[f64], unit: f64) -> (CalibrationProblem<Line>, Vec<f64>) {
+    line_problem_of(values, unit, (-20.0, 20.0))
+}
+
+/// [`line_problem_in_units`] with `k0` in `bounds`.
+fn line_problem_of(
+    values: &[f64],
+    unit: f64,
+    bounds: (f64, f64),
+) -> (CalibrationProblem<Line>, Vec<f64>) {
     let observations = values
         .iter()
         .enumerate()
@@ -1085,7 +1094,7 @@ fn line_problem_in_units(values: &[f64], unit: f64) -> (CalibrationProblem<Line>
         },
         observations,
         vec![
-            CalibrationParameter::new("k0".to_string(), -20.0, 20.0),
+            CalibrationParameter::new("k0".to_string(), bounds.0, bounds.1),
             CalibrationParameter::new("k1".to_string(), -5.0 / unit, 5.0 / unit),
         ],
         None,
@@ -1263,6 +1272,35 @@ fn information_matching_does_not_depend_on_the_unit_of_a_parameter() {
 
     for exponent in [-1000, -540, -530, -300, 300, 530, 1000] {
         assert_eq!(calibration(2f64.powi(exponent)), expected, "2^{exponent}");
+    }
+}
+
+#[test]
+fn information_matching_gives_eta_at_a_fit_near_or_on_its_bound() {
+    // The curvature is read on the scale of the parameters, where a bound
+    // changes nothing: a bound 1e-6 of `k0` from the fit, a few roundings
+    // from it, or at it, on either side, gives the `η` and the `ν` of no
+    // bound near.
+    let values: Vec<f64> = (0..24)
+        .map(|t| 5.0 + 0.5 * t as f64 + (t * t % 7) as f64)
+        .collect();
+    let (problem, fit) = line_problem(&values);
+    let expected = information_matching_eta(&problem, &fit, 4).unwrap();
+
+    for gap in [1e-6, 1e-14, 0.0] {
+        for bounds in [(-20.0, fit[0] + gap), (fit[0] - gap, 20.0)] {
+            let (problem, _) = line_problem_of(&values, 1.0, bounds);
+            let calibration = information_matching_eta(&problem, &fit, 4).unwrap();
+            assert!(
+                (calibration.eta / expected.eta - 1.0).abs() < 1e-9,
+                "{bounds:?}: {} against {}",
+                calibration.eta,
+                expected.eta
+            );
+            assert!(
+                (calibration.degrees_of_freedom / expected.degrees_of_freedom - 1.0).abs() < 1e-9
+            );
+        }
     }
 }
 
