@@ -6345,6 +6345,26 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
+<p><code>curvature="hessian"</code> gives the covariance of a parameter whose curvature is
+  so large that its steps moved the objective above the largest number: for a
+  parameter in <code>[0, 100]</code> read by an observation of scale <code>1e156</code>, a variance
+  of <code>4.0e-318</code>, as Gauss–Newton gives, where it raised a <code>RuntimeError</code> of an
+  infeasible point whose objective is not a finite number. Its step is the
+  shorter of <code>δ^{1/4} · dθ/du</code> (<code>δ^{1/4} · max(|θ|, 1)</code> without bounds) and the
+  one that keeps the objective a number by the Gauss–Newton curvature. For a
+  step of <code>δ^{1/4}</code> on the unbounded scale, the step is shorter only where the
+  curvature there is within a factor of about 15 of the one at which the
+  objective overflowed, from about <code>4e314</code> with an accuracy <code>δ</code> of machine
+  precision and lower for a coarser engine (<code>6e309</code> at <code>δ = 1e-6</code>); the larger
+  step of a parameter without bounds and <code>|θ|</code> above 1 is shorter from a
+  smaller curvature. A Hessian there can change. When the shorter step is
+  within the rounding of the parameter or of the predictions of the model at
+  the fit, the <code>RuntimeError</code> names the parameter and says that its curvature
+  is too large for the Hessian, and which rounding hides the step. See <a href="../../guide/uncertainty/local/#the-curvature-and-the-unbounded-scale">The
+  curvature and the unbounded
+  scale</a>.</p>
+</li>
+<li>
 <p>Every method that refits around a fit refuses a fit that is not feasible,
   with a <code>ValueError</code> that says why: <code>BayesianBootstrap</code>, <code>ResidualBootstrap</code>,
   <code>WildBootstrap</code>, <code>BlockJackknife</code>, <code>RollingConformal</code>, <code>JackknifePlus</code>,

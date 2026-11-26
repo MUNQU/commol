@@ -3269,6 +3269,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-steps-of-the-hessian-keep-the-objective-a-number" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The steps of the Hessian keep the objective a number
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-curvature-refuses-a-prediction-or-a-derivative-that-is-not-finite" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4001,6 +4012,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-steps-of-the-hessian-keep-the-objective-a-number" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The steps of the Hessian keep the objective a number
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-curvature-refuses-a-prediction-or-a-derivative-that-is-not-finite" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4114,10 +4136,11 @@ two arguments of a Student t). <code>Curvature::hessian</code> takes the central
 Hessian of the objective with given steps of the <code>finitediff</code> crate of the
 argmin fork, with steps <code>δ^{1/4} · dθ/du</code> (<code>δ^{1/4} · max(|θ|, 1)</code> with no
 bound), <code>δ</code> the output accuracy of the engine, so <code>θ ± 2h</code> stays inside the
-bounds. Each entry of either carries an estimated error; an entry above 1 %
-of <code>√(H_jj H_kk)</code> is a note. The threshold measures the error on the scale
-of a correlation, so an off-diagonal entry near 0 is judged against its row
-and column; a note changes no result. The note gives the share only, read in
+bounds (<a href="#the-steps-of-the-hessian-keep-the-objective-a-number">shorter</a> for
+a large curvature). Each entry of either carries an estimated error; an entry
+above 1 % of <code>√(H_jj H_kk)</code> is a note. The threshold measures the error on the
+scale of a correlation, so an off-diagonal entry near 0 is judged against its
+row and column; a note changes no result. The note gives the share only, read in
 the <a href="#the-curvature-is-kept-in-units-of-its-parameters">units of the parameters</a>,
 since an entry on the unbounded scale can be below or above any number, and
 words a share above 100 % as that.</p>
@@ -4153,6 +4176,55 @@ words a share above 100 % as that.</p>
 <code>crates/commol-calibration/tests/test_likelihood.rs::fisher_information_of_each_model_has_its_closed_form</code>,
 <code>tests/uncertainty/test_local.py::TestCurvature::test_an_uncertain_curvature_is_noted</code>,
 <code>tests/uncertainty/test_local.py::TestCurvature::test_an_error_above_the_scale_of_its_entry_is_noted_as_such</code>.</p>
+<h2 id="the-steps-of-the-hessian-keep-the-objective-a-number">The steps of the Hessian keep the objective a number<a class="headerlink" href="#the-steps-of-the-hessian-keep-the-objective-a-number" title="Permanent link">&para;</a></h2>
+<p>A step <code>δ^{1/4}</code> (unbounded scale) puts the objective at <code>θ ± 2h</code> above the
+largest number from <code>H_u ≈ 6e315</code> (<code>δ = ε</code>); <code>1/H_u</code> is a number to <code>5e-324</code>.
+From <code>H_u ≈ 4e314</code> for that step (<code>6e309</code> at <code>δ = 1e-6</code>; sooner for the step
+<code>δ^{1/4}|θ|</code> of no bounds) the step is the power of two at or below the one
+whose <code>H_jj h_j²</code>, by the Gauss–Newton curvature in its units, is <code>MAX / 32</code>
+(<code>OBJECTIVE_ROOM</code>). By <code>|H_jk| ≤ √(H_jj H_kk)</code> each point of the steps <code>2h</code>
+moves the objective by at most a quarter of the largest number if the observed
+curvature is at most that one and the objective grows like its quadratic (not a
+Student t of small <code>df</code>); a point still not finite keeps the infeasible-point
+error. A <code>MethodError::Failed</code> that names the rounding refuses the step unless
+<code>θ ± h</code>, <code>θ ± 2h</code> are exact (the differences divide by the step), and unless
+the rounding <code>e</code> of the runs (<code>run_rounding</code>) is at most the error of the step
+<code>δ^{1/4}</code>: <code>Σ |C| |A| e ≤ δ^{1/2} h Ĥ_jj</code> by Gauss–Newton (<code>rounding_of_runs</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Steps that move the objective by <code>δ^{1/2}</code> by the Gauss–Newton curvature</td>
+<td>They change every Hessian, and <code>δ^{1/4}/√H_u</code> is below a rounding of <code>θ</code> long before the objective overflows.</td>
+</tr>
+<tr>
+<td>The steps of <code>δ^{1/4}</code>, refused with words of the curvature when a point is not finite</td>
+<td>It refuses a covariance that is a number, which Gauss–Newton gives.</td>
+</tr>
+<tr>
+<td>Halve the steps until every point is finite</td>
+<td>Up to <code>4p² + 1</code> runs for each halving, when the bound is known before any run.</td>
+</tr>
+<tr>
+<td>A floor of <code>δ^{1/2}</code> times the size of <code>θ</code> on the step</td>
+<td>It reads the origin of <code>θ</code>: it refuses a parameter far from 0 whose runs are those of one near it, and accepts a large constant in the runs.</td>
+</tr>
+<tr>
+<td>Exact points only</td>
+<td>The rounding of the runs then gives wrong values with no note.</td>
+</tr>
+<tr>
+<td>A note in place of the refusal</td>
+<td>When the rounding makes the Hessian indefinite, the error still says that the data do not determine the parameters.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_local.rs::a_hessian_steps_where_its_objective_is_a_number</code>, <code>crates/commol-inference/tests/test_local.rs::a_hessian_that_cannot_step_says_that_the_curvature_is_too_large</code>, <code>crates/commol-inference/tests/test_local.rs::a_hessian_reads_no_step_within_the_rounding_of_its_parameter_or_its_runs</code>, <code>tests/uncertainty/test_hessian_steps.py::test_a_hessian_reads_a_curvature_whose_differences_would_overflow</code>, <code>tests/uncertainty/test_local.py::TestCurvature::test_a_curvature_that_overflows_on_the_unbounded_scale_says_so</code>, <code>tests/uncertainty/test_hessian_steps.py::test_a_hessian_refuses_a_step_that_the_rounding_of_the_runs_hides</code>.</p>
 <h2 id="the-curvature-refuses-a-prediction-or-a-derivative-that-is-not-finite">The curvature refuses a prediction or a derivative that is not finite<a class="headerlink" href="#the-curvature-refuses-a-prediction-or-a-derivative-that-is-not-finite" title="Permanent link">&para;</a></h2>
 <p>A <code>SensitivitySource</code> (<a href="../identifiability/#sensitivities-come-from-one-port">one port</a>)
 may give entries that are not finite, as a difference of finite runs that

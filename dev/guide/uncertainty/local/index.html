@@ -4304,12 +4304,22 @@ loss. The setting <code>curvature</code> of each method chooses it:</p>
 <code>δ^{1/4} · max(|θ|, 1)</code> for one without, where <code>δ</code> is the accuracy of the
 engine (machine precision, or the <code>rtol</code> of the ODE engine): the step that
 balances the truncation error of the differences with the error of the runs,
-and keeps every run inside the bounds. Each entry of either curvature has an
-estimated error. An entry whose error is above 1 % of <code>√(H_jj · H_kk)</code> is
-listed in <code>notes</code> and logged as a warning. The error is read as a share of a
-correlation: an off-diagonal entry near 0 is compared with the diagonal of its
-row and column, not with its own size. A note changes no result. A share above
-100 % says that the entry, and any covariance that reads it, is unknown.</p>
+and keeps every run inside the bounds. For a curvature so large that such a
+step moves the objective near the largest number, the step is shorter, so that
+by the Gauss–Newton curvature the objective stays a number, as it does for an
+objective that grows like its quadratic. For a step of <code>δ^{1/4}</code> on the
+unbounded scale, that is from a curvature there of about <code>4e314</code> with machine
+precision, and lower for a coarser engine (<code>6e309</code> at <code>rtol = 1e-6</code>); the
+larger step of a parameter without bounds and <code>|θ|</code> above 1 is shorter from a
+smaller curvature. When that step is within the rounding of <code>θ</code> or of the
+predictions of the model at the fit, <code>"hessian"</code> raises a <code>RuntimeError</code> that
+says the curvature of the parameter is too large for the Hessian. Each entry of
+either curvature has an estimated error. An entry whose error is above 1 % of
+<code>√(H_jj · H_kk)</code> is listed in <code>notes</code> and logged as a warning. The error is
+read as a share of a correlation: an off-diagonal entry near 0 is compared with
+the diagonal of its row and column, not with its own size. A note changes no
+result. A share above 100 % says that the entry, and any covariance that reads
+it, is unknown.</p>
 <p>Every distribution lives on the <strong>unbounded scale</strong> of the parameters, the
 scale on which the <a href="../smc/#how-the-sampler-works">sampler</a> of sequential Monte
 Carlo proposes its moves. The curvature there is
