@@ -1,9 +1,15 @@
 //! A normal or Student-t distribution on the unbounded scale, and the
 //! Laplace approximation `N(û, H_u⁻¹)` of a curvature.
+//!
+//! A Student t has degrees of freedom `ν_j` for each parameter: the grouped t
+//! of Daul, De Giorgi, Lindskog and McNeil (2003), whose margin of parameter
+//! `j` is a Student t of `ν_j`, with one χ² level common to all. With equal
+//! `ν_j` it is the multivariate t.
 
 use commol_random::Generator;
 use commol_random::sample::{gamma, normal};
 use commol_statistics::numeric::{normal_log_density, student_t_log_density};
+use commol_statistics::special::{chi_square_quantile, gamma_p};
 use nalgebra::DVector;
 
 use super::curvature::Curvature;
@@ -12,21 +18,22 @@ use crate::sensitivity::Matrix;
 use crate::transform::Transform;
 use commol_random::Stream;
 
-/// A normal distribution on the unbounded scale, or a multivariate Student t
-/// with `degrees_of_freedom`, whose draws map back to the parameters.
+/// A normal distribution on the unbounded scale, or a grouped Student t with
+/// `degrees_of_freedom` for each parameter, whose draws map back to the
+/// parameters.
 #[derive(Debug, Clone)]
 pub struct Gaussian {
     transform: Transform,
     center: Vec<f64>,
     covariance: Matrix,
     factor: Matrix,
-    degrees_of_freedom: Option<f64>,
+    degrees_of_freedom: Option<Vec<f64>>,
 }
 
 impl Gaussian {
     /// The distribution of centre `center` and covariance `covariance` on
-    /// the unbounded scale of `transform`; a Student t with
-    /// `degrees_of_freedom`, or a normal with `None`.
+    /// the unbounded scale of `transform`; a grouped Student t with
+    /// `degrees_of_freedom`, one per parameter, or a normal with `None`.
     ///
     /// # Errors
     ///
@@ -36,8 +43,14 @@ impl Gaussian {
         transform: Transform,
         center: Vec<f64>,
         covariance: Matrix,
-        degrees_of_freedom: Option<f64>,
+        degrees_of_freedom: Option<Vec<f64>>,
     ) -> Result<Self, MethodError> {
+        debug_assert!(
+            degrees_of_freedom
+                .as_ref()
+                .is_none_or(|nu| nu.len() == center.len()),
+            "one degree of freedom per parameter"
+        );
         let factor = Some(&covariance)
             .filter(|covariance| covariance.iter().all(|entry| entry.is_finite()))
             .and_then(|covariance| covariance.clone().cholesky())
@@ -73,9 +86,10 @@ impl Gaussian {
         &self.factor
     }
 
-    /// The degrees of freedom of a Student t, or `None` for a normal.
-    pub fn degrees_of_freedom(&self) -> Option<f64> {
-        self.degrees_of_freedom
+    /// The degrees of freedom of each parameter of a Student t, or `None` for
+    /// a normal.
+    pub fn degrees_of_freedom(&self) -> Option<&[f64]> {
+        self.degrees_of_freedom.as_deref()
     }
 
     /// `L⁻¹ (u − c)`: the point `u` of the unbounded scale in standard units;
@@ -95,25 +109,43 @@ impl Gaussian {
 
     /// The log density at a point `u` of the unbounded scale: its squared
     /// Mahalanobis distance from the centre and the log determinant of the
-    /// Cholesky factor, read by the one normal or Student t density.
-    pub fn log_density(&self, unbounded: &[f64]) -> f64 {
+    /// Cholesky factor, read by the one normal or Student t density. `None`
+    /// for a grouped t of unequal degrees of freedom, whose density has no
+    /// closed form.
+    pub fn log_density(&self, unbounded: &[f64]) -> Option<f64> {
         let dimensions = self.center.len();
         let squared: f64 = self.standardized(unbounded).iter().map(|z| z * z).sum();
         let log_scale: f64 = self.factor.diagonal().iter().map(|&l| libm::log(l)).sum();
-        match self.degrees_of_freedom {
-            None => normal_log_density(squared, dimensions, log_scale),
-            Some(nu) => student_t_log_density(squared, nu, dimensions, log_scale),
+        match self.degrees_of_freedom.as_deref() {
+            None => Some(normal_log_density(squared, dimensions, log_scale)),
+            Some([nu, rest @ ..]) if rest.iter().all(|other| other == nu) => {
+                Some(student_t_log_density(squared, *nu, dimensions, log_scale))
+            }
+            Some(_) => None,
         }
     }
 
     /// One draw on the unbounded scale: `c + L z`, with `z` standard normal,
-    /// divided by `√(w/ν)` with `w ~ χ²_ν` for a Student t.
+    /// and for a Student t each entry `j` divided by `√(w_j/ν_j)`. The level
+    /// `w_1 ~ χ²_{ν_1}` is drawn, and `w_j` is the quantile of `χ²_{ν_j}` at
+    /// its probability, so `w_j = w_1` where `ν_j = ν_1`.
     pub fn draw_unbounded(&self, generator: &mut Generator) -> Vec<f64> {
         let normals = DVector::from_fn(self.center.len(), |_, _| normal(generator));
         let mut step = &self.factor * normals;
-        if let Some(nu) = self.degrees_of_freedom {
-            let chi_square = gamma(generator, 0.5 * nu, 0.5);
-            step *= (nu / chi_square).sqrt();
+        if let Some(degrees) = &self.degrees_of_freedom {
+            let first = degrees[0];
+            let chi_square = gamma(generator, 0.5 * first, 0.5);
+            let mut level = None;
+            for (entry, &nu) in step.iter_mut().zip(degrees) {
+                let own = if nu == first {
+                    chi_square
+                } else {
+                    let level =
+                        *level.get_or_insert_with(|| gamma_p(0.5 * first, 0.5 * chi_square));
+                    chi_square_quantile(nu, level)
+                };
+                *entry *= (nu / own).sqrt();
+            }
         }
         self.center
             .iter()
@@ -154,6 +186,7 @@ pub fn laplace(curvature: &Curvature) -> Result<Gaussian, MethodError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use commol_statistics::special::student_t_quantile;
 
     fn gaussian(degrees_of_freedom: Option<f64>) -> Gaussian {
         let transform = Transform::new(&[(f64::NEG_INFINITY, f64::INFINITY)]);
@@ -161,7 +194,7 @@ mod tests {
             transform,
             vec![1.0],
             Matrix::from_element(1, 1, 4.0),
-            degrees_of_freedom,
+            degrees_of_freedom.map(|nu| vec![nu]),
         )
         .unwrap()
     }
@@ -170,12 +203,76 @@ mod tests {
     fn densities_have_their_closed_forms() {
         // At u = 3, one standard deviation of 2 from the centre 1.
         let normal = -0.5 * (2.0 * std::f64::consts::PI).ln() - 2f64.ln() - 0.5;
-        assert!((gaussian(None).log_density(&[3.0]) - normal).abs() < 1e-12);
+        assert!((gaussian(None).log_density(&[3.0]).unwrap() - normal).abs() < 1e-12);
         // A t of 3 degrees of freedom and scale 2: Γ(2)/(Γ(3/2)√(3π)·2)·(1 + 1/3)⁻².
         let t = (1.0 / (libm::tgamma(1.5) * (3.0 * std::f64::consts::PI).sqrt() * 2.0)
             * (1.0f64 + 1.0 / 3.0).powi(-2))
         .ln();
-        assert!((gaussian(Some(3.0)).log_density(&[3.0]) - t).abs() < 1e-12);
+        assert!((gaussian(Some(3.0)).log_density(&[3.0]).unwrap() - t).abs() < 1e-12);
+    }
+
+    /// A Student t on the real line in two dimensions, of covariance
+    /// `[[4, 1], [1, 2]]` and `degrees_of_freedom`.
+    fn pair(degrees_of_freedom: Vec<f64>) -> Gaussian {
+        let transform = Transform::new(&[(f64::NEG_INFINITY, f64::INFINITY); 2]);
+        let covariance = Matrix::from_row_slice(2, 2, &[4.0, 1.0, 1.0, 2.0]);
+        Gaussian::new(
+            transform,
+            vec![1.0, -1.0],
+            covariance,
+            Some(degrees_of_freedom),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn equal_degrees_of_freedom_draw_the_multivariate_t() {
+        // Each draw is c + L z √(ν/w), with z two normals and w ~ χ²_ν next in
+        // the stream.
+        let gaussian = pair(vec![3.0, 3.0]);
+        let mut generator = Generator::from_seed(Stream::LocalDraws.seed(5));
+        let factor = gaussian.factor().clone();
+        for draw in gaussian.draws(20, 5) {
+            let normals = DVector::from_fn(2, |_, _| normal(&mut generator));
+            let scale = (3.0 / gamma(&mut generator, 1.5, 0.5)).sqrt();
+            let expected = &factor * normals * scale;
+            assert_eq!(draw, vec![1.0 + expected[0], -1.0 + expected[1]]);
+        }
+        assert!(gaussian.log_density(&[0.0, 0.0]).is_some());
+    }
+
+    #[test]
+    fn a_grouped_t_has_the_margin_of_the_degrees_of_freedom_of_each_parameter() {
+        // The quartiles of t₁ and t₃₀ are 1 and 0.683; with 4000 draws the error
+        // of a quartile is about 0.04 and 0.02 standard deviations.
+        let gaussian = pair(vec![1.0, 30.0]);
+        let draws = gaussian.draws(4000, 7);
+        for (j, (sd, nu)) in [(2.0, 1.0), (2f64.sqrt(), 30.0)].into_iter().enumerate() {
+            let mut standardized: Vec<f64> = draws
+                .iter()
+                .map(|draw| (draw[j] - gaussian.center()[j]) / sd)
+                .collect();
+            standardized.sort_by(f64::total_cmp);
+            let quartile = student_t_quantile(0.75, nu);
+            for (index, expected) in [(1000, -quartile), (3000, quartile)] {
+                let value = standardized[index];
+                assert!(
+                    (value - expected).abs() < 0.2,
+                    "{nu}: {value} against {expected}"
+                );
+            }
+        }
+        assert_eq!(gaussian.log_density(&[0.0, 0.0]), None);
+    }
+
+    #[test]
+    fn a_grouped_t_is_continuous_where_its_degrees_of_freedom_are_equal() {
+        let equal = pair(vec![3.0, 3.0]).draws(50, 11);
+        let close = pair(vec![3.0, 3.0 + 1e-9]).draws(50, 11);
+        for (equal, close) in equal.iter().zip(&close) {
+            assert_eq!(equal[0], close[0]);
+            assert!((equal[1] - close[1]).abs() < 1e-7 * (1.0 + equal[1].abs()));
+        }
     }
 
     #[test]

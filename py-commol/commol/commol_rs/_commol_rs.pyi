@@ -655,7 +655,6 @@ class LocalRunProtocol(Protocol):
     values: list[list[float]]
     center: list[float]
     covariance: list[list[float]]
-    degrees_of_freedom: float | None
     notes: list[str]
 
 class MixtureRunProtocol(Protocol):
@@ -891,7 +890,7 @@ class InferenceModule(Protocol):
     ) -> tuple[StartsProtocol, LocalRunProtocol]: ...
     def sandwich(
         self, problem: CalibrationProblemProtocol, settings: str
-    ) -> tuple[StartsProtocol, LocalRunProtocol, int, int]: ...
+    ) -> tuple[StartsProtocol, LocalRunProtocol, list[float], int, int]: ...
     def laplace_mixture(
         self, problem: CalibrationProblemProtocol, settings: str, logger: Logger
     ) -> tuple[StartsProtocol, MixtureRunProtocol]: ...
@@ -901,7 +900,7 @@ class InferenceModule(Protocol):
         names: list[str],
         fit: list[tuple[str, float]],
         covariance: list[list[float]],
-        degrees_of_freedom: float | None,
+        block_length: int | None,
         positions: list[float],
         confidence_level: float,
     ) -> tuple[list[str], list[list[float]], list[list[float]], list[list[float]]]: ...

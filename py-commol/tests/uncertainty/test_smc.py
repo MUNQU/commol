@@ -522,7 +522,9 @@ def test_the_blocks_ignore_observations_that_carry_no_information_at_shared_posi
 
 def test_a_position_of_observations_with_no_information_counts_in_the_windows() -> None:
     # B starts at step 5, and C is 0 at steps 1 to 4: with them 20 positions
-    # make 5 blocks of 4, the first with scores of 0, and 16 make 4.
+    # make 5 blocks of 4, the first with scores and curvature of 0, and 16
+    # make 4. The sandwich reads the curvature of each block, so the first
+    # changes nothing.
     without = structural_zero_calibrator(11, first_b=5)
     with_zeros = structural_zero_calibrator(1, first_b=5)
     sandwich = Sandwich(block_length=4, draws=2)
@@ -530,8 +532,7 @@ def test_a_position_of_observations_with_no_information_counts_in_the_windows() 
     first, second = (c.uncertainty(sandwich) for c in (without, with_zeros))
 
     assert (first.blocks, second.blocks) == (4, 5)
-    assert (first.degrees_of_freedom(), second.degrees_of_freedom()) == (3, 4)
-    # The meat sums the same scores, times G/(G − 1).
-    ratio = (5 / 4) / (4 / 3)
-    expected = ratio * np.array(first.covariance)
-    assert np.allclose(second.covariance, expected, rtol=1e-9)
+    assert second.degrees_of_freedom == pytest.approx(
+        first.degrees_of_freedom, rel=1e-9
+    )
+    assert np.allclose(second.covariance, first.covariance, rtol=1e-9)

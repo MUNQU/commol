@@ -142,6 +142,12 @@ CASES: dict[str, tuple[str, Callable[[Bindings], object]]] = {
         "randomizations",
         _residual_dependence(randomizations=-1),
     ),
+    "block_length of delta_band": (
+        "block_length",
+        lambda b: inference.delta_band(
+            _problem(b), ["c"], [("c", 1.0)], [[1.0]], -1, [1.0], 0.9
+        ),
+    ),
 }
 """Each count a binding takes as a number, called with -1."""
 

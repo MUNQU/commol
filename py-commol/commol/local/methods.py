@@ -55,27 +55,35 @@ class Laplace(UncertaintyMethod[LaplaceResult], RangeChecked):
 
 class Sandwich(UncertaintyMethod[SandwichResult], RangeChecked):
     """
-    The sandwich covariance ``H⁻¹ B H⁻¹`` at the fit, with the meat ``B``
-    summed over blocks of positions (the clustered estimator CR1):
-    ``B = G/(G − 1) · Σ_b s_b s_bᵀ``, with ``s_b`` the sum of the gradients
-    of the terms of the observations of block ``b``.
+    The sandwich covariance at the fit, with the meat summed over blocks of
+    positions: ``√(f_j f_k) · (H⁻¹ Σ_b s̃_b s̃_bᵀ H⁻¹)_jk``, with ``s_b`` the
+    sum of the gradients of the terms of the observations of block ``b``,
+    taken after one Gauss–Newton step to the zero of their sum ``g``:
+    ``s̃_b = s_b − J_b J⁻¹ g``. The factor ``f_j`` and the degrees of freedom
+    ``ν_j`` of each parameter come from the share ``J_b`` of its Gauss–Newton
+    curvature ``J`` that each block holds (Bell and McCaffrey, 2002): with
+    equal shares, ``f_j = G/(G − 1)`` and ``ν_j = G − 1`` for ``G`` blocks; a
+    parameter that few blocks read has fewer, and a block with no curvature
+    counts for nothing.
 
     It needs no noise model: with a loss, ``H`` is the curvature of the loss;
     with observation models, of ``−log L``. It holds when the noise depends
     on its neighbours inside a block, when its size changes, and when the
-    noise model is wrong but the mean is right. Intervals and draws read a
-    Student t with ``G − 1`` degrees of freedom; with ``G`` blocks not above
-    the parameters it is refused, since ``B`` would have rank below them.
-    ``loss_function="mae"`` is refused: its sandwich needs a density of the
-    residuals at 0 and a bandwidth (use a bootstrap).
+    noise model is wrong but the mean is right. Intervals read the Student t
+    of each parameter, and draws a grouped t whose margins are those t. With
+    no more blocks with curvature than parameters it is refused, since the
+    meat would have rank below them; so it is when the blocks each hold all
+    the curvature of a parameter. ``loss_function="mae"`` is refused: its
+    sandwich needs a density of the residuals at 0 and a bandwidth (use a
+    bootstrap).
 
     Attributes
     ----------
     block_length : int
-        Positions per block of the meat; they must make more blocks than
-        parameters.
+        Positions per block of the meat; they must make more blocks with
+        curvature than parameters.
     draws : int
-        Number of draws of the Student t, at least 1.
+        Number of draws of the grouped t, at least 1.
     curvature : {"gauss_newton", "hessian"}
         The curvature ``H`` (default ``"gauss_newton"``). With the Hessian,
         the sandwich also holds when the mean is wrong.

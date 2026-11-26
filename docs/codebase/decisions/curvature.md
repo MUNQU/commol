@@ -177,16 +177,16 @@ be too large or too small for a number
 
 ## One rule says what the data do not determine
 
-`Curvature::inverse` (`InverseCurvature`, `local/inverse.rs`) is the one
-inverse of a curvature, for the Laplace approximation, the sandwich, the
-mixture and information matching, on `symmetric_inverse`
-(`commol_statistics::linear_algebra`): the matrix is scaled to a diagonal of
-1, and it is singular when its smallest eigenvalue is at most `p·ε` times the
-largest (`singular`, which `collinearity_index` also reads), the size of the
-rounding of an eigenvalue of 0. A singular curvature is a
-`MethodError::Invalid` with one message, and the mixture words it in the note
-of the end that gives no component. The rule reads neither the scale of a
-parameter nor the estimated error of the derivatives.
+`Curvature::inverse` (`InverseCurvature`, `local/inverse.rs`) inverts the
+curvature for the Laplace approximation, the sandwich, the mixture and
+information matching, on `symmetric_inverse` of `commol_statistics`: the matrix
+is scaled to a diagonal of 1, and it is singular when its smallest eigenvalue is
+at most `p·ε` times the largest (`singular`, which `collinearity_index` also
+reads), the size of the rounding of an eigenvalue of 0. A singular curvature is
+a `MethodError::Invalid` with one message, and the mixture words it in the note
+of the end that gives no component. `BlockShares::new` inverts the Gauss–Newton
+curvature of the blocks by it, with its own message. The rule reads neither the
+scale of a parameter nor the estimated error of the derivatives.
 
 Two parameters that the model reads only through their product have an
 eigenvalue of 0 but for the rounding of the sums, which grows with the number

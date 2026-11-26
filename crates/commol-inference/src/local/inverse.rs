@@ -5,9 +5,7 @@
 use commol_statistics::linear_algebra::symmetric_inverse;
 
 use super::curvature::Curvature;
-use super::sandwich::scaled_block_scores;
 use crate::error::MethodError;
-use crate::resampling::BlockScheme;
 use crate::sensitivity::Matrix;
 
 /// The inverse of a [`Curvature`], kept in its units ([`Curvature::inverse`]).
@@ -60,29 +58,29 @@ impl<'a> InverseCurvature<'a> {
     }
 
     /// The sandwich covariance on the unbounded scale,
-    /// `G/(G − 1) · Σ_b a_b a_bᵀ` over the `G` blocks of `blocks`, with the
-    /// influence `a_b = H_u⁻¹ s_b` of the block score `s_b` of the curvature
-    /// ([`scaled_block_scores`]), exactly symmetric. `blocks` has at least two
-    /// blocks.
+    /// `√(f_j f_k) · Σ_b a_bj a_bk` over the rows of `scores`, with the
+    /// influence `a_b = H_u⁻¹ s_b` of the score `s_b` of each block, in the
+    /// units of the curvature ([`super::BlockShares::corrected_scores`]), and
+    /// the factor `f_j` of each parameter in `factors`
+    /// ([`super::BlockShares::factor`]), exactly symmetric.
     ///
     /// # Errors
     ///
     /// [`MethodError::Failed`] when a variance is below the smallest number
     /// while an influence on its parameter is not 0: the curvature of that
     /// parameter is too large for its covariance to be a number.
-    pub fn sandwich(&self, blocks: &BlockScheme) -> Result<Matrix, MethodError> {
-        let count = blocks.count();
-        debug_assert!(count >= 2, "the sandwich of one block");
-        let scaled = scaled_block_scores(self.curvature, blocks) * &self.matrix;
+    pub fn sandwich(&self, scores: Matrix, factors: &[f64]) -> Result<Matrix, MethodError> {
+        let mut scaled = scores * &self.matrix;
+        for (mut column, factor) in scaled.column_iter_mut().zip(factors) {
+            column.scale_mut(factor.sqrt());
+        }
         let mut influences = scaled.clone();
         for (mut column, &scale) in influences.column_iter_mut().zip(self.curvature.scales()) {
             column.unscale_mut(scale);
         }
-        let correction = count as f64 / (count - 1) as f64;
         let p = influences.ncols();
-        let covariance = Matrix::from_fn(p, p, |j, k| {
-            correction * influences.column(j).dot(&influences.column(k))
-        });
+        let covariance =
+            Matrix::from_fn(p, p, |j, k| influences.column(j).dot(&influences.column(k)));
         self.check_variances(&covariance, |j| {
             scaled.column(j).iter().any(|&entry| entry != 0.0)
         })?;

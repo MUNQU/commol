@@ -211,6 +211,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** `SandwichResult.degrees_of_freedom` is a field, a
+  `dict[str, float]` of the degrees of freedom of each parameter, where it was
+  a method that gave `blocks − 1` for all of them, and
+  `LocalResult.degrees_of_freedom()` is gone. Each parameter reads its own
+  from the share of its Gauss–Newton curvature that each block holds (Bell and
+  McCaffrey 2002): `blocks − 1` when every block holds the same share, fewer
+  when few blocks read it. The draws of a sandwich are a grouped t whose
+  margin for each parameter is the t of its degrees of freedom, the same
+  draws as before when they are all equal. Read
+  `result.degrees_of_freedom["name"]` in place of
+  `result.degrees_of_freedom()`. See
+  [Sandwich](../guide/uncertainty/local.md#sandwich).
+
 - `commol.scores.pit(predictive, observations, DistributionNoise())` reads the
   distribution functions of the observation models: each value is
   `F(y⁻) + v · p(y)` of the mixture over the draws, exact for any sample, also
@@ -854,6 +867,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `SandwichRun` are removed.
 
 ### Fixed
+
+- `Sandwich` reads its factor and its degrees of freedom from the curvature
+  of each block, so a block with no curvature, such as a window of
+  observations that carry no information, counts for nothing, and a parameter
+  read in few blocks gets wide enough intervals. Before, a block of
+  observations with no information counted as one that reads the
+  parameters: two blocks with curvature and two without, for two parameters,
+  gave a correlation of `−0.9999994`, and a parameter read in 2 of 8 blocks
+  had intervals of 90 % that covered about 61 %, as every parameter read a t
+  of `blocks − 1`. A sandwich with no more blocks
+  with curvature than parameters (a block that holds more than `10⁻¹⁰` of the
+  curvature), with blocks that each hold all the curvature of a parameter, or
+  with block scores of rank below the parameters, which gave draws of
+  correlation 1, is refused with a message that suggests another block
+  length. The rank holds for a fit an optimizer returns: each block's scores
+  are read after one step to the zero of their sum, so the covariance does
+  not follow the error of the fit. `LocalResult.delta_band` of a sandwich
+  gives each output at each position the degrees of freedom of its own
+  direction. See
+  [Sandwich](../guide/uncertainty/local.md#sandwich).
 
 - `curvature="hessian"` gives the covariance of a parameter whose curvature is
   so large that its steps moved the objective above the largest number: for a

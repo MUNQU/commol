@@ -105,30 +105,54 @@ def test_parameters_told_apart_by_little_are_not_refused(name: str) -> None:
     assert np.all(np.linalg.eigvalsh(result.covariance) > 0)
 
 
+NOISE = np.array([0.3, 0.8, 0.1, 0.6, 0.2] * 4)
+"""The values of D at the positions 1 to 20, in the unit ``scale``."""
+
+
+def _own_bin(scale: float) -> Calibrator:
+    """``weak_parameter_calibrator(scale, own_bin=True)`` with D observed at
+    ``scale`` times `NOISE`."""
+    base = weak_parameter_calibrator(scale, own_bin=True)
+    data = [
+        o.model_copy(update={"value": scale * float(NOISE[int(o.at) - 1])})
+        if o.output == "D"
+        else o
+        for o in base.problem.observed_data
+    ]
+    return Calibrator(
+        base.simulation, base.problem.model_copy(update={"observed_data": data})
+    )
+
+
 def _own_bin_variance(k2: float) -> float:
     """
-    The sandwich variance of ``k2`` on the unbounded scale for
-    ``weak_parameter_calibrator(scale, own_bin=True)`` in blocks of 2.
+    The sandwich variance of ``k2`` on the unbounded scale for `_own_bin` in
+    blocks of 2.
 
-    D at ``t`` is ``k2 · scale · S_t``, ``S_t = t(t − 1)/2``, observed at 0 with
-    sd 1, and no other observation reads ``k2``: the score of block ``b`` over
-    the curvature is ``k2 Σ_b S_t² / Σ S_t²`` at any scale, and ``dk2/du`` is
-    ``k2 (1 − k2)``.
+    D at ``t`` is ``k2 · scale · S_t``, ``S_t = t(t − 1)/2``, observed at
+    ``scale · e_t`` with sd 1, and no other observation reads ``k2``: the
+    share of block ``b`` in its curvature is ``w_b = Σ_b S_t² / Σ S_t²`` at
+    any scale, and its factor is ``1 / (1 − Σ_b w_b²)``. Its scores after one
+    step to the zero of their sum are those of the least-squares ``k̂``, at
+    any fit, so its influence is ``Σ_b S_t (k̂ S_t − e_t) / Σ S_t²`` at any
+    scale, and ``dk2/du`` is ``k2 (1 − k2)``.
     """
-    squares = np.array([t * (t - 1) / 2 for t in range(1, 21)]) ** 2
-    shares = k2 * squares.reshape(10, 2).sum(axis=1) / squares.sum()
-    return 10 / 9 * float(np.sum(shares**2)) / (k2 * (1 - k2)) ** 2
+    reads = np.array([t * (t - 1) / 2 for t in range(1, 21)])
+    total = float(np.sum(reads**2))
+    weights = (reads**2).reshape(10, 2).sum(axis=1) / total
+    factor = 1 / (1 - float(np.sum(weights**2)))
+    optimum = float(reads @ NOISE) / total
+    influences = (reads * (optimum * reads - NOISE)).reshape(10, 2).sum(axis=1) / total
+    return factor * float(np.sum(influences**2)) / (k2 * (1 - k2)) ** 2
 
 
 @pytest.mark.parametrize("scale", [1e-6, 1e-160, 1e-300])
 def test_a_sandwich_does_not_depend_on_the_scale_of_a_parameter(scale: float) -> None:
     # The scores and the curvature of k2 change with the scale, and the
-    # covariance H⁻¹ B H⁻¹ does not: the curvature of k2 on the unbounded
-    # scale, about 8e3 scale², is below the smallest normal number at 1e-160
-    # and below any number at 1e-300.
-    result = weak_parameter_calibrator(scale, own_bin=True).uncertainty(
-        METHODS["sandwich"]
-    )
+    # sandwich does not: the curvature of k2 on the unbounded scale, about
+    # 8e3 scale², is below the smallest normal number at 1e-160 and below any
+    # number at 1e-300.
+    result = _own_bin(scale).uncertainty(METHODS["sandwich"])
 
     k2 = result.fit.best_parameters["k2"]
     assert result.covariance[1][1] == pytest.approx(_own_bin_variance(k2), rel=1e-9)
