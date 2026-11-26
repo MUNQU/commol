@@ -18,7 +18,7 @@
         <link rel="prev" href="../dependence/">
       
       
-        <link rel="next" href="../files/">
+        <link rel="next" href="../descriptions/">
       
       
         
@@ -3375,17 +3375,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#a-description-is-data-rendered-apart" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        A description is data, rendered apart
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#reports" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3400,6 +3389,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../descriptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Descriptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3978,17 +3995,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#a-description-is-data-rendered-apart" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        A description is data, rendered apart
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#reports" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4021,9 +4027,9 @@
 
 <h1 id="results">Results<a class="headerlink" href="#results" title="Permanent link">&para;</a></h1>
 <p><a href="../../design-decisions/">Back to Design decisions</a></p>
-<p>How intervals, descriptions and reports are made from a model and its runs.
-Figures have <a href="../figures/">a page of their own</a>, and the files of models and
-results <a href="../files/">one too</a>.</p>
+<p>How intervals and reports are made from a model and its runs. Descriptions,
+figures and the files of models and results have pages of their own:
+<a href="../descriptions/">Descriptions</a>, <a href="../figures/">Figures</a> and <a href="../files/">Files</a>.</p>
 <h2 id="one-confidence-interval-convention">One confidence-interval convention<a class="headerlink" href="#one-confidence-interval-convention" title="Permanent link">&para;</a></h2>
 <p>Every interval is a weighted quantile: the inverse of the weighted empirical
 distribution, interpolated between the midpoints of the cumulative weights
@@ -4218,14 +4224,21 @@ no source, as <code>series_dependence</code> of any values, takes the seed, such
 <code>tests/uncertainty/test_local.py::TestStarts</code>,
 <code>tests/uncertainty/test_smc.py::test_the_eta_calibrations_fit_from_their_starts</code>.</p>
 <h2 id="fits-that-fail-have-one-place">Fits that fail have one place<a class="headerlink" href="#fits-that-fail-have-one-place" title="Permanent link">&para;</a></h2>
-<p>Six methods fit one perturbation of the data per replicate: the bootstraps,
-the jackknife, jackknife+, rolling conformal, EnbPI and a bootstrap threshold.
-They share one loop, <code>ReplicateRunner::fit_all</code> (<code>resampling/runner.rs</code>),
-which returns <code>ReplicateFits</code>, and one check, <code>FitUnit::require</code>, whose message
-says how many of how many fits of a replicate, block or origin succeeded and
-how many the method needs. Every Python result of several fits has <code>failed</code>,
-entries <code>"&lt;Start|Replicate|Block|Origin&gt; &lt;index&gt; failed: &lt;reason&gt;"</code> logged as
+<p>Seven methods fit one perturbation of the data per replicate: the bootstraps,
+the jackknife, jackknife+, rolling conformal, EnbPI, a bootstrap threshold and
+the <code>Refitted</code> reference of a dependence analysis. They share one loop,
+<code>ReplicateRunner::fit_all</code> (<code>resampling/runner.rs</code>), which returns
+<code>ReplicateFits</code>, and one check, <code>FitUnit::require</code>, whose message says how many
+of how many fits of a replicate, block or origin succeeded and how many the
+method needs. Every Python result of several fits has <code>failed</code>, entries
+<code>"&lt;Start|Replicate|Block|Origin&gt; &lt;index&gt; failed: &lt;reason&gt;"</code> logged as
 warnings, and, for fits of replicates, <code>not_converged</code>, at its top.</p>
+<p>Every refit starts from the fit, so <code>ReplicateRunner::new</code> refuses a fit that
+has no run or is not feasible (<code>CalibrationProblem::evaluate</code>). The message
+names the violated constraints of the first check that fails: the constraints
+on the parameters come before those at positions. <code>ResidualNoise</code>,
+<code>SplitConformal</code> and <code>AdaptiveConformal</code> do not refit, so they take a fit that
+runs and is not feasible.</p>
 <table>
 <thead>
 <tr>
@@ -4238,94 +4251,26 @@ warnings, and, for fits of replicates, <code>not_converged</code>, at its top.</
 <td>One loop per method, or <code>diagnostics.failed</code></td>
 <td>Counts and messages drift apart; three results have no diagnostics.</td>
 </tr>
+<tr>
+<td>Refits from a fit that is not feasible</td>
+<td>With no feasible point in the bounds, the fit ends on the penalty, and every refit starts and stays there: an interval of width 0, with no message.</td>
+</tr>
+<tr>
+<td>The check in <code>fitted_values</code></td>
+<td><code>ResidualNoise</code> reads a fit through it and must take one that is not feasible, and <code>RollingConformal</code> and <code>Refitted</code> with <code>NoNoise()</code> do not call it.</td>
+</tr>
 </tbody>
 </table>
 <p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_resampling.rs::every_replicate_method_counts_the_same_fits</code>,
-<code>tests/uncertainty/test_resampling.py::test_every_method_lists_its_failed_replicates_in_failed</code>.</p>
-<h2 id="a-description-is-data-rendered-apart">A description is data, rendered apart<a class="headerlink" href="#a-description-is-data-rendered-apart" title="Permanent link">&para;</a></h2>
-<p><code>Model.describe(layout)</code> returns a <code>ModelDescription</code>
-(<code>description/blocks.py</code>): sections with a key, a title and blocks from a
-closed set of Pydantic models (<code>Text</code>, <code>Table</code>, <code>Equations</code>, <code>StateGraph</code>,
-<code>Matrix</code>). The sections every kind shares come from <code>Model</code>
-(<code>_model/describe.py</code>); a kind adds its own through
-<code>ModelStructure.describe</code> (<code>Aggregate</code>: <code>_model/aggregate_description.py</code>).
-The renderers (<code>description/render.py</code>) read only blocks, so a new kind renders
-in every format with no new renderer. The form of the dynamics and the
-schedule come from the engine's list (<code>EngineType::dynamics_form</code>), because
-one structure runs as equations or as events depending on its engine.</p>
-<table>
-<thead>
-<tr>
-<th>Part</th>
-<th>Rule</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Equations</td>
-<td>Computed by the code of the planner's flows (<code>transition_flows</code>), so a description shows what the engine simulates. The text rendering keeps the compact and expanded forms line by line.</td>
-</tr>
-<tr>
-<td>Diagrams</td>
-<td>Mermaid in the Markdown rendering, only for a graph that is not <code>expanded</code>; Graphviz DOT for every graph in a <code>.dot</code> file. Text, LaTeX and JSON draw none.</td>
-</tr>
-<tr>
-<td>State graphs</td>
-<td>Built from the flows of the engine (<code>DynamicsDescription.state_graph</code>, <code>strata_graph</code>). The graph of the bins holds the moves between bins, the inflows and the outflows; the graph of the strata, only when a move changes categories, holds the categories that each move changes, joined when a move changes several stratifications. One edge per pair of nodes, one node <code>none</code> per side. A label is the formula of the one rate of one transition, and otherwise the parameters that the rates read, in declaration order.</td>
-</tr>
-<tr>
-<td>Layouts</td>
-<td><code>"default"</code>: overview, entities, dynamics, schedule, initialization, parameters, outputs. <code>"odd"</code>: the ODD protocol; an element commol cannot fill is marked <code>TO_BE_WRITTEN</code>. A section with no blocks is left out of every rendering.</td>
-</tr>
-</tbody>
-</table>
-<table>
-<thead>
-<tr>
-<th>Alternative</th>
-<th>Why not</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>A printer per kind and per format</td>
-<td>Every kind writes every format, and no caller can read or export the description.</td>
-</tr>
-<tr>
-<td>A free-form dict</td>
-<td>The renderers would guess its shape; typed blocks are checked by Pydantic and <code>ty</code>.</td>
-</tr>
-<tr>
-<td>An image (PNG, SVG) of a graph</td>
-<td>Needs Graphviz or a browser at run time, a dependency for a view.</td>
-</tr>
-<tr>
-<td>One graph of the bins and the categories</td>
-<td>A move between categories crosses every bin: it is an edge from a bin to itself, which hides the categories, or one edge per bin and category.</td>
-</tr>
-<tr>
-<td>A graph per stratification</td>
-<td>A move can change several stratifications at once; one graph of the strata draws it as one edge.</td>
-</tr>
-<tr>
-<td>The formulas, or the transition ids, as the label of a shared edge</td>
-<td>The formulas are one per stratum, too long for an edge, and the graph of the compartments and the equations hold them; an id names a transition, not what drives it.</td>
-</tr>
-<tr>
-<td>A node <code>none</code> per inflow or outflow</td>
-<td>A model with an outflow from every bin draws as many <code>none</code> nodes as bins.</td>
-</tr>
-<tr>
-<td>TikZ in the LaTeX rendering</td>
-<td>Needs node coordinates, so a layout algorithm; a PDF made from the DOT file does the same.</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Guards:</strong> <code>tests/description/</code> (<code>test_equations*.py</code> check the lines of the
-equations through <code>equation_forms</code>; <code>test_rendering.py</code> checks the snapshots of
-<code>description/snapshots/</code>, parses the DOT with <code>pydot</code> and compiles the LaTeX
-with <code>latexmk</code> when they are installed), <code>tests/building/test_engine.py</code>
-(every engine gives a form).</p>
+<code>tests/uncertainty/test_resampling.py::test_every_method_lists_its_failed_replicates_in_failed</code>,
+<code>crates/commol-inference/tests/test_errors.rs::a_method_that_refits_refuses_a_fit_that_is_not_feasible</code>,
+<code>tests/uncertainty/test_resampling.py::test_a_fit_that_violates_a_constraint_is_refused</code>,
+<code>tests/uncertainty/test_conformal.py::TestFailures::test_a_variant_that_refits_refuses_a_fit_that_is_not_feasible</code>,
+<code>tests/uncertainty/test_dependence.py::TestReferences::test_refits_refuse_a_fit_that_is_not_feasible</code>,
+<code>tests/uncertainty/test_resampling.py::TestResidualNoise::test_residual_noise_reads_a_fit_that_is_not_feasible</code>,
+<code>tests/uncertainty/test_conformal.py::TestFailures::test_a_variant_that_reads_the_fit_takes_one_that_is_not_feasible</code>,
+<code>tests/uncertainty/test_conformal.py::TestFailures::test_rolling_settings_come_before_the_check_of_the_fit</code>,
+<code>tests/uncertainty/test_block_length.py::test_a_bootstrap_checks_the_length_before_the_run_of_the_fit</code>.</p>
 <h2 id="reports">Reports<a class="headerlink" href="#reports" title="Permanent link">&para;</a></h2>
 <p>A report is a method of the object of results whose data it describes:
 <code>SimulationResults.report</code> (one run), <code>SimulationReplicates.report</code> (the

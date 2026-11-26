@@ -3508,6 +3508,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../codebase/decisions/descriptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Descriptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../codebase/decisions/files/" class="md-nav__link">
         
   
@@ -4768,6 +4796,10 @@ each at least the one before.</p>
 <tr>
 <td><code>Refitted</code> with a sample of many draws, or observations other than the problem's</td>
 <td><code>ValueError</code> that points to <code>point_sample</code> or to <code>AtParameters</code></td>
+</tr>
+<tr>
+<td><code>Refitted</code> with a draw that is not feasible, since each refit starts from it</td>
+<td><code>ValueError</code> that says why, as for every method that refits (<a href="../resampling/#how-replicates-run">How replicates run</a>)</td>
 </tr>
 <tr>
 <td>A predictive of a <code>SensitivityAnalysis</code></td>

@@ -3283,6 +3283,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/descriptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Descriptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/files/" class="md-nav__link">
         
   
@@ -6279,14 +6307,43 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   takes the place of <code>BlockScheme::resolve</code> and <code>BlockScheme::at_fit</code>;
   <code>sandwich_approximation</code> and <code>information_matching_eta</code> take a <code>usize</code>;
   <code>BayesianBootstrap::new</code> takes the problem and the fit, and refuses a fit
-  with no run, as <code>block_jackknife</code>, <code>jackknife_plus</code>, <code>enbpi</code> and
-  <code>bootstrap_coverage_eta</code> do; <code>automatic_length</code>, <code>automatic_block_length</code>,
+  with no run, as <code>ReplicateRunner::new</code> (the runner of <code>block_jackknife</code>,
+  <code>jackknife_plus</code> and <code>enbpi</code>) and <code>bootstrap_coverage_eta</code> do;
+  <code>automatic_length</code>, <code>automatic_block_length</code>,
   <code>AutomaticLength</code>, <code>BlockDrawing</code>, <code>Estimates</code>, <code>BlockScheme::estimates</code>,
   <code>blocks_at</code>, <code>Curvature::predictions</code> and the field <code>estimates</code> of
   <code>SandwichRun</code> are removed.</li>
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>
+<p>Every method that refits around a fit refuses a fit that is not feasible,
+  with a <code>ValueError</code> that says why: <code>BayesianBootstrap</code>, <code>ResidualBootstrap</code>,
+  <code>WildBootstrap</code>, <code>BlockJackknife</code>, <code>RollingConformal</code>, <code>JackknifePlus</code>,
+  <code>EnbPI</code>, and <code>residual_dependence</code> with <code>Refitted</code> and <code>NoNoise()</code>. A fit is
+  not feasible when it violates a constraint, which the message names by its
+  <code>id</code>, when a predicted mean lies outside the means its observation model
+  allows, or when its loss or likelihood is not a finite number. Before, when
+  no point of the bounds met the constraints, the fit ended on the penalty
+  with <code>converged=True</code>, and every refit started and ended there: the
+  bootstraps gave an interval of width 0 and the jackknife a standard error of
+  0, with no message. Before its refits, <code>RollingConformal</code> refuses a fit with
+  no run. When the run leaves the values its model allows, the error is a
+  <code>ValueError</code>. Before, a refit raised <code>InfeasibleStateError</code> ("Parameter set
+  0 is not feasible: ..."), so code that catches <code>InfeasibleStateError</code> no
+  longer catches it. <code>Refitted</code> with <code>DistributionNoise</code> already refused such
+  a draw, and now says why as the other methods do, in place of "The fit has
+  no likelihood". <code>ResidualNoise</code>, <code>SplitConformal</code> and <code>AdaptiveConformal</code>
+  read the residuals of the fit and do not refit, so they still take it. The
+  message of an infeasible point says in words what is not feasible, as does
+  the error of a sensitivity at such a point. Before, it gave the Rust value,
+  such as <code>Infeasible point: Constraint { amount: 0.5 }</code>, and a sensitivity
+  gave words of its own. In Rust, <code>ReplicateRunner::new</code> refuses such a fit,
+  <code>Violation::Constraint</code> has the <code>ids</code> of the violated constraints, and
+  <code>check_rolling_settings</code> checks the settings of <code>rolling_conformal</code> before
+  its runner exists. See
+  <a href="../../guide/uncertainty/resampling/#how-replicates-run">How replicates run</a>.</p>
+</li>
 <li>
 <p>A <code>"pulse"</code> series acts on step 0 with a point at <code>-0.0</code>, in every engine,
   as <code>"step_function"</code> and <code>"linear"</code> do. Before, the point was accepted and

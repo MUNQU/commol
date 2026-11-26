@@ -272,6 +272,14 @@ print(error.lower[0] <= lower <= error.lower[1])  # True
 
 Each replicate starts from the fit. With `starts > 1` it also starts from the [other starts](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts) of the optimizer, and keeps the end of lowest loss, so a second basin of the loss shows up instead of adding optimizer noise to the data's uncertainty. Replicate `b` draws its data and its starts from streams of the problem's seed, one for the data and one for the fits, at index `b`: two runs with one seed give one result. A replicate changes only the observed values or the weights (`CalibrationProblem::with_data`); with `normalize_observations` its normalization comes from its own values, as the fit's does.
 
+Since every replicate starts from the fit, the fit must run and be feasible. When no point of the bounds meets the constraints, the fit ends on the penalty ([How a violation counts](https://munqu.github.io/commol/latest/guide/calibration-constraints/#how-a-violation-counts)) and can still say it converged, and each replicate would stay there: an interval of width 0. So a bootstrap and the jackknife raise a `ValueError` for a fit that:
+
+- violates a constraint, which the message names by its `id`,
+- has a predicted mean outside the means its observation model allows,
+- or has a loss or a likelihood that is not a finite number.
+
+`ResidualNoise` does not refit, so it reads the residuals of such a fit.
+
 ## Prediction intervals
 
 The draws of a bootstrap give a band of the model. `ResidualNoise` adds moving blocks of residuals of the fit to every draw's prediction of each observation, which gives a prediction interval with no noise model. It serves the series the fit has residuals of, at any position, and rejects an observation of any other series. It and `ResidualBootstrap` draw one residual per position of a series, so they refuse a series with two observations at one position, in the fit or in the observations they serve ([One position, two observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#one-position-two-observations)).

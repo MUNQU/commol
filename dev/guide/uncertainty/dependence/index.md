@@ -246,18 +246,19 @@ print(holm({s.label: s.p_value for s in together.series}))  # {'south': 1.0, 'no
 
 ## Errors
 
-| Situation                                                                                                    | What happens                                                    |
-| ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
-| `values` is a list of lists                                                                                  | `TypeError` that points to `residual_dependence`                |
-| `values` is not one finite value per observation                                                             | `ValueError`                                                    |
-| `max_lag`, `replicates` or `randomizations` below 1                                                          | `ValueError` that names the rule                                |
-| `max_lag`, `replicates` of `series_dependence` or `randomizations` not a whole number, such as a text or 7.0 | `TypeError` that names it                                       |
-| `ResidualNoise(...)`                                                                                         | `TypeError`                                                     |
-| `NoNoise()` with more than one randomization                                                                 | `ValueError`                                                    |
-| `DistributionNoise()` with a loss, or an observed value outside the support of its model                     | `ValueError`                                                    |
-| `Refitted` with a sample of many draws, or observations other than the problem's                             | `ValueError` that points to `point_sample` or to `AtParameters` |
-| A predictive of a `SensitivityAnalysis`                                                                      | `ValueError`: an analysis has no data                           |
-| Every refit fails                                                                                            | `RuntimeError`                                                  |
+| Situation                                                                                                    | What happens                                                                                                                                                               |
+| ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `values` is a list of lists                                                                                  | `TypeError` that points to `residual_dependence`                                                                                                                           |
+| `values` is not one finite value per observation                                                             | `ValueError`                                                                                                                                                               |
+| `max_lag`, `replicates` or `randomizations` below 1                                                          | `ValueError` that names the rule                                                                                                                                           |
+| `max_lag`, `replicates` of `series_dependence` or `randomizations` not a whole number, such as a text or 7.0 | `TypeError` that names it                                                                                                                                                  |
+| `ResidualNoise(...)`                                                                                         | `TypeError`                                                                                                                                                                |
+| `NoNoise()` with more than one randomization                                                                 | `ValueError`                                                                                                                                                               |
+| `DistributionNoise()` with a loss, or an observed value outside the support of its model                     | `ValueError`                                                                                                                                                               |
+| `Refitted` with a sample of many draws, or observations other than the problem's                             | `ValueError` that points to `point_sample` or to `AtParameters`                                                                                                            |
+| `Refitted` with a draw that is not feasible, since each refit starts from it                                 | `ValueError` that says why, as for every method that refits ([How replicates run](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#how-replicates-run)) |
+| A predictive of a `SensitivityAnalysis`                                                                      | `ValueError`: an analysis has no data                                                                                                                                      |
+| Every refit fails                                                                                            | `RuntimeError`                                                                                                                                                             |
 
 ## Checklist
 

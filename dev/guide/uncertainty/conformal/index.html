@@ -3491,6 +3491,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../codebase/decisions/descriptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Descriptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../codebase/decisions/files/" class="md-nav__link">
         
   
@@ -4412,6 +4440,11 @@ choice: a small series does not borrow the errors of a large one, but it needs
 </tr>
 </tbody>
 </table>
+<p><code>RollingConformal</code>, <code>JackknifePlus</code> and <code>EnbPI</code> start each refit from the fit,
+so they refuse a fit that is not feasible with a <code>ValueError</code>, as a bootstrap
+does (<a href="../resampling/#how-replicates-run">How replicates run</a>).
+<code>SplitConformal</code> and <code>AdaptiveConformal</code> only score the predictions of the
+fit, and take it as it is.</p>
 <h2 id="how-to-hold-data-out">How to hold data out<a class="headerlink" href="#how-to-hold-data-out" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

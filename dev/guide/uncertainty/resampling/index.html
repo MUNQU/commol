@@ -3519,6 +3519,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../codebase/decisions/descriptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Descriptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../codebase/decisions/files/" class="md-nav__link">
         
   
@@ -4726,6 +4754,18 @@ streams of the problem's seed, one for the data and one for the fits, at
 index <code>b</code>: two runs with one seed give one result. A replicate changes only the observed values or the weights
 (<code>CalibrationProblem::with_data</code>); with <code>normalize_observations</code> its
 normalization comes from its own values, as the fit's does.</p>
+<p>Since every replicate starts from the fit, the fit must run and be feasible.
+When no point of the bounds meets the constraints, the fit ends on the penalty
+(<a href="../../calibration-constraints/#how-a-violation-counts">How a violation counts</a>)
+and can still say it converged, and each replicate would stay there: an
+interval of width 0. So a bootstrap and the jackknife raise a <code>ValueError</code> for
+a fit that:</p>
+<ul>
+<li>violates a constraint, which the message names by its <code>id</code>,</li>
+<li>has a predicted mean outside the means its observation model allows,</li>
+<li>or has a loss or a likelihood that is not a finite number.</li>
+</ul>
+<p><code>ResidualNoise</code> does not refit, so it reads the residuals of such a fit.</p>
 <h2 id="prediction-intervals">Prediction intervals<a class="headerlink" href="#prediction-intervals" title="Permanent link">&para;</a></h2>
 <p>The draws of a bootstrap give a band of the model. <code>ResidualNoise</code> adds moving
 blocks of residuals of the fit to every draw's prediction of each observation,

@@ -168,12 +168,12 @@ Returns:
 
 Raises:
 
-| Type                   | Description                                                                                                                                                                                                                                                                                       |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TypeError`            | If noise is ResidualNoise, or a count, such as max_lag, is not a whole number.                                                                                                                                                                                                                    |
-| `ValueError`           | If a setting is outside its range, the predictive is of a sensitivity analysis, quantile residuals have a loss or an observed value outside the support of its model, additive residuals have more than one randomization, or Refitted reads many draws or observations other than the problem's. |
-| `RuntimeError`         | If every refit fails, or the exact sum of an observation does not end within the counts of sum="exact" (NegativeBinomialObservations).                                                                                                                                                            |
-| `InfeasibleStateError` | If a draw leaves the values its model allows.                                                                                                                                                                                                                                                     |
+| Type                   | Description                                                                                                                                                                                                                                                                                                                                                        |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `TypeError`            | If noise is ResidualNoise, or a count, such as max_lag, is not a whole number.                                                                                                                                                                                                                                                                                     |
+| `ValueError`           | If a setting is outside its range, the predictive is of a sensitivity analysis, quantile residuals have a loss or an observed value outside the support of its model, additive residuals have more than one randomization, or Refitted reads many draws, observations other than the problem's, or a draw that is not feasible, which its refits would start from. |
+| `RuntimeError`         | If every refit fails, or the exact sum of an observation does not end within the counts of sum="exact" (NegativeBinomialObservations).                                                                                                                                                                                                                             |
+| `InfeasibleStateError` | If a draw leaves the values its model allows.                                                                                                                                                                                                                                                                                                                      |
 
 References
 
@@ -251,8 +251,9 @@ def residual_dependence(
         If a setting is outside its range, the predictive is of a
         sensitivity analysis, quantile residuals have a loss or an observed
         value outside the support of its model, additive residuals have more
-        than one randomization, or `Refitted` reads many draws or
-        observations other than the problem's.
+        than one randomization, or `Refitted` reads many draws, observations
+        other than the problem's, or a draw that is not feasible, which its
+        refits would start from.
     RuntimeError
         If every refit fails, or the exact sum of an observation does not end
         within the counts of ``sum="exact"`` (`NegativeBinomialObservations`).
