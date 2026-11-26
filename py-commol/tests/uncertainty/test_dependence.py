@@ -137,7 +137,8 @@ def test_any_values_of_one_set() -> None:
     q = 5.75**2 / 29.3125 + 1 / 4.25
     assert x.portmanteau == pytest.approx(q)
     assert x.degrees_of_freedom == 2
-    assert x.p_value == pytest.approx(math.exp(-q / 2))
+    # (1 + #{Q_b ≥ Q}) / 20 over 19 permutations, fixed by the seed.
+    assert x.p_value == 0.65
     assert x.tau == pytest.approx(1 + 2 * 5.75 / 5 / variance)
     assert x.cut_lag == 1
     assert x.tau_band is not None
@@ -194,12 +195,38 @@ def test_one_largest_lag_serves_series_of_different_lengths() -> None:
         assert series.correlations[: alone.max_lag] == alone.correlations
         assert series.portmanteau == alone.portmanteau
         assert series.p_value == alone.p_value
-    # τ, its band and the series together do not read max_lag.
+    # τ, its band, the series together and the permutations of Q̃ do not
+    # read max_lag: the short series has the same test at 2 and 10 lags.
     other = _values(values, long + short, max_lag=2)
+    assert other.series[1].p_value == of_short.p_value
     assert other.problem == both.problem
     for series, same in zip(both.series, other.series, strict=True):
         assert (series.tau, series.tau_band) == (same.tau, same.tau_band)
         assert series.cut_lag == same.cut_lag
+
+
+def test_the_p_value_of_a_series_does_not_read_the_other_series() -> None:
+    # The permutations of each series draw from its label alone.
+    labels = ("a", "b", "c")
+    lengths = {"a": 12, "b": 20, "c": 9}
+    series = {
+        label: [math.sin(3.0 * t + i) + math.cos(t * t) for t in range(lengths[label])]
+        for i, label in enumerate(labels)
+    }
+
+    def analysis(order: tuple[str, ...]) -> dict:
+        observations = [
+            point
+            for label in order
+            for point in _points(label, list(range(lengths[label])))
+        ]
+        values = [value for label in order for value in series[label]]
+        result = _values(values, observations, max_lag=3)
+        return {s.label: s.p_value for s in result.series}
+
+    first = analysis(labels)
+    assert analysis(("c", "a", "b")) == first
+    assert analysis(("b", "c")) == {label: first[label] for label in ("b", "c")}
 
 
 def _normal(**models):

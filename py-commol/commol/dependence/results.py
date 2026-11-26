@@ -76,7 +76,8 @@ class SeriesStatistics(ResultModel):
         product other than 0, as of constant values.
     degrees_of_freedom : int
         The lags in the sum of ``Q̃``: those of 4 pairs or more with a
-        product other than 0.
+        product other than 0. They are the degrees of freedom of ``χ²``, the
+        law of ``Q̃`` of a long series of independent values.
     p_value : float | None
         The p-value of ``Q̃`` under the reference, with one draw.
     draw_p_values : DrawPValues | None
@@ -205,7 +206,7 @@ class DependenceSettings(ResultModel):
     seed : int
         The seed of its random numbers.
     replicates : int | None
-        The wild sets of `series_dependence`.
+        The permutations and the wild sets of `series_dependence`.
     noise : NoNoise | DistributionNoise | None
         The residuals of `residual_dependence`.
     randomizations : int | None

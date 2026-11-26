@@ -134,16 +134,18 @@ fn python(py: Python<'_>, analysis: SeriesDependence) -> PyResult<PySeriesDepend
     })
 }
 
-/// The dependence of `values`, one per observation, with a wild band of
-/// `replicates` sets whose signs come from `seed`
+/// The dependence of `values`, one per observation, with `Q̃` read against
+/// `replicates` permutations of each series and a wild band of `replicates`
+/// sets, both drawn from `seed`; the permutations of each series also from
+/// its label
 ///
 /// Args:
 ///     observations: The JSON of the observations
 ///     values: One value per observation
 ///     max_lag: The largest lag of each series
-///     replicates: The wild sets of the band
+///     replicates: The permutations of `Q̃` and the wild sets of the band
 ///     confidence_level: The level of the band
-///     seed: The seed of the signs
+///     seed: The seed of the permutations and the signs
 ///
 /// Raises:
 ///     ValueError: If a setting is outside its range, or the values are not

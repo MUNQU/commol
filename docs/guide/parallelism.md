@@ -47,7 +47,7 @@ A number below 1, or `levels` other than `"all"` and `"outer"`, raises
 | The sensitivity methods | The runs of the design |
 | The local approximations, the identifiability methods | The runs of the finite differences, the points |
 | `Simulation.replicates(count)` | The replicates of a stochastic engine |
-| `residual_dependence`, `series_dependence` | The draws of the sample, the data sets and refits of the reference, the wild sets |
+| `residual_dependence`, `series_dependence` | The draws of the sample, the data sets and refits of the reference, the permutations and the wild sets |
 
 One run of a model is never split: each thread runs whole runs.
 
