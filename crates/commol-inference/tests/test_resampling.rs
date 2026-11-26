@@ -12,7 +12,7 @@ use commol_inference::conformal::{
     ConformalSettings, NonconformityScore, Pooling, enbpi, jackknife_plus, rolling_conformal,
 };
 use commol_inference::local::{
-    CurvatureKind, block_scores, curvature_at, sandwich, sandwich_approximation,
+    CurvatureKind, curvature_at, sandwich, sandwich_approximation, scaled_block_scores,
 };
 use commol_inference::profiles::{ProfiledQuantity, bootstrap_thresholds};
 use commol_inference::resampling::{
@@ -237,7 +237,7 @@ fn a_given_block_length_gives_the_blocks_of_its_windows() {
     let problem = line_problem_of(observations);
     let fit = [2.0, 0.5];
     let curvature = curvature_at(&problem, &fit, CurvatureKind::GaussNewton).unwrap();
-    let gradients = curvature.gradients();
+    let gradients = curvature.scaled_gradients();
 
     // The `η` of each length, and its blocks as windows of the distinct
     // positions, which hold the observations of `y` as 10, 11, 12 and 13.
@@ -284,7 +284,7 @@ fn a_given_block_length_gives_the_blocks_of_its_windows() {
                 }
             }
         }
-        assert_eq!(block_scores(&curvature, &scheme), scores);
+        assert_eq!(scaled_block_scores(&curvature, &scheme), scores);
     }
 }
 

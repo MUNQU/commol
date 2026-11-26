@@ -374,10 +374,10 @@ class TestParts:
             "k": 0.008110949594956205,
             "phi": 0.023657880499419526,
         }
-        assert result.covariance == [
-            [0.013258180575577419, 0.0],
-            [0.0, 2.2397584820553185],
-        ]
+        assert np.array(result.covariance) == pytest.approx(
+            np.array([[0.013258180575577419, 0.0], [0.0, 2.2397584820553185]]),
+            rel=1e-12,
+        )
 
     def test_a_label_mixes_any_parts(self) -> None:
         values = [250.0, 130.0, 150.0, 70.0, 95.0]

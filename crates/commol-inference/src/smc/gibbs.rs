@@ -16,7 +16,7 @@ use super::TemperedTarget;
 use super::kernel::Kernel;
 use super::sampler::{SmcEvent, SmcRun, SmcSampler, SmcState, SmcSteps, Stop, stopped};
 use crate::error::MethodError;
-use crate::local::{Curvature, CurvatureKind, block_scores, curvature_at};
+use crate::local::{Curvature, CurvatureKind, curvature_at, scaled_block_scores};
 use crate::priors::Priors;
 use crate::resampling::{BayesianBootstrap, BlockScheme};
 use crate::sensitivity::Matrix;
@@ -169,9 +169,10 @@ pub(crate) fn reached_the_posterior(run: SmcRun, posterior: &str) -> Result<SmcR
 /// `tr(J I⁻¹ J) / tr(J)` (Holmes and Walker 2017; Lyddon, Holmes and Walker
 /// 2019).
 ///
-/// The trace sums `s_bᵀ J⁻¹ s_b` over the block scores ([`block_scores`]),
-/// times `p / (p − L)` with `L = Σ_b tr((J⁻¹ J_b)²)` and `J_b` the curvature
-/// of block `b` ([`Curvature::block_matrix`]): the leverage of the blocks,
+/// The trace sums `s_bᵀ J⁻¹ s_b` over the block scores
+/// ([`scaled_block_scores`]), times `p / (p − L)` with
+/// `L = Σ_b tr((J⁻¹ J_b)²)` and `J_b` the curvature of block `b`
+/// ([`Curvature::scaled_block_matrix`]): the leverage of the blocks,
 /// `G/(G − 1)` when each holds `1/G` of `J`, which gives the trace its mean
 /// when the blocks share the curvature unevenly. `η` is then scaled by
 /// `median(χ²_ν)/ν`, with `ν` Satterthwaite's degrees of freedom of the
@@ -182,9 +183,11 @@ pub(crate) fn reached_the_posterior(run: SmcRun, posterior: &str) -> Result<SmcR
 ///
 /// [`MethodError::Invalid`] when the loss is not the sum of squares, the
 /// engine is stochastic, the fit is on a bound, the blocks are fewer than
-/// two, every block score is 0 while the scores of the terms are not, or
-/// each block holds all the curvature of its parameters; [`MethodError::Failed`] when
-/// the derivatives fail at the fit, `J` is singular or every score is 0.
+/// two, the data do not determine every parameter ([`Curvature::inverse`]),
+/// every block score is 0 while the scores of the terms are not, or each block
+/// holds all the curvature of its parameters; [`MethodError::Failed`] when the
+/// derivatives fail at the fit, or every score is 0 or too small against the
+/// curvature for `η` to be a number.
 pub fn information_matching_eta<E>(
     problem: &CalibrationProblem<E>,
     fit: &[f64],
@@ -222,37 +225,27 @@ where
             blocks.length()
         )));
     }
-    // On the unbounded scale: `tr(J⁻¹ I)` is the same on every scale. A
-    // curvature singular to working precision has an inverse that is not
-    // finite.
-    let inverse = curvature
-        .matrix()
-        .clone()
-        .try_inverse()
-        .filter(|inverse| inverse.iter().all(|entry| entry.is_finite()))
-        .ok_or_else(|| {
-            MethodError::Failed(
-                "The curvature of the objective at the fit is singular: information matching \
-                 needs every parameter read by the data"
-                    .to_string(),
-            )
-        })?;
+    let inverse = curvature.inverse()?;
+    let inverse = inverse.scaled_matrix();
+    let no_eta = || {
+        MethodError::Failed(
+            "The scores of the terms at the fit are all 0, as when the fit runs through every \
+             observation, or too small against the curvature for eta to be a number"
+                .to_string(),
+        )
+    };
     // `J` is positive definite, so the trace is 0 only when every block
     // score is; `tr(J⁻¹ Σᵢ gᵢ gᵢᵀ)`, the trace of one block per observation,
-    // is its scale.
-    let gradients = curvature.gradients();
-    let independent = (gradients * &inverse).component_mul(gradients).sum();
+    // is its scale. Both are the same in any units.
+    let gradients = curvature.scaled_gradients();
+    let independent = (gradients * inverse).component_mul(gradients).sum();
     if independent <= 0.0 {
-        return Err(MethodError::Failed(
-            "The scores of the terms at the fit are all 0: the fit runs through every \
-             observation, so information matching has no variance of the scores to read"
-                .to_string(),
-        ));
+        return Err(no_eta());
     }
-    let scores = block_scores(&curvature, &blocks);
-    let trace = (&scores * &inverse).component_mul(&scores).sum();
+    let scores = scaled_block_scores(&curvature, &blocks);
+    let trace = (&scores * inverse).component_mul(&scores).sum();
     let p = fit.len() as f64;
-    let leverage = BlockLeverage::new(&curvature, &blocks, &inverse);
+    let leverage = BlockLeverage::new(&curvature, &blocks, inverse);
     let read = p - leverage.squares;
     if trace.is_nan() || trace <= 1e-10 * independent {
         return Err(MethodError::Invalid(format!(
@@ -272,8 +265,12 @@ where
     }
     let degrees_of_freedom = leverage.degrees_of_freedom(read);
     let median = chi_square_quantile(degrees_of_freedom, 0.5) / degrees_of_freedom;
+    let eta = read * median / trace;
+    if !eta.is_finite() {
+        return Err(no_eta());
+    }
     Ok(InformationCalibration {
-        eta: read * median / trace,
+        eta,
         degrees_of_freedom,
         block_length: blocks.length(),
     })
@@ -301,7 +298,7 @@ impl BlockLeverage {
             sum_of_squares: Matrix::zeros(p, p),
         };
         for block in blocks.blocks() {
-            let share = inverse * curvature.block_matrix(block);
+            let share = inverse * curvature.scaled_block_matrix(block);
             let square = &share * &share;
             leverage.squares += square.trace();
             leverage.cubes += (&square * &share).trace();

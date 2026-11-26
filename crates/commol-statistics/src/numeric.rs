@@ -20,6 +20,42 @@ pub fn log_sum_exp(terms: &[f64]) -> f64 {
     largest + libm::log(terms.iter().map(|&x| libm::exp(x - largest)).sum::<f64>())
 }
 
+/// A sum that keeps the rounding of each addition and adds it at the end
+/// (Neumaier 1974): its error is about that of one addition of the terms,
+/// whatever their number, against one that grows with their number for a
+/// plain sum. A sum with a term that is not finite is not finite.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct CompensatedSum {
+    sum: f64,
+    roundings: f64,
+    magnitude: f64,
+}
+
+impl CompensatedSum {
+    /// Add `term`.
+    pub fn add(&mut self, term: f64) {
+        let sum = self.sum + term;
+        self.roundings += if self.sum.abs() >= term.abs() {
+            (self.sum - sum) + term
+        } else {
+            (term - sum) + self.sum
+        };
+        self.sum = sum;
+        self.magnitude += term.abs();
+    }
+
+    /// The sum of the terms added, 0 for none.
+    pub fn value(&self) -> f64 {
+        self.sum + self.roundings
+    }
+
+    /// The sum of the absolute values of the terms added: [`Self::value`] has
+    /// an error of about `ε` times it.
+    pub fn magnitude(&self) -> f64 {
+        self.magnitude
+    }
+}
+
 /// `x · ln y`, with `0 · ln y = 0` also at `y = 0`.
 pub fn x_log_y(x: f64, y: f64) -> f64 {
     if x == 0.0 { 0.0 } else { x * libm::log(y) }

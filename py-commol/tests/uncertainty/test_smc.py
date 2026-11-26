@@ -45,7 +45,6 @@ from tests.support import (
     flow_observations,
     structural_zero_calibrator,
     two_wells_calibrator,
-    weak_parameter_calibrator,
 )
 
 NOISE = 2.0
@@ -220,30 +219,6 @@ class TestGibbsPosterior:
             match=r"deterministic engine.*BootstrapCoverageEta",
         ):
             _binomial(300, loss_function="sse").uncertainty(method)
-
-    def test_information_matching_needs_a_parameter_the_data_read(self) -> None:
-        # No output reads d: the curvature of the objective is singular.
-        model = build(
-            a_to_b_builder(
-                parameters={"c": None, "d": None},
-                rate="c * A / A",
-                amounts={"A": 1e6, "B": 0},
-            )
-        )
-        problem = CalibrationProblem(
-            observed_data=flow_observations(_flow_data(10, 3), windowed=True),
-            parameters=[
-                bounded("c", 0.0, 50.0, initial_guess=25.0),
-                bounded("d", 0.0, 1.0, initial_guess=0.5),
-            ],
-            loss_function="sse",
-            optimization_config=NelderMeadConfig(max_iterations=200),
-            seed=1,
-        )
-        with pytest.raises(RuntimeError, match="singular"):
-            Calibrator(Simulation(model), problem).uncertainty(
-                _gibbs(eta=InformationMatchingEta(block_length=1))
-            )
 
     def test_bootstrap_coverage_needs_a_loss_above_zero_at_the_fit(self) -> None:
         # With no flow and no flow observed, every c fits exactly.
@@ -560,18 +535,3 @@ def test_a_position_of_observations_with_no_information_counts_in_the_windows() 
     ratio = (5 / 4) / (4 / 3)
     expected = ratio * np.array(first.covariance)
     assert np.allclose(second.covariance, expected, rtol=1e-9)
-
-
-def test_information_matching_refuses_a_curvature_singular_to_working_precision() -> (
-    None
-):
-    # k2 is read through 1e-160: the curvature of k2, about 1e-310, has a
-    # Cholesky factor, but its inverse is not finite.
-    calibrator = weak_parameter_calibrator(1e-160)
-
-    with pytest.raises(
-        RuntimeError, match="curvature of the objective at the fit is singular"
-    ):
-        calibrator.uncertainty(
-            _gibbs(eta=InformationMatchingEta(block_length=2), particles=50)
-        )

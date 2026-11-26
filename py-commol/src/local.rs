@@ -68,9 +68,10 @@ impl PyLocalRun {
 ///
 /// Raises:
 ///     ValueError: If a setting is not valid, the problem has a loss, a fit
-///         is on a bound, the engine is stochastic or the curvature is
-///         singular
-///     RuntimeError: If the fit or the derivatives fail at the fit
+///         is on a bound, the engine is stochastic, or the curvature is
+///         singular or too small for its covariance to be a number
+///     RuntimeError: If the fit or the derivatives fail at the fit, or the
+///         curvature is too large for its covariance to be a number
 #[pyfunction]
 fn laplace(
     py: Python<'_>,
@@ -111,9 +112,11 @@ type SandwichTables = (PyStarts, PyLocalRun, usize, usize);
 /// Raises:
 ///     ValueError: If a setting is not valid, the loss is the absolute
 ///         error, a fit is on a bound, the engine is stochastic, the block
-///         length does not fit the positions, or there are not more blocks
-///         than parameters
-///     RuntimeError: If the fit or the derivatives fail at the fit
+///         length does not fit the positions, there are not more blocks
+///         than parameters, or the curvature is singular or too small for its
+///         covariance to be a number
+///     RuntimeError: If the fit or the derivatives fail at the fit, or the
+///         curvature is too large for its covariance to be a number
 #[pyfunction]
 fn sandwich(
     py: Python<'_>,
@@ -223,7 +226,8 @@ pub struct PyMixtureRun {
     k_hat: f64,
     /// Kish's effective size of the smoothed weights
     effective_size: f64,
-    /// Whether k_hat is at most 0.7
+    /// Whether k_hat is at most 0.7 and no end that gives no component fits at
+    /// least as well as the worst component
     reliable: bool,
     /// Ends that gave no component, and an unreliable sample, in words
     notes: Vec<String>,

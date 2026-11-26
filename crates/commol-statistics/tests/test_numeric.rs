@@ -4,8 +4,8 @@
 use std::f64::consts::{EULER_GAMMA, LN_2, PI};
 
 use commol_statistics::numeric::{
-    digamma, ln_beta, ln_gamma, log_normal_log_density, log_sum_exp, normal_log_density,
-    student_t_log_density, trigamma, x_log_y, x_log1p_y,
+    CompensatedSum, digamma, ln_beta, ln_gamma, log_normal_log_density, log_sum_exp,
+    normal_log_density, student_t_log_density, trigamma, x_log_y, x_log1p_y,
 };
 
 fn close(a: f64, b: f64, tolerance: f64) -> bool {
@@ -28,6 +28,36 @@ fn log_sum_exp_keeps_the_digits_of_large_terms() {
     let value = log_sum_exp(&[1000.0, 1000.0]);
     assert!(close(value, 1000.0 + LN_2, 1e-15), "{value}");
     assert!(close(log_sum_exp(&[0.0, f64::NEG_INFINITY]), 0.0, 1e-15));
+}
+
+#[test]
+fn a_compensated_sum_keeps_what_each_addition_rounds() {
+    let total = |terms: &[f64]| {
+        let mut sum = CompensatedSum::default();
+        terms.iter().for_each(|&term| sum.add(term));
+        sum.value()
+    };
+    // A plain sum of the first gives 0, and one of 10⁶ times 0.1 is off by
+    // 1.3e-6.
+    assert_eq!(total(&[1.0, 1e100, 1.0, -1e100]), 2.0);
+    assert_eq!(total(&vec![0.1; 1_000_000]), 100_000.0);
+    assert_eq!(total(&[]), 0.0);
+    // The sum 0.1 + 0.2 + 0.3 of exact rationals, in any order.
+    assert_eq!(total(&[0.1, 0.2, 0.3]), total(&[0.3, 0.2, 0.1]));
+    assert!(!total(&[1.0, f64::INFINITY]).is_finite());
+    assert!(!total(&[1e308, 1e308]).is_finite());
+}
+
+#[test]
+fn a_compensated_sum_holds_the_size_of_its_terms() {
+    // The size against which the rounding of a sum is read: terms that cancel
+    // sum to 0 and have the size 4.
+    let mut sum = CompensatedSum::default();
+    for term in [1.5, -0.5, 0.5, -1.5] {
+        sum.add(term);
+    }
+    assert_eq!((sum.value(), sum.magnitude()), (0.0, 4.0));
+    assert_eq!(CompensatedSum::default().magnitude(), 0.0);
 }
 
 #[test]

@@ -170,7 +170,9 @@ impl Transform {
             .zip(values)
             .map(|(scale, &theta)| match *scale {
                 Scale::Logit { lower, upper } => {
-                    ((theta - lower) * (upper - theta) / (upper - lower)).max(0.0)
+                    // The product of both distances can be too large or too
+                    // small for a number when the derivative is not.
+                    ((theta - lower) * ((upper - theta) / (upper - lower))).max(0.0)
                 }
                 Scale::Log { lower } => (theta - lower).max(0.0),
                 Scale::LogFromAbove { upper } => (upper - theta).max(0.0),
@@ -253,6 +255,16 @@ mod tests {
         assert!((transform.log_jacobian(&values) - expected).abs() < 1e-6);
         let product: f64 = transform.derivatives(&values).iter().map(|d| d.ln()).sum();
         assert!((transform.log_jacobian(&values) - product).abs() < 1e-12);
+    }
+
+    #[test]
+    fn the_derivative_does_not_depend_on_the_unit_of_the_bounds() {
+        // The product of the distances to both bounds is 1e600 or 1e-600.
+        for unit in [1e300, 1e-300] {
+            let transform = Transform::new(&[(-unit, 3.0 * unit)]);
+            let derivative = transform.derivatives(&[unit])[0];
+            assert!((derivative / unit - 1.0).abs() < 1e-15, "{derivative}");
+        }
     }
 
     #[test]

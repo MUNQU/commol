@@ -10,8 +10,9 @@
 //! for a Gibbs posterior), and its log evidence is
 //! `log p(θ̂_k) + log |dθ/du| + (d/2) log 2π + ½ log |Σ_k|`. Every draw is
 //! weighted by the target over the mixture and smoothed by PSIS. An end on a
-//! bound gives no component; when it fits at least as well as the worst
-//! component, the sample misses an optimum and is unreliable.
+//! bound, one whose curvature the data do not determine and one whose
+//! covariance is refused give no component; when one fits at least as well as
+//! the worst component, the sample misses an optimum and is unreliable.
 
 use commol_calibration::{CalibrationProblem, Workspace};
 use commol_core::SimulationEngine;
@@ -19,7 +20,7 @@ use commol_random::Generator;
 use commol_statistics::numeric::log_sum_exp;
 
 use super::approximation::{CurvatureKind, curvature_at};
-use super::gaussian::{Gaussian, inverse};
+use super::gaussian::Gaussian;
 use crate::error::MethodError;
 use crate::importance::{ImportanceRun, Proposal, importance_sample};
 use crate::psis::RELIABLE_K_HAT;
@@ -81,8 +82,8 @@ impl Proposal for Mixture<'_> {
 pub struct MixtureRun {
     /// The components, in order of their objective.
     pub components: Vec<Component>,
-    /// Whether the sample is reliable: `k̂ ≤ 0.7`, and no end on a bound
-    /// fits at least as well as the worst component.
+    /// Whether the sample is reliable: `k̂ ≤ 0.7`, and no end that gives no
+    /// component fits at least as well as the worst component.
     pub reliable: bool,
     /// The draws and their smoothed weights.
     pub sample: ImportanceRun,
@@ -134,9 +135,9 @@ where
     }
     scored.sort_by(|a, b| a.0.total_cmp(&b.0));
     let mut components: Vec<Component> = Vec::new();
-    // The objective of each kept component, and of each end on a bound.
+    // The objective of each kept component, and of each end that gives none.
     let mut kept = Vec::new();
-    let mut on_bounds = Vec::new();
+    let mut refused = Vec::new();
     for (objective, end) in scored {
         let unbounded = transform.to_unbounded(end);
         let merged = components.iter().any(|component| {
@@ -152,7 +153,7 @@ where
             continue;
         }
         if let Some((j, bound)) = transform.on_bound(end) {
-            on_bounds.push((objective, end));
+            refused.push((objective, end));
             notes.push(format!(
                 "The end {end:?} gives no component: '{}' is on its bound {bound}",
                 names[j]
@@ -160,15 +161,18 @@ where
             continue;
         }
         let curvature = curvature_at(problem, end, kind)?;
-        let matrix = curvature.matrix() * curvature_scale;
-        let covariance = match inverse(&matrix) {
-            Ok(covariance) => covariance,
+        let gaussian = curvature
+            .inverse()
+            .and_then(|inverse| inverse.covariance(curvature_scale))
+            .and_then(|covariance| Gaussian::new(transform.clone(), unbounded, covariance, None));
+        let gaussian = match gaussian {
+            Ok(gaussian) => gaussian,
             Err(error) => {
+                refused.push((objective, end));
                 notes.push(format!("The end {end:?} gives no component: {error}"));
                 continue;
             }
         };
-        let gaussian = Gaussian::new(transform.clone(), unbounded, covariance, None)?;
         let log_target = target
             .log_density(end, &mut workspace)
             .map_err(MethodError::Failed)?;
@@ -219,19 +223,19 @@ where
             sample.k_hat
         ));
     }
-    // An end on a bound that fits at least as well as a kept component is
-    // an optimum the mixture leaves out: its mass is missing from the
-    // sample, which k̂ cannot see.
+    // An end that gives no component and fits at least as well as a kept
+    // component is an optimum the mixture leaves out: its mass is missing from
+    // the sample, which k̂ cannot see.
     let worst = kept.iter().copied().fold(f64::NEG_INFINITY, f64::max);
-    let missed: Vec<String> = on_bounds
+    let missed: Vec<String> = refused
         .iter()
         .filter(|(objective, _)| *objective <= worst)
         .map(|(objective, end)| format!("{end:?} (objective {objective})"))
         .collect();
     if !missed.is_empty() {
         notes.push(format!(
-            "The mixture misses an optimum on a bound that fits at least as well as its \
-             worst component (objective {worst}): {}; the sample is unreliable",
+            "The mixture misses an optimum that gives no component and fits at least as \
+             well as its worst component (objective {worst}): {}; the sample is unreliable",
             missed.join(", ")
         ));
     }
