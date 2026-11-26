@@ -92,14 +92,15 @@ def run_sandwich(calibrator: CalibrationPort, method: "Sandwich") -> SandwichRes
     Returns
     -------
     SandwichResult
-        The fit, the sandwich covariance on the unbounded scale, the draws
-        and the blocks.
+        The fit, the sandwich covariance on the unbounded scale, the draws,
+        the degrees of freedom of each parameter and the blocks.
     """
-    starts, run, blocks, block_length = commol_rs.inference.sandwich(
-        calibrator._engine_problem, engine_json(method)
+    starts, run, degrees_of_freedom, blocks, block_length = (
+        commol_rs.inference.sandwich(calibrator._engine_problem, engine_json(method))
     )
+    names = calibrator.parameter_names
     return SandwichResult(
-        fit=fit_result(starts, calibrator.parameter_names, calibrator.seed, logger),
+        fit=fit_result(starts, names, calibrator.seed, logger),
         covariance=run.covariance,
         sample=_sample(
             calibrator,
@@ -107,6 +108,7 @@ def run_sandwich(calibrator: CalibrationPort, method: "Sandwich") -> SandwichRes
             sample_method(calibrator, "sandwich", method),
         ),
         notes=_notes(run),
+        degrees_of_freedom=dict(zip(names, degrees_of_freedom, strict=True)),
         blocks=blocks,
         block_length=block_length,
     )

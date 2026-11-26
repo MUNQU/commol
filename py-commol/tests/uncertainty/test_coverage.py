@@ -15,7 +15,9 @@ probability of a chain binomial from the units that moved in one step.
 The Laplace approximation fits the same flow with a normal model of known
 ``sd``, whose likelihood is exactly normal in ``c``. The sandwich fits a line
 through the origin, ``B(t) = c·t``, whose noise grows with ``t``: a normal
-model of one ``sd`` is wrong there, and so are its Laplace intervals. The
+model of one ``sd`` is wrong there, and so are its Laplace intervals; it
+also fits two constant flows (``fan_calibrator``), one of them read in few
+blocks, whose draws read the degrees of freedom of each flow. The
 Laplace mixture fits a flow ``c²``, whose likelihood has the two optima
 ``±√ȳ``: with a flat prior its central interval runs from the negative mode
 to the upper quantile of the positive one, so it holds ``c > 0`` when that
@@ -486,6 +488,25 @@ class TestSandwich:
 
         assert sandwich.calibrated(), sandwich
         assert laplace.coverage("c") < LEVEL - laplace.tolerance, laplace
+
+    def test_a_parameter_read_in_few_blocks_is_calibrated(self) -> None:
+        # c1 is read only at the first 10 of 40 positions, in 2 of the 8
+        # blocks of 5: its draws read a t of 1 degree of freedom, where a t of
+        # 7, the blocks less one, covers about 61 %.
+        method = Sandwich(block_length=5, draws=2000)
+        truth = {"c0": FLOW, "c1": FLOW / 2}
+
+        def interval(index: int, rng: np.random.Generator) -> dict[str, Interval]:
+            series = [
+                truth["c0"] + rng.normal(0.0, FLOW_NOISE, 40),
+                truth["c1"] + rng.normal(0.0, FLOW_NOISE, 10),
+            ]
+            calibrator = fan_calibrator([s.tolist() for s in series], seed=index)
+            return calibrator.uncertainty(method).sample.interval(LEVEL)
+
+        study = coverage_study(interval, truth, LEVEL, data_sets=300, seed=61)
+
+        assert study.calibrated(), study
 
 
 SQUARE_ROOT, SQUARE_COUNT = 2.0, 10

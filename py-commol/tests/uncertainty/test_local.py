@@ -56,6 +56,7 @@ from tests.support import (
     flow_observations,
     two_wells_calibrator,
     normal_values,
+    structural_zero_calibrator,
     weak_parameter_calibrator,
 )
 
@@ -322,7 +323,7 @@ def test_a_delta_band_comes_from_the_local_module() -> None:
         ["c"],
         [("c", result.fit.best_parameters["c"])],
         result.covariance,
-        result.degrees_of_freedom(),
+        result.block_length,
         [1.0, 2.0],
         0.9,
     )
@@ -406,9 +407,33 @@ class TestSandwich:
         calibrator = flow_calibrator(normal_values(6, 4, sd=1.0), windowed=True)
 
         with pytest.raises(
-            ValueError, match=r"block_length 6 makes 1 block for 1 parameter.*shorter"
+            ValueError,
+            match=r"block_length 6 makes 1 block with curvature, of 1 in all, for 1 "
+            r"parameter.*shorter",
         ):
             calibrator.uncertainty(Sandwich(block_length=6, draws=10))
+
+    def test_blocks_with_no_curvature_do_not_count_in_the_sandwich(self) -> None:
+        # The mean of C is 0 up to step 10, so its observations there carry no
+        # information: with them 20 positions make 4 blocks of 5, and only the
+        # 2 of steps 11 to 20 have curvature, as without them.
+        full = structural_zero_calibrator(1)
+        for first, blocks in [(11, 2), (1, 4)]:
+            data = [
+                o
+                for o in full.problem.observed_data
+                if o.at >= 11 or (o.label == "C" and o.at >= first)
+            ]
+            problem = full.problem.model_copy(update={"observed_data": data})
+            message = (
+                f"block_length 5 makes 2 blocks with curvature, of {blocks} in all, "
+                "for 2 parameters"
+            )
+
+            with pytest.raises(ValueError, match=f"^{re.escape(message)}: .*blocks$"):
+                Calibrator(full.simulation, problem).uncertainty(
+                    Sandwich(block_length=5, draws=2)
+                )
 
     def test_sandwich_refuses_the_absolute_error(self) -> None:
         model = build(

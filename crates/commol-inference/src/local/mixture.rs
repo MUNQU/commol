@@ -71,7 +71,10 @@ impl Proposal for Mixture<'_> {
             .components
             .iter()
             .zip(&self.log_weights)
-            .map(|(component, log_weight)| log_weight + component.gaussian.log_density(unbounded))
+            .map(|(component, log_weight)| {
+                let density = component.gaussian.log_density(unbounded);
+                log_weight + density.expect("a component of a mixture is a normal")
+            })
             .collect();
         log_sum_exp(&terms)
     }

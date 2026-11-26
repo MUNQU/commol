@@ -9,16 +9,50 @@ functions are on [Scores and distribution functions](scores.md).
 
 ## The sandwich sums scores over blocks
 
-`sandwich` (`local/sandwich.rs`) gives `H⁻¹ B H⁻¹` with
-`B = G/(G − 1) · Σ_b s_b s_bᵀ` over the non-overlapping blocks of
-`BlockScheme` (CR1), and its draws and intervals read a Student t with
-`G − 1` degrees of freedom. `G ≤ p` is refused, since the block scores of a
-fit sum to zero and `B` would have rank below `p`.
+`sandwich` (`local/sandwich.rs`) gives
+`√(f_j f_k) · (H⁻¹ Σ_b s_b s_bᵀ H⁻¹)_jk` over the non-overlapping blocks of
+`BlockScheme`, and its draws and intervals read a Student t of `ν_j` degrees
+of freedom for each parameter.
 [The user gives the length of a block](dependence.md#the-user-gives-the-length-of-a-block).
-It is computed as `G/(G − 1) · Σ_b a_b a_bᵀ`, with the influence
-`a_b = H⁻¹ s_b` of each block on the fit (`InverseCurvature::sandwich`):
-neither the square of a score nor the product of two inverses is formed, so
-the covariance is not refused for the range of its products.
+The factor and the degrees of freedom are those of Bell and McCaffrey (2002)
+for the share of each block in the Gauss–Newton curvature
+(`local/shares.rs`): with `J_b` the curvature of block `b`, `J = Σ_b J_b`
+and `v_bc = cᵀ J⁻¹ (J_b δ_bc − J_b J⁻¹ J_c) J⁻¹ c` for a direction `c`,
+`f_j = (J⁻¹)_jj / Σ_b v_bb` and `ν = (Σ_b v_bb)² / Σ_bc v_bc²`, at least 1.
+When every `J_b = J/G`, `f_j = G/(G − 1)` (CR1) and `ν = G − 1`; a parameter
+read in few blocks gets a larger factor and fewer degrees of freedom, and
+the blocks whose `J_b` is 0 drop out of both sums. The shares are those of Gauss–Newton also
+when the bread is the Hessian: they describe where the data read each
+parameter, and need no second derivative of the model. The sums are read
+with no `G × G` matrix and no difference, so a block that holds nearly all
+the curvature of a direction keeps its share. The draws are a grouped t
+(Daul et al. 2003): one `χ²` level, read through the quantile of each `ν_j`,
+so its margins are the t of each parameter and equal `ν` give the
+multivariate t. `delta_band` reads the `ν` of the direction of each output
+at each position from the curvature of the blocks at the fit, so a result
+read back from JSON gives the same band.
+
+It refuses no more blocks with curvature than parameters, since the block
+scores of a fit sum to zero: a block has curvature when its share
+`tr(J⁻¹ J_b) / p` is above `ROUNDED_SHARE = 10⁻¹⁰`, the threshold of
+information matching, while every block with a `J_b` that is not 0 stays in
+`J` and in the sums of `f_j` and `ν_j`, which are continuous in it. It
+refuses block scores of rank below `p`: the covariance on a diagonal of 1 is
+[singular](curvature.md#one-rule-says-what-the-data-do-not-determine), which
+the rounding of a Cholesky factor can hide. Each block's scores are read
+after one Gauss–Newton step to the zero of their sum `g`,
+`s̃_b = s_b − J_b J⁻¹ g` (`BlockShares::corrected_scores`), so they sum to 0
+by construction, as at an exact minimum, where `V_bc` is their covariance:
+the gradient that an optimizer leaves does not fill the missing rank, and the
+covariance does not follow the error of the fit. And it refuses blocks that each
+hold all the curvature of a parameter, where `Σ_b v_bb` is at most
+`10⁻¹⁰ (J⁻¹)_jj` and the scores of the parameter sum to zero in each block.
+With a Hessian bread, a singular Gauss–Newton `Σ_b J_b` has a message of its
+own. It is computed as `√(f_j f_k) · Σ_b a_bj a_bk`, with the
+influence `a_b = H⁻¹ s̃_b` of each block on the fit
+(`InverseCurvature::sandwich`): neither the square of a score nor the
+product of two inverses is formed, so the covariance is not refused for the
+range of its products.
 Information matching (`smc/gibbs.rs`) reads the same `H` as `J` and the same
 block scores for `I`, so it takes a likelihood and holds under dependence; it
 reads them only through a trace, so it needs two blocks, not more than `p`
@@ -30,10 +64,31 @@ reads them only through a trace, so it needs two blocks, not more than `p`
 | Newey–West | It needs lags across series at irregular positions, and does not reuse the blocks. |
 | A warning below a fixed number of blocks | An arbitrary threshold; the t widens the intervals by the right amount. |
 | The product `H⁻¹ · B · H⁻¹` | The square of a score leaves the range where the covariance is a number like any other: a squared error on data of `1e78` has scores of about `1e156`. The product also cancels: with a curvature whose smallest eigenvalue is `1e-8` of the largest, its rounding makes a covariance that is not positive definite. |
-| CR2 with Bell–McCaffrey degrees of freedom | Linear theory and the leverage of each block; kept for when a coverage study needs it. Information matching reads the leverage of its blocks ([below](#information-matching-reads-the-meat-through-a-trace)). |
+| A rank threshold of `G·p·ε` | The floor of the smallest eigenvalue is the optimizer's, from `1e-15` to `1e-5`, not the rounding of a sum, and the refusal would depend on the number of blocks. |
+| A rank threshold from the size of the terms | On a unit diagonal it is `p·ε` again. |
+| An exact 0 test of each block | A block of weight `1e-300` counts; two blocks with curvature for two parameters then give correlation −1 and `ν = 1`. |
+| CR1 with `G − 1` degrees of freedom | It counts a block with no curvature as one that reads the parameters, and gives a parameter read in two blocks the `ν` of all of them: its intervals cover about 61 % where they claim 90 %. |
+| The leverage `h_jb` of each block alone | It gives the factor but not the degrees of freedom, which need the covariance of the blocks after the fit. |
+| CR2, with a matrix root per block | A root of `I − H_bb` for each block, and a block that holds all its curvature has none; the factor of each parameter keeps the meat of the blocks, with no root. |
+| One `ν` for every parameter, from a trace | A parameter read in few blocks would share the `ν` of those read in all. |
+| `G` as the sum of the weights of the blocks | It has no account of the uneven shares of the blocks that read a parameter. |
+| The smallest `ν` for every parameter | Too wide for the parameters that every block reads. |
+| A Gaussian copula with t margins | Its draws are not the multivariate t when every `ν` is equal, and its margins have no common `χ²`. |
 
 **Guards:** `tests/uncertainty/test_local.py::TestSandwich`,
+`tests/uncertainty/test_sandwich_blocks.py`,
 `tests/uncertainty/test_coverage.py::TestSandwich`,
+`crates/commol-inference/tests/test_local.rs::equal_blocks_give_cr1_and_one_degree_of_freedom_fewer_than_the_blocks`,
+`crates/commol-inference/tests/test_local.rs::a_sandwich_reads_the_share_of_the_curvature_of_each_block`,
+`crates/commol-inference/tests/test_local.rs::a_block_with_no_curvature_changes_nothing`,
+`crates/commol-inference/tests/test_local.rs::a_sandwich_needs_more_blocks_with_curvature_than_parameters`,
+`crates/commol-inference/tests/test_local.rs::blocks_that_each_hold_all_the_curvature_of_a_parameter_are_refused`,
+`crates/commol-inference/tests/test_local.rs::the_shares_of_a_hessian_sandwich_are_those_of_gauss_newton`,
+`crates/commol-inference/tests/test_local.rs::block_scores_that_move_together_in_every_block_are_refused`,
+`crates/commol-inference/tests/test_local.rs::parameters_read_in_fewer_blocks_than_themselves_are_refused`,
+`crates/commol-inference/tests/test_local.rs::the_sandwich_of_a_fit_off_its_optimum_is_that_of_the_optimum`,
+`crates/commol-inference/tests/test_local.rs::a_hessian_sandwich_whose_gauss_newton_curvature_is_singular_says_so`,
+`crates/commol-inference/tests/test_local.rs::a_band_reads_the_degrees_of_freedom_of_a_direction_beyond_the_range_of_a_quotient`,
 `crates/commol-inference/tests/test_local.rs::a_sandwich_reads_scores_whose_squares_underflow`,
 `tests/uncertainty/test_local.py::TestSandwich::test_a_sandwich_reads_scores_whose_squares_overflow`,
 `tests/uncertainty/test_singular_curvature.py::test_a_sandwich_does_not_depend_on_the_scale_of_a_parameter`,

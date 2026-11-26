@@ -38,8 +38,6 @@ pub struct PyLocalRun {
     center: Vec<f64>,
     /// The covariance on the unbounded scale
     covariance: Vec<Vec<f64>>,
-    /// The degrees of freedom of a Student t, or None for a normal
-    degrees_of_freedom: Option<f64>,
     /// The curvature entries whose error is not small, in words
     notes: Vec<String>,
 }
@@ -50,7 +48,6 @@ impl PyLocalRun {
             values: gaussian.draws(draws, seed),
             center: gaussian.center().to_vec(),
             covariance: rows(gaussian.covariance()),
-            degrees_of_freedom: gaussian.degrees_of_freedom(),
             notes,
         }
     }
@@ -94,9 +91,9 @@ fn laplace(
     Ok((PyStarts { inner: starts }, run))
 }
 
-/// A sandwich: the starts of the fit, the run, the blocks and the block
-/// length.
-type SandwichTables = (PyStarts, PyLocalRun, usize, usize);
+/// A sandwich: the starts of the fit, the run, the degrees of freedom of
+/// each parameter, the blocks and the block length.
+type SandwichTables = (PyStarts, PyLocalRun, Vec<f64>, usize, usize);
 
 /// Fit the problem, then take the sandwich covariance at the fit, with the
 /// meat summed over blocks
@@ -106,14 +103,15 @@ type SandwichTables = (PyStarts, PyLocalRun, usize, usize);
 ///     settings: The JSON of a `Sandwich`
 ///
 /// Returns:
-///     The starts of the fit, the run, the number of blocks and the
-///     positions per block
+///     The starts of the fit, the run, the degrees of freedom of each
+///     parameter, the number of blocks and the positions per block
 ///
 /// Raises:
 ///     ValueError: If a setting is not valid, the loss is the absolute
 ///         error, a fit is on a bound, the engine is stochastic, the block
-///         length does not fit the positions, there are not more blocks
-///         than parameters, or the curvature is singular or too small for its
+///         length does not fit the positions, there are not more blocks with
+///         curvature than parameters, the blocks each hold all the curvature
+///         of a parameter, or the curvature is singular or too small for its
 ///         covariance to be a number
 ///     RuntimeError: If the fit or the derivatives fail at the fit, or the
 ///         curvature is too large for its covariance to be a number
@@ -141,9 +139,15 @@ fn sandwich(
         problem.seed,
         run.curvature.notes().to_vec(),
     );
+    let degrees_of_freedom = run
+        .gaussian
+        .degrees_of_freedom()
+        .expect("a sandwich is a Student t")
+        .to_vec();
     Ok((
         PyStarts { inner: starts },
         local,
+        degrees_of_freedom,
         run.blocks,
         run.block_length,
     ))
@@ -160,8 +164,9 @@ type BandTables = (Vec<String>, Vec<Vec<f64>>, Vec<Vec<f64>>, Vec<Vec<f64>>);
 ///     names: The parameters of the rows and columns of the covariance
 ///     fit: The fitted value of each parameter, by name
 ///     covariance: The covariance on the unbounded scale
-///     degrees_of_freedom: The degrees of freedom of a Student t, or None
-///         for a normal
+///     block_length: The positions per block of a sandwich, whose Student t
+///         reads the degrees of freedom of each output at each position from
+///         the curvature of its blocks at the fit, or None for a normal
 ///     positions: Positions to report at
 ///     confidence_level: The level of the band
 ///
@@ -173,7 +178,9 @@ type BandTables = (Vec<String>, Vec<Vec<f64>>, Vec<Vec<f64>>, Vec<Vec<f64>>);
 ///     ValueError: If the names are not the parameters of the problem, the
 ///         fit lacks one, the covariance is not one row and column per
 ///         parameter, the level is not strictly between 0 and 1, the engine is
-///         stochastic, or a position is one the engine rejects
+///         stochastic, a position is one the engine rejects, or the block
+///         length is below 1 or above the positions, or the Gauss–Newton
+///         curvature of its blocks at the fit is singular
 ///     RuntimeError: If the derivatives fail at the fit
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
@@ -183,17 +190,19 @@ fn delta_band(
     names: Vec<String>,
     fit: Vec<(String, f64)>,
     covariance: Vec<Vec<f64>>,
-    degrees_of_freedom: Option<f64>,
+    block_length: Option<i64>,
     positions: Vec<f64>,
     confidence_level: f64,
 ) -> PyResult<BandTables> {
+    let block_length: Option<usize> =
+        crate::counts::optional_count(&commol_inference::ranges::BLOCK_LENGTH, block_length)?;
     let band = parallel(py, || {
         local::delta_band(
             &problem.inner,
             &names,
             &fit,
             &covariance,
-            degrees_of_freedom,
+            block_length,
             &positions,
             confidence_level,
         )

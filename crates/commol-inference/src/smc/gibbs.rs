@@ -16,6 +16,7 @@ use super::TemperedTarget;
 use super::kernel::Kernel;
 use super::sampler::{SmcEvent, SmcRun, SmcSampler, SmcState, SmcSteps, Stop, stopped};
 use crate::error::MethodError;
+use crate::local::shares::ROUNDED_SHARE;
 use crate::local::{Curvature, CurvatureKind, curvature_at, scaled_block_scores};
 use crate::priors::Priors;
 use crate::resampling::{BayesianBootstrap, BlockScheme};
@@ -247,7 +248,7 @@ where
     let p = fit.len() as f64;
     let leverage = BlockLeverage::new(&curvature, &blocks, inverse);
     let read = p - leverage.squares;
-    if trace.is_nan() || trace <= 1e-10 * independent {
+    if trace.is_nan() || trace <= ROUNDED_SHARE * independent {
         return Err(MethodError::Invalid(format!(
             "block_length {} makes block scores that are all 0: the scores of each \
              parameter fall inside one block, where they sum to zero at the fit. Use \
@@ -255,7 +256,7 @@ where
             blocks.length()
         )));
     }
-    if read <= 1e-10 * p {
+    if read <= ROUNDED_SHARE * p {
         return Err(MethodError::Invalid(format!(
             "block_length {} makes blocks that each hold all the curvature of their \
              parameters, so they read no degree of freedom about the scale. Use shorter \

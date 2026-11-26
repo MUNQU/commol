@@ -290,18 +290,27 @@ fn a_given_block_length_gives_the_blocks_of_its_windows() {
 
 #[test]
 fn a_block_of_scores_of_zero_counts_in_the_sandwich() {
-    // The line runs through the observations of the first two of five blocks.
-    let values: Vec<f64> = [0.0, 0.0, 0.0, 0.0, 0.3, -0.2, 0.5, 0.1, -0.4, 0.2]
-        .iter()
-        .enumerate()
-        .map(|(t, e)| 2.0 + 0.5 * t as f64 + e)
-        .collect();
-    let problem = line_problem(&values);
+    // The line runs through the observations of the first two of five
+    // blocks: their scores are 0 and their curvature is not, so they read the
+    // degrees of freedom they read with residuals.
+    let run = |first: [f64; 4]| {
+        let values: Vec<f64> = first
+            .iter()
+            .chain(&[0.3, -0.2, 0.5, 0.1, -0.4, 0.2])
+            .enumerate()
+            .map(|(t, e)| 2.0 + 0.5 * t as f64 + e)
+            .collect();
+        let problem = line_problem(&values);
+        sandwich_approximation(&problem, &[2.0, 0.5], CurvatureKind::GaussNewton, 2).unwrap()
+    };
 
-    let run = sandwich_approximation(&problem, &[2.0, 0.5], CurvatureKind::GaussNewton, 2).unwrap();
+    let [zeros, residuals] = [[0.0; 4], [0.2, -0.1, 0.3, -0.3]].map(run);
 
-    assert_eq!(run.blocks, 5);
-    assert_eq!(run.gaussian.degrees_of_freedom(), Some(4.0));
+    assert_eq!(zeros.blocks, 5);
+    assert_eq!(
+        zeros.gaussian.degrees_of_freedom(),
+        residuals.gaussian.degrees_of_freedom()
+    );
 }
 
 #[test]
