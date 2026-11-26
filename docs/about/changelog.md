@@ -855,6 +855,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `curvature="hessian"` gives the covariance of a parameter whose curvature is
+  so large that its steps moved the objective above the largest number: for a
+  parameter in `[0, 100]` read by an observation of scale `1e156`, a variance
+  of `4.0e-318`, as Gauss–Newton gives, where it raised a `RuntimeError` of an
+  infeasible point whose objective is not a finite number. Its step is the
+  shorter of `δ^{1/4} · dθ/du` (`δ^{1/4} · max(|θ|, 1)` without bounds) and the
+  one that keeps the objective a number by the Gauss–Newton curvature. For a
+  step of `δ^{1/4}` on the unbounded scale, the step is shorter only where the
+  curvature there is within a factor of about 15 of the one at which the
+  objective overflowed, from about `4e314` with an accuracy `δ` of machine
+  precision and lower for a coarser engine (`6e309` at `δ = 1e-6`); the larger
+  step of a parameter without bounds and `|θ|` above 1 is shorter from a
+  smaller curvature. A Hessian there can change. When the shorter step is
+  within the rounding of the parameter or of the predictions of the model at
+  the fit, the `RuntimeError` names the parameter and says that its curvature
+  is too large for the Hessian, and which rounding hides the step. See [The
+  curvature and the unbounded
+  scale](../guide/uncertainty/local.md#the-curvature-and-the-unbounded-scale).
+
 - Every method that refits around a fit refuses a fit that is not feasible,
   with a `ValueError` that says why: `BayesianBootstrap`, `ResidualBootstrap`,
   `WildBootstrap`, `BlockJackknife`, `RollingConformal`, `JackknifePlus`,

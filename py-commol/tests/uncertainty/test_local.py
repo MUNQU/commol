@@ -51,6 +51,7 @@ from tests.support import (
     bounded,
     build,
     build_ode,
+    far_calibrator,
     flow_calibrator,
     flow_observations,
     two_wells_calibrator,
@@ -136,6 +137,24 @@ class TestCurvature:
             match="The Hessian of the objective at the fit failed: Infeasible point",
         ):
             calibrator.uncertainty(Laplace(draws=10, curvature="hessian"))
+
+    @pytest.mark.parametrize(
+        ("curvature", "words"),
+        [("gauss_newton", "its covariance to be"), ("hessian", "the Hessian: a step")],
+    )
+    def test_a_curvature_that_overflows_on_the_unbounded_scale_says_so(
+        self, curvature: str, words: str
+    ) -> None:
+        # At a scale of 1e160 the variance is 4e-326, below the smallest number,
+        # and at a Hessian step that keeps the objective a number the rounding
+        # of the runs is above δ^{1/2} of the curvature.
+        calibrator = far_calibrator(1e160)
+
+        with pytest.raises(
+            RuntimeError,
+            match=f"The curvature of 'c' at the fit is too large for {words}",
+        ):
+            calibrator.uncertainty(Laplace(draws=2, curvature=curvature))
 
     def test_an_uncertain_curvature_is_noted(
         self, caplog: pytest.LogCaptureFixture

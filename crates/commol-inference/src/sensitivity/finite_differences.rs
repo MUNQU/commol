@@ -155,11 +155,9 @@ impl<E: SimulationEngine + Send + Sync> FiniteDifferences<E> {
     /// The background of every observation, then of every part.
     fn backgrounds(&self) -> Vec<f64> {
         let observations = self.observed_data.iter().map(|obs| obs.background);
-        let parts = self
-            .observed_data
-            .iter()
-            .flat_map(|obs| std::iter::repeat_n(obs.part_background(), obs.parts.max(1)));
-        observations.chain(parts).collect()
+        observations
+            .chain(part_backgrounds(&self.observed_data))
+            .collect()
     }
 
     /// The derivative of every observation, then of every part, with
@@ -214,18 +212,31 @@ impl<E: SimulationEngine + Send + Sync> FiniteDifferences<E> {
         for (i, &background) in backgrounds.iter().enumerate() {
             let with_h = derivative(stencil.with_h, i);
             let with_2h = derivative(stencil.with_2h, i);
-            // The error of a run is a share of what it gives; the background
-            // is exact, and only its sum is rounded.
-            let size = runs
+            let error = runs
                 .iter()
-                .map(|run| (run[i] - background).abs())
+                .map(|run| run_rounding(self.accuracy, run[i], background))
                 .fold(0.0, f64::max);
-            let error = self.accuracy * size + f64::EPSILON * background;
             column.push(with_h);
             errors.push((with_h - with_2h).abs() / 3.0 + error * stencil.rounding / step);
         }
         Ok((column, errors))
     }
+}
+
+/// The background of every part of each of `observed`, observation after
+/// observation: one part for an observation with no parts.
+pub(crate) fn part_backgrounds(observed: &[ObservedDataPoint]) -> impl Iterator<Item = f64> + '_ {
+    observed
+        .iter()
+        .flat_map(|obs| std::iter::repeat_n(obs.part_background(), obs.parts.max(1)))
+}
+
+/// The rounding of a run that predicts `run` with the background
+/// `background`, by an engine of relative accuracy `accuracy`. The error of a
+/// run is a share of what it gives; the background is exact, and only its sum
+/// is rounded.
+pub(crate) fn run_rounding(accuracy: f64, run: f64, background: f64) -> f64 {
+    accuracy * (run - background).abs() + f64::EPSILON * background
 }
 
 impl<E: SimulationEngine + Send + Sync> SensitivitySource for FiniteDifferences<E> {

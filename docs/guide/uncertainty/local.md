@@ -105,12 +105,22 @@ The Hessian steps are `δ^{1/4} · dθ/du` for a parameter with a bound and
 `δ^{1/4} · max(|θ|, 1)` for one without, where `δ` is the accuracy of the
 engine (machine precision, or the `rtol` of the ODE engine): the step that
 balances the truncation error of the differences with the error of the runs,
-and keeps every run inside the bounds. Each entry of either curvature has an
-estimated error. An entry whose error is above 1 % of `√(H_jj · H_kk)` is
-listed in `notes` and logged as a warning. The error is read as a share of a
-correlation: an off-diagonal entry near 0 is compared with the diagonal of its
-row and column, not with its own size. A note changes no result. A share above
-100 % says that the entry, and any covariance that reads it, is unknown.
+and keeps every run inside the bounds. For a curvature so large that such a
+step moves the objective near the largest number, the step is shorter, so that
+by the Gauss–Newton curvature the objective stays a number, as it does for an
+objective that grows like its quadratic. For a step of `δ^{1/4}` on the
+unbounded scale, that is from a curvature there of about `4e314` with machine
+precision, and lower for a coarser engine (`6e309` at `rtol = 1e-6`); the
+larger step of a parameter without bounds and `|θ|` above 1 is shorter from a
+smaller curvature. When that step is within the rounding of `θ` or of the
+predictions of the model at the fit, `"hessian"` raises a `RuntimeError` that
+says the curvature of the parameter is too large for the Hessian. Each entry of
+either curvature has an estimated error. An entry whose error is above 1 % of
+`√(H_jj · H_kk)` is listed in `notes` and logged as a warning. The error is
+read as a share of a correlation: an off-diagonal entry near 0 is compared with
+the diagonal of its row and column, not with its own size. A note changes no
+result. A share above 100 % says that the entry, and any covariance that reads
+it, is unknown.
 
 Every distribution lives on the **unbounded scale** of the parameters, the
 scale on which the [sampler](smc.md#how-the-sampler-works) of sequential Monte

@@ -1086,6 +1086,11 @@ fn a_loss_with_no_curvature_is_refused_before_a_derivative_that_is_not_finite() 
 /// series `far` of `y = b`, `scale` times its value, with noise of sd 1, seen
 /// at its prediction at `fit`.
 fn line_and_slope(scale: f64, fit: [f64; 2]) -> CalibrationProblem<Curve> {
+    line_and_slope_of_sd(scale, fit, 1.0)
+}
+
+/// [`line_and_slope`] with noise of sd `sd` for far.
+fn line_and_slope_of_sd(scale: f64, fit: [f64; 2], sd: f64) -> CalibrationProblem<Curve> {
     let values = [0.1, 0.3, 0.2, 0.6, 0.5, 0.8, 0.7, 1.0, 0.9];
     let mut data = observed("x", &values);
     let mut far = ObservedDataPoint::new(4.0, "y".to_string(), scale * fit[1]);
@@ -1103,7 +1108,7 @@ fn line_and_slope(scale: f64, fit: [f64; 2]) -> CalibrationProblem<Curve> {
         vec![],
         DiscrepancyConfig::Likelihood(vec![
             normal("x", Argument::Value(0.5)),
-            normal("far", Argument::Value(1.0)),
+            normal("far", Argument::Value(sd)),
         ]),
     )
     .unwrap()
@@ -1154,6 +1159,112 @@ fn a_covariance_is_given_until_the_curvature_is_too_large_for_it() {
             "{scale:e}: {} against {}",
             calibration.eta,
             expected.eta
+        );
+    }
+}
+
+#[test]
+fn a_hessian_steps_where_its_objective_is_a_number() {
+    // At a scale of 1e159 the curvature of b on the unbounded scale is about
+    // 2.5e317: a step of δ^{1/4} there moves the objective above the largest
+    // number, while the variance, about 4e-318, is a number.
+    let fit = [0.05, 0.1];
+    let problem = line_and_slope(1e159, fit);
+    let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+    let expected = laplace(&Curvature::gauss_newton(&problem, &source, &fit).unwrap()).unwrap();
+
+    let curvature = Curvature::hessian(&problem, &source, &fit).unwrap();
+
+    let covariance = laplace(&curvature).unwrap().covariance().clone();
+    let expected = expected.covariance();
+    assert!(expected[(1, 1)] > 0.0 && expected[(1, 1)] < 1e-317);
+    for j in 0..2 {
+        let relative = (covariance[(j, j)] / expected[(j, j)] - 1.0).abs();
+        assert!(relative < 1e-5, "{j}: {covariance} against {expected}");
+    }
+    // At a corner of (a, b) the objective of far is about 1e306, which rounds
+    // away what x adds: the note says that the coupling is not read.
+    let note = "The curvature of ('a', 'b') has an estimated error of more than 100% of the \
+                scale of its row and column";
+    assert_eq!(curvature.notes(), [note]);
+}
+
+#[test]
+fn a_hessian_that_cannot_step_says_that_the_curvature_is_too_large() {
+    // At a scale of 1e300 the objective one rounding of b away from the fit
+    // is about 1e566: no step that moves b keeps it a number. With an sd of
+    // 1e-150 for far the scale of b, about 5e449, is above the largest
+    // number, and the bound of a step reads only its unit.
+    let fit = [0.05, 0.1];
+    for sd in [1.0, 1e-150] {
+        let problem = line_and_slope_of_sd(1e300, fit, sd);
+        let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+
+        let error = Curvature::hessian(&problem, &source, &fit).unwrap_err();
+
+        assert_eq!(error, too_large_for_the_hessian("'b'"), "{sd:e}");
+    }
+}
+
+/// The refusal of a Hessian whose curvature of `b` is too large for it, at
+/// steps within the rounding of `what`.
+fn too_large_for_the_hessian(what: &str) -> MethodError {
+    MethodError::Failed(format!(
+        "The curvature of 'b' at the fit is too large for the Hessian: a step that keeps its \
+         objective well below the largest number is within the rounding of {what}"
+    ))
+}
+
+#[test]
+fn a_hessian_reads_no_step_within_the_rounding_of_its_parameter_or_its_runs() {
+    // An unbounded b at 1e12, whose rounding is 2⁻¹³, with x on the line and
+    // far at its prediction. At 1e148 the shorter step is 2¹⁷. At 1e157 it is
+    // 2⁻¹³, whose points are exact, and the runs of far, 1e169, round by about
+    // their change; at 3e157 it is 2⁻¹⁴, and a point of it rounds.
+    let fit = [0.05, 1e12];
+    let problem_at = |scale: f64| {
+        let values: Vec<f64> = (0..9).map(|t| fit[0] + fit[1] * t as f64).collect();
+        let mut data = observed("x", &values);
+        let mut far = ObservedDataPoint::new(4.0, "y".to_string(), scale * fit[1]);
+        far.label = "far".to_string();
+        far.scale = scale;
+        data.push(far);
+        CalibrationProblem::new(
+            Curve::new(Shape::LineAndSlope),
+            data,
+            vec![
+                CalibrationParameter::new("a".to_string(), -1.0, 1.0),
+                CalibrationParameter::new("b".to_string(), f64::NEG_INFINITY, f64::INFINITY),
+            ],
+            None,
+            vec![],
+            DiscrepancyConfig::Likelihood(vec![
+                normal("x", Argument::Value(0.5)),
+                normal("far", Argument::Value(1.0)),
+            ]),
+        )
+        .unwrap()
+    };
+    let variances = |scale: f64| {
+        let problem = problem_at(scale);
+        let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+        let expected = Curvature::gauss_newton(&problem, &source, &fit).unwrap();
+        let variance = |curvature: &Curvature| laplace(curvature).unwrap().covariance()[(1, 1)];
+        Curvature::hessian(&problem, &source, &fit)
+            .map(|curvature| (variance(&curvature), variance(&expected)))
+    };
+
+    let (variance, expected) = variances(1e148).unwrap();
+    assert!(
+        (variance / expected - 1.0).abs() < 1e-6,
+        "{variance} against {expected}"
+    );
+    let runs = "the predictions of the model at the fit";
+    for (scale, what) in [(1e157, runs), (3e157, "'b'")] {
+        assert_eq!(
+            variances(scale).unwrap_err(),
+            too_large_for_the_hessian(what),
+            "{scale:e}"
         );
     }
 }

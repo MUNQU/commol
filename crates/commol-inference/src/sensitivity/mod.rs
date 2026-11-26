@@ -18,6 +18,7 @@
 mod finite_differences;
 
 pub use finite_differences::FiniteDifferences;
+pub(crate) use finite_differences::{part_backgrounds, run_rounding};
 
 use std::fmt;
 

@@ -47,10 +47,11 @@ two arguments of a Student t). `Curvature::hessian` takes the central
 Hessian of the objective with given steps of the `finitediff` crate of the
 argmin fork, with steps `δ^{1/4} · dθ/du` (`δ^{1/4} · max(|θ|, 1)` with no
 bound), `δ` the output accuracy of the engine, so `θ ± 2h` stays inside the
-bounds. Each entry of either carries an estimated error; an entry above 1 %
-of `√(H_jj H_kk)` is a note. The threshold measures the error on the scale
-of a correlation, so an off-diagonal entry near 0 is judged against its row
-and column; a note changes no result. The note gives the share only, read in
+bounds ([shorter](#the-steps-of-the-hessian-keep-the-objective-a-number) for
+a large curvature). Each entry of either carries an estimated error; an entry
+above 1 % of `√(H_jj H_kk)` is a note. The threshold measures the error on the
+scale of a correlation, so an off-diagonal entry near 0 is judged against its
+row and column; a note changes no result. The note gives the share only, read in
 the [units of the parameters](#the-curvature-is-kept-in-units-of-its-parameters),
 since an entry on the unbounded scale can be below or above any number, and
 words a share above 100 % as that.
@@ -68,6 +69,33 @@ words a share above 100 % as that.
 `crates/commol-calibration/tests/test_likelihood.rs::fisher_information_of_each_model_has_its_closed_form`,
 `tests/uncertainty/test_local.py::TestCurvature::test_an_uncertain_curvature_is_noted`,
 `tests/uncertainty/test_local.py::TestCurvature::test_an_error_above_the_scale_of_its_entry_is_noted_as_such`.
+
+## The steps of the Hessian keep the objective a number
+
+A step `δ^{1/4}` (unbounded scale) puts the objective at `θ ± 2h` above the
+largest number from `H_u ≈ 6e315` (`δ = ε`); `1/H_u` is a number to `5e-324`.
+From `H_u ≈ 4e314` for that step (`6e309` at `δ = 1e-6`; sooner for the step
+`δ^{1/4}|θ|` of no bounds) the step is the power of two at or below the one
+whose `H_jj h_j²`, by the Gauss–Newton curvature in its units, is `MAX / 32`
+(`OBJECTIVE_ROOM`). By `|H_jk| ≤ √(H_jj H_kk)` each point of the steps `2h`
+moves the objective by at most a quarter of the largest number if the observed
+curvature is at most that one and the objective grows like its quadratic (not a
+Student t of small `df`); a point still not finite keeps the infeasible-point
+error. A `MethodError::Failed` that names the rounding refuses the step unless
+`θ ± h`, `θ ± 2h` are exact (the differences divide by the step), and unless
+the rounding `e` of the runs (`run_rounding`) is at most the error of the step
+`δ^{1/4}`: `Σ |C| |A| e ≤ δ^{1/2} h Ĥ_jj` by Gauss–Newton (`rounding_of_runs`).
+
+| Alternative | Why not |
+|---|---|
+| Steps that move the objective by `δ^{1/2}` by the Gauss–Newton curvature | They change every Hessian, and `δ^{1/4}/√H_u` is below a rounding of `θ` long before the objective overflows. |
+| The steps of `δ^{1/4}`, refused with words of the curvature when a point is not finite | It refuses a covariance that is a number, which Gauss–Newton gives. |
+| Halve the steps until every point is finite | Up to `4p² + 1` runs for each halving, when the bound is known before any run. |
+| A floor of `δ^{1/2}` times the size of `θ` on the step | It reads the origin of `θ`: it refuses a parameter far from 0 whose runs are those of one near it, and accepts a large constant in the runs. |
+| Exact points only | The rounding of the runs then gives wrong values with no note. |
+| A note in place of the refusal | When the rounding makes the Hessian indefinite, the error still says that the data do not determine the parameters. |
+
+**Guards:** `crates/commol-inference/tests/test_local.rs::a_hessian_steps_where_its_objective_is_a_number`, `crates/commol-inference/tests/test_local.rs::a_hessian_that_cannot_step_says_that_the_curvature_is_too_large`, `crates/commol-inference/tests/test_local.rs::a_hessian_reads_no_step_within_the_rounding_of_its_parameter_or_its_runs`, `tests/uncertainty/test_hessian_steps.py::test_a_hessian_reads_a_curvature_whose_differences_would_overflow`, `tests/uncertainty/test_local.py::TestCurvature::test_a_curvature_that_overflows_on_the_unbounded_scale_says_so`, `tests/uncertainty/test_hessian_steps.py::test_a_hessian_refuses_a_step_that_the_rounding_of_the_runs_hides`.
 
 ## The curvature refuses a prediction or a derivative that is not finite
 

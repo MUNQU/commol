@@ -34,12 +34,23 @@ use nalgebra::{DMatrix, DMatrixView};
 
 use super::inverse::InverseCurvature;
 use crate::error::MethodError;
-use crate::sensitivity::{Matrix, Sensitivities, SensitivitySource};
+use crate::sensitivity::{
+    Matrix, Sensitivities, SensitivitySource, part_backgrounds, run_rounding,
+};
 use crate::transform::{Scale, Transform};
 
 /// An entry of the curvature is reported when its estimated error is above
 /// this share of `√(H_jj · H_kk)`, the scale of its row and column.
 const UNCERTAIN_ENTRY: f64 = 0.01;
+
+/// The largest `H_jj h_j²` of a step `h_j` of the Hessian on the unbounded
+/// scale, with `H_jj` the Gauss–Newton curvature. By it the points of the
+/// differences with the steps `2h` move the objective by at most 8 times this,
+/// a quarter of the largest number, so a stencil of four of them sums to a
+/// number, when the observed curvature is at most the Gauss–Newton one and the
+/// objective grows like its quadratic in the residuals. A Student t of a small
+/// `df`, which forms `z²/ν`, can still overflow.
+const OBJECTIVE_ROOM: f64 = f64::MAX / 32.0;
 
 /// The curvature of the objective at a fit. Its matrices, named `scaled`, are
 /// in the units of [`Self::scales`].
@@ -79,6 +90,22 @@ impl Curvature {
         source: &S,
         fit: &[f64],
     ) -> Result<Self, MethodError>
+    where
+        E: SimulationEngine,
+        S: SensitivitySource + ?Sized,
+    {
+        Self::gauss_newton_and_means(problem, source, fit).map(|(curvature, ..)| curvature)
+    }
+
+    /// [`Self::gauss_newton`], the mean of each part of each observation at
+    /// `fit` that it reads, and the exponent of the unit of each parameter: a
+    /// step of 1 in its units is one of `2^-unit` on the scale of `θ`. The
+    /// unit is an exponent because its scale can be above the largest number.
+    fn gauss_newton_and_means<E, S>(
+        problem: &CalibrationProblem<E>,
+        source: &S,
+        fit: &[f64],
+    ) -> Result<(Self, Vec<f64>, Vec<i32>), MethodError>
     where
         E: SimulationEngine,
         S: SensitivitySource + ?Sized,
@@ -148,7 +175,7 @@ impl Curvature {
             .map(|(&unit, &derivative)| libm::ldexp(derivative, unit))
             .collect();
         let notes = notes(&names, &matrix, &errors);
-        Ok(Self {
+        let curvature = Self {
             names,
             unbounded_fit: transform.to_unbounded(fit),
             transform,
@@ -160,7 +187,8 @@ impl Curvature {
             arguments,
             first_arguments,
             notes,
-        })
+        };
+        Ok((curvature, sensitivities.parts.means, units))
     }
 
     /// The curvature of `problem` at `fit` by central differences of its
@@ -177,6 +205,19 @@ impl Curvature {
     /// with a bound, and `max(|θ_j|, 1)` for one without: `dθ/du` is below
     /// the distance to each bound, so `θ ± 2h` stays inside them.
     ///
+    /// A step is at most the one whose `H_jj h_j²` on the unbounded scale,
+    /// with `H_jj` the Gauss–Newton curvature, is `f64::MAX / 32`, so that
+    /// the objective at the points of the differences stays a number when the
+    /// curvature is large. That step is the power of two at or below the
+    /// bound. It is refused unless `θ ± h` and `θ ± 2h` are numbers with no
+    /// rounding, since the differences divide by the step, and unless the
+    /// share of the rounding of the runs at the fit in the curvature,
+    /// `Σ |C| |A| e / (h Ĥ_jj)` by the Gauss–Newton terms (`rounding_of_runs`),
+    /// is at most `δ^{1/2}`: the error that the step `δ^{1/4}` accepts, so the
+    /// shorter step is never less accurate. A coupling with a parameter of a
+    /// far smaller curvature rounds away, and its note says so. The bound is
+    /// read in the units of Gauss–Newton, so it is the same in any unit of `θ`.
+    ///
     /// The differences are taken in the unit `q_j`, the power of two at or
     /// below `h_j`: at `θ/q` with steps `h/q`, which are the same points, so
     /// that the Hessian is in those units whatever the size of `h`.
@@ -185,7 +226,9 @@ impl Curvature {
     ///
     /// As [`Self::gauss_newton`], also for an entry of `source` that the
     /// differences of the objective do not read, and [`MethodError::Failed`]
-    /// when a point of the differences is infeasible or the engine fails.
+    /// when a point of the differences is infeasible or the engine fails, or
+    /// when the shorter step is refused: its curvature is too large for the
+    /// Hessian.
     pub fn hessian<E, S>(
         problem: &CalibrationProblem<E>,
         source: &S,
@@ -195,21 +238,54 @@ impl Curvature {
         E: SimulationEngine,
         S: SensitivitySource + ?Sized,
     {
-        let expected = Self::gauss_newton(problem, source, fit)?;
+        let (expected, means, expected_units) = Self::gauss_newton_and_means(problem, source, fit)?;
         let derivatives = expected.transform.derivatives(fit);
         let accuracy = problem.forward().base_engine().accuracy().relative;
-        let factor = accuracy.powf(0.25);
-        let steps: Vec<f64> = expected
-            .transform
-            .scales()
+        let roundings: Vec<f64> = means
             .iter()
-            .zip(&derivatives)
-            .zip(fit)
-            .map(|((scale, &derivative), &value)| match scale {
-                Scale::Identity => factor * value.abs().max(1.0),
-                _ => factor * derivative,
-            })
+            .zip(part_backgrounds(problem.observed_data()))
+            .map(|(&mean, background)| run_rounding(accuracy, mean, background))
             .collect();
+        let factor = accuracy.powf(0.25);
+        let mut steps = Vec::with_capacity(fit.len());
+        for (j, scale) in expected.transform.scales().iter().enumerate() {
+            let step = match scale {
+                Scale::Identity => factor * fit[j].abs().max(1.0),
+                _ => factor * derivatives[j],
+            };
+            // A step of 1 in the units of Gauss–Newton is one of `2^unit` on
+            // the scale of θ.
+            let unit = -expected_units[j];
+            let largest = libm::ldexp((OBJECTIVE_ROOM / expected.matrix[(j, j)]).sqrt(), unit);
+            if largest >= step {
+                steps.push(step);
+                continue;
+            }
+            // The power of two at or below the bound, whose points must be
+            // exact, since the differences divide by the step.
+            let step = libm::ldexp(1.0, libm::frexp(largest).1 - 1);
+            let within = |what: &str| {
+                MethodError::Failed(format!(
+                    "The curvature of '{name}' at the fit is too large for the Hessian: a step \
+                     that keeps its objective well below the largest number is within the \
+                     rounding of {what}",
+                    name = expected.names[j]
+                ))
+            };
+            let exact = [-2.0, -1.0, 1.0, 2.0]
+                .iter()
+                .all(|&k| exact_sum(fit[j], k * step));
+            if !(largest > 0.0 && exact) {
+                return Err(within(&format!("'{}'", expected.names[j])));
+            }
+            let in_units = libm::ldexp(step, -unit);
+            if rounding_of_runs(&expected, &roundings, j)
+                > accuracy.sqrt() * in_units * expected.matrix[(j, j)]
+            {
+                return Err(within("the predictions of the model at the fit"));
+            }
+            steps.push(step);
+        }
         let workspace = RefCell::new(Workspace::default());
         let objective = |values: &Vec<f64>| -> Result<f64, anyhow::Error> {
             problem
@@ -351,6 +427,41 @@ impl Curvature {
     pub fn notes(&self) -> &[String] {
         &self.notes
     }
+}
+
+/// The rounding of the runs at the fit in the Gauss–Newton curvature of
+/// parameter `j`, per unit of its step, in its units: `Σ_i Σ_{a,b} |C_i,ab|
+/// |A_i,bj| e_i,a`, with `e_i,a` the rounding of each mean of a part,
+/// `roundings` ([`run_rounding`]), and 0 for a noise argument. A rounding `e`
+/// of a mean moves the objective at a step `h` by about `|C A| h e`, and its
+/// second difference by that over `h²`. The term of the residual at the fit is
+/// left out: under the bound of a step the change of the residual over the
+/// step is above it, unless the objective at the fit is near the largest
+/// number.
+fn rounding_of_runs(curvature: &Curvature, roundings: &[f64], j: usize) -> f64 {
+    let mut sum = 0.0;
+    let mut part = 0;
+    for (term, &first) in curvature.terms.iter().zip(&curvature.first_arguments) {
+        let count = argument_count(term);
+        for a in 0..term.parts {
+            let rounding = roundings[part + a];
+            for b in 0..count {
+                sum += term.curvature[a * count + b].abs()
+                    * curvature.arguments[(first + b, j)].abs()
+                    * rounding;
+            }
+        }
+        part += term.parts;
+    }
+    sum
+}
+
+/// Whether `a + b` is a number with no rounding: the error of the sum by
+/// Knuth's two-sum, which is exact, is 0.
+fn exact_sum(a: f64, b: f64) -> bool {
+    let sum = a + b;
+    let b_part = sum - a;
+    sum.is_finite() && (a - (sum - b_part)) + (b - b_part) == 0.0
 }
 
 /// Refuse a fit on a bound of its parameter ([`Transform::on_bound`]): the
