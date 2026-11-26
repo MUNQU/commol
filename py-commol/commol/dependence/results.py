@@ -1,7 +1,7 @@
 """The result of a dependence analysis: the statistics of each series, of
 each pair of series and of the series together, with their tests."""
 
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from pydantic import ConfigDict, Field
 
@@ -198,8 +198,8 @@ class DependenceSettings(ResultModel):
 
     Attributes
     ----------
-    max_lag : int | "auto"
-        The largest lag of each series.
+    max_lag : int
+        The largest lag of each series, in steps of its grid.
     confidence_level : float
         The level of the band of ``τ``.
     seed : int
@@ -216,7 +216,7 @@ class DependenceSettings(ResultModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    max_lag: int | Literal["auto"]
+    max_lag: int
     confidence_level: float
     seed: int
     replicates: int | None = None

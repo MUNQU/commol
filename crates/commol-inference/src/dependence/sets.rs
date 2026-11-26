@@ -12,11 +12,11 @@ use super::grid::Layout;
 /// The statistics of one series in one set of values.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct SeriesSet {
-    /// The autocovariance at lags `1 … h`, None at a lag with no pair.
+    /// The autocovariance at lags `1 … max_lag`, None at a lag with no pair.
     pub lags: Vec<Option<Autocovariance>>,
     /// The variance of the values.
     pub variance: f64,
-    /// The robust portmanteau at lags `1 … h`.
+    /// The robust portmanteau at lags `1 … max_lag`.
     pub portmanteau: Portmanteau,
     /// The integrated time, or why there is none.
     pub time: Result<Time, &'static str>,
@@ -80,14 +80,13 @@ fn correlation(pairs: &[(f64, f64)]) -> Option<f64> {
 }
 
 /// The statistics of `values`, one per observation, on the series of
-/// `layout`, with `lags[s]` lags for series `s`.
-pub(crate) fn statistics(layout: &Layout, lags: &[usize], values: &[f64]) -> SetStatistics {
+/// `layout`, at the lags `1 … max_lag` of each.
+pub(crate) fn statistics(layout: &Layout, max_lag: usize, values: &[f64]) -> SetStatistics {
     let mut standardized: Vec<Vec<Option<f64>>> = Vec::with_capacity(layout.series.len());
     let series = layout
         .series
         .iter()
-        .zip(lags)
-        .map(|(series, &h)| {
+        .map(|series| {
             if series.reason.is_some() {
                 standardized.push(Vec::new());
                 return None;
@@ -107,9 +106,11 @@ pub(crate) fn statistics(layout: &Layout, lags: &[usize], values: &[f64]) -> Set
                     .collect(),
             );
             Some(SeriesSet {
-                lags: (1..=h).map(|lag| autocovariance(&gridded, lag)).collect(),
+                lags: (1..=max_lag)
+                    .map(|lag| autocovariance(&gridded, lag))
+                    .collect(),
                 variance,
-                portmanteau: robust_portmanteau(&gridded, h),
+                portmanteau: robust_portmanteau(&gridded, max_lag),
                 time: initial_monotone_time(&gridded),
             })
         })
@@ -183,8 +184,8 @@ fn problem(layout: &Layout, standardized: &[Vec<Option<f64>>]) -> ProblemSet {
 /// The statistics of one series averaged over several sets.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct SeriesSummary {
-    /// The mean autocorrelation at lags `1 … h`, over the sets whose series
-    /// varies; None at a lag with no pair.
+    /// The mean autocorrelation at lags `1 … max_lag`, over the sets whose
+    /// series varies; None at a lag with no pair.
     pub correlations: Vec<Option<f64>>,
     /// The pairs of each lag.
     pub pairs: Vec<usize>,

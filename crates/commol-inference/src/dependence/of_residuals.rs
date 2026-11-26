@@ -11,16 +11,16 @@ use commol_core::{CONFIDENCE_LEVEL, SimulationEngine};
 use commol_random::{Generator, Stream, replicate_seed};
 use rayon::prelude::*;
 
+use super::SeriesDependence;
 use super::grid::Layout;
 use super::law::{Portmanteau, Tests, result, spread, test};
-use super::of_values::{lags_of, wild_band};
+use super::of_values::wild_band;
 use super::sets::{SetStatistics, Summary, statistics, summarize};
-use super::{MaxLag, SeriesDependence};
 use crate::error::MethodError;
 use crate::predictive::{
     DistributionNoise, ObservationNoise, ObservedMeans, check_names, observe_sets,
 };
-use crate::ranges::RANDOMIZATIONS;
+use crate::ranges::{MAX_LAG, RANDOMIZATIONS};
 use crate::resampling::{
     FitUnit, Multipliers, ParametricResampler, Perturbation, ReplicateRunner, Resampler,
     RunnerSteps,
@@ -44,7 +44,7 @@ pub enum ResidualKind {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ResidualSettings {
     /// The largest lag of each series.
-    pub max_lag: MaxLag,
+    pub max_lag: usize,
     /// The randomizations of the quantile residuals; 1 for additive ones.
     pub randomizations: usize,
     /// The reference of the tests and the bands.
@@ -166,10 +166,10 @@ fn with_values(observations: &[ObservedDataPoint], values: &[f64]) -> Vec<Observ
         .collect()
 }
 
-/// The statistics of each set of `sets`.
-fn statistics_of(layout: &Layout, lags: &[usize], sets: &[Vec<f64>]) -> Vec<SetStatistics> {
+/// The statistics of each set of `sets` at the lags `1 … max_lag`.
+fn statistics_of(layout: &Layout, max_lag: usize, sets: &[Vec<f64>]) -> Vec<SetStatistics> {
     sets.iter()
-        .map(|set| statistics(layout, lags, set))
+        .map(|set| statistics(layout, max_lag, set))
         .collect()
 }
 
@@ -204,7 +204,7 @@ struct Analysis<'a, E: SimulationEngine> {
     problem: &'a CalibrationProblem<E>,
     observations: &'a [ObservedDataPoint],
     layout: Layout,
-    lags: Vec<usize>,
+    max_lag: usize,
     reader: Reader,
     noise: Option<DistributionNoise>,
     seed: u64,
@@ -228,7 +228,7 @@ impl<E: SimulationEngine + Send + Sync> Analysis<'_, E> {
             let seed = Stream::DependenceSigns.replicate(self.seed, index as u64);
             let band = wild_band(
                 &self.layout,
-                &self.lags,
+                self.max_lag,
                 &draw.residuals[0],
                 replicates,
                 seed,
@@ -252,7 +252,11 @@ impl<E: SimulationEngine + Send + Sync> Analysis<'_, E> {
                 );
                 let data = with_values(self.observations, &values);
                 let sets = self.reader.sets(&data, draw.values, &draw.means)?;
-                Ok(summary_of(&statistics_of(&self.layout, &self.lags, &sets)))
+                Ok(summary_of(&statistics_of(
+                    &self.layout,
+                    self.max_lag,
+                    &sets,
+                )))
             })
             .collect::<Result<_, MethodError>>()?;
         Ok((summaries, Portmanteau::Replicates))
@@ -312,7 +316,11 @@ impl<E: SimulationEngine + Send + Sync> Analysis<'_, E> {
                                 self.reader
                                     .sets(problem.observed_data(), &values, &means)
                                     .map(|sets| {
-                                        summary_of(&statistics_of(&self.layout, &self.lags, &sets))
+                                        summary_of(&statistics_of(
+                                            &self.layout,
+                                            self.max_lag,
+                                            &sets,
+                                        ))
                                     })
                             })
                         });
@@ -345,7 +353,9 @@ fn check<E: SimulationEngine>(
     kind: ResidualKind,
     settings: &ResidualSettings,
 ) -> Result<(), MethodError> {
-    settings.max_lag.check().map_err(MethodError::Invalid)?;
+    MAX_LAG
+        .check(settings.max_lag)
+        .map_err(MethodError::Invalid)?;
     RANDOMIZATIONS
         .check(settings.randomizations)
         .map_err(MethodError::Invalid)?;
@@ -458,12 +468,11 @@ where
         ),
     };
     let layout = Layout::new(observations);
-    let lags = lags_of(&layout, settings.max_lag);
     let analysis = Analysis {
         problem,
         observations,
         layout,
-        lags,
+        max_lag: settings.max_lag,
         reader,
         noise,
         seed,
@@ -474,7 +483,7 @@ where
         .zip(sample.values())
         .map(|(means, values)| {
             let residuals = analysis.reader.sets(observations, values, &means)?;
-            let statistics = statistics_of(&analysis.layout, &analysis.lags, &residuals);
+            let statistics = statistics_of(&analysis.layout, analysis.max_lag, &residuals);
             Ok(Draw {
                 values,
                 means,
@@ -549,7 +558,7 @@ where
     };
     let mut dependence = result(
         &analysis.layout,
-        &analysis.lags,
+        analysis.max_lag,
         &summary,
         &tests,
         draws.len(),

@@ -301,8 +301,8 @@ pub enum Setting {
     Number(f64),
     /// A list: the rule checks each of its settings.
     List(Vec<Setting>),
-    /// Not a number, such as a choice (`"auto"`), a parameter name or a
-    /// setting not given: no rule applies to it.
+    /// Not a number, such as a choice, a parameter name or a setting not
+    /// given: no rule applies to it.
     Other,
 }
 

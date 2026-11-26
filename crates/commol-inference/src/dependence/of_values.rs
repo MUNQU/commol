@@ -7,23 +7,13 @@ use commol_core::CONFIDENCE_LEVEL;
 use commol_random::{Generator, Stream, replicate_seed};
 use rayon::prelude::*;
 
-use super::MaxLag;
 use super::SeriesDependence;
 use super::grid::Layout;
 use super::law::{Portmanteau, Tests, result, test};
 use super::sets::{SetStatistics, Summary, statistics, summarize};
 use crate::error::MethodError;
-use crate::ranges::REPLICATES;
+use crate::ranges::{MAX_LAG, REPLICATES};
 use crate::resampling::Multipliers;
-
-/// The lags of each series of `layout`.
-pub(crate) fn lags_of(layout: &Layout, max_lag: MaxLag) -> Vec<usize> {
-    layout
-        .series
-        .iter()
-        .map(|series| max_lag.of(series.members.len()))
-        .collect()
-}
 
 /// `values` with the values of each series of `layout` that has statistics
 /// centered on their mean and multiplied by a sign ±1 each, drawn with
@@ -49,11 +39,11 @@ pub(crate) fn one(set: &SetStatistics) -> Summary {
     summarize(&[(1.0, set)])
 }
 
-/// The summaries of `replicates` wild sets of `values` ([`wild`]): set `b`
-/// draws its signs from `replicate_seed(seed, b)`.
+/// The summaries of `replicates` wild sets of `values` ([`wild`]) at the lags
+/// `1 … max_lag`: set `b` draws its signs from `replicate_seed(seed, b)`.
 pub(crate) fn wild_band(
     layout: &Layout,
-    lags: &[usize],
+    max_lag: usize,
     values: &[f64],
     replicates: usize,
     seed: u64,
@@ -64,7 +54,7 @@ pub(crate) fn wild_band(
             let mut generator = Generator::from_seed(replicate_seed(seed, b));
             one(&statistics(
                 layout,
-                lags,
+                max_lag,
                 &wild(layout, values, &mut generator),
             ))
         })
@@ -96,11 +86,11 @@ fn check_values(observations: &[ObservedDataPoint], values: &[f64]) -> Result<()
 }
 
 /// The dependence of `values`, one per observation of `observations`: the
-/// statistics of each series and of the series together, the p-value of
-/// `Q̃` against `χ²(h)`, and the band of `τ` at `confidence_level` and the
-/// p-value of the information factor from `replicates` wild sets of the
-/// values, whose signs come from the stream [`Stream::DependenceSigns`] of
-/// `seed`.
+/// statistics of each series at the lags `1 … max_lag` and of the series
+/// together, the p-value of `Q̃` against `χ²(h)`, and the band of `τ` at
+/// `confidence_level` and the p-value of the information factor from
+/// `replicates` wild sets of the values, whose signs come from the stream
+/// [`Stream::DependenceSigns`] of `seed`.
 ///
 /// # Errors
 ///
@@ -109,23 +99,22 @@ fn check_values(observations: &[ObservedDataPoint], values: &[f64]) -> Result<()
 pub fn series_dependence(
     observations: &[ObservedDataPoint],
     values: &[f64],
-    max_lag: MaxLag,
+    max_lag: usize,
     replicates: usize,
     confidence_level: f64,
     seed: u64,
 ) -> Result<SeriesDependence, MethodError> {
-    max_lag.check().map_err(MethodError::Invalid)?;
+    MAX_LAG.check(max_lag).map_err(MethodError::Invalid)?;
     REPLICATES.check(replicates).map_err(MethodError::Invalid)?;
     CONFIDENCE_LEVEL
         .check(confidence_level)
         .map_err(MethodError::Invalid)?;
     check_values(observations, values)?;
     let layout = Layout::new(observations);
-    let lags = lags_of(&layout, max_lag);
-    let observed = one(&statistics(&layout, &lags, values));
+    let observed = one(&statistics(&layout, max_lag, values));
     let band = wild_band(
         &layout,
-        &lags,
+        max_lag,
         values,
         replicates,
         Stream::DependenceSigns.seed(seed),
@@ -136,5 +125,5 @@ pub fn series_dependence(
         Portmanteau::ChiSquare,
         confidence_level,
     ));
-    Ok(result(&layout, &lags, &observed, &tests, 1))
+    Ok(result(&layout, max_lag, &observed, &tests, 1))
 }

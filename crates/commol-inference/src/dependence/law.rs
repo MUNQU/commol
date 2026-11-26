@@ -150,10 +150,10 @@ pub(crate) enum Tests {
 }
 
 /// The result of an analysis of the statistics `summary` of the series of
-/// `layout`, with `lags[s]` lags for series `s`.
+/// `layout` at the lags `1 … max_lag`.
 pub(crate) fn result(
     layout: &Layout,
-    lags: &[usize],
+    max_lag: usize,
     summary: &Summary,
     tests: &Tests,
     draws: usize,
@@ -167,7 +167,7 @@ pub(crate) fn result(
                 label: series.label.clone(),
                 values: series.members.len(),
                 reason: series.reason.clone(),
-                max_lag: lags[s],
+                max_lag,
                 correlations: Vec::new(),
                 pairs: Vec::new(),
                 few_pairs: Vec::new(),

@@ -72,20 +72,22 @@ calibrator = Calibrator(Simulation(flow_model()), problem)
 fit = calibrator.run()
 
 # The residuals of the fit, against refits of data built from the fit and
-# its residuals with signs ±1.
+# its residuals with signs ±1. The noise carries over 0.6 from one step to
+# the next: its correlation is 0.6, 0.36 and 0.22 at lags 1 to 3, and then
+# fades. So the largest lag is 3.
 at_fit = Predictive(calibrator, calibrator.point_sample(fit), positions=[1])
 result = residual_dependence(
     at_fit,
     problem.observed_data,
     NoNoise(),
-    max_lag="auto",
+    max_lag=3,
     randomizations=1,
     reference=Refitted(replicates=99),
     confidence_level=0.9,
 )
 (series,) = result.series
-print(series.max_lag)  # 10
-print([round(r, 2) for r in series.correlations[:3]])  # [0.52, 0.17, 0.1]
+print(series.pairs, series.degrees_of_freedom)  # [59, 58, 57] 3
+print([round(r, 2) for r in series.correlations])  # [0.52, 0.17, 0.1]
 print(series.p_value)  # 0.02
 print(round(series.tau, 2), [round(b, 2) for b in series.tau_band])  # 2.58 [0.38, 1.97]
 ```
@@ -110,9 +112,9 @@ lag.
 | `tau_band` | The central interval of `τ` at `confidence_level` under independence, with one draw; `None` when no replicate has a `τ`, as for a constant series |
 | `cut_lag` | The largest lag in the sum of `τ`: the sequence `Γ_k = r(2k) + r(2k+1)`, made monotone, stops at its first `Γ_k ≤ 0` or at the first lag with no pair; over several sets, the largest of theirs |
 
-`max_lag` has no default: an integer, in steps of the grid of each series, or
-`"auto"`, `min(10, n/5)` for a series of `n` values, at least 1. `τ` does
-not read it: its sum stops where the sequence of Geyer stops.
+`max_lag` has no default: you give a whole number of at least 1
+([Choose the largest lag](#choose-the-largest-lag)). `τ` does not read it:
+its sum stops where the sequence of Geyer stops.
 
 A series has no statistics, with the `reason`, when two of its observations
 share one position (give one of them a label of its own), a position is off
@@ -134,15 +136,57 @@ of 19 positions on a grid of 35 and of 14 on a grid of 24, `Q̃` rejects at
 
 A lag of 4 pairs or more still pulls the rate down, less the more pairs
 it reads: one lag of 4 independent pairs alone rejects at 5 % in 0.2 % of
-the sets, of 6 in 1.2 %, of 10 in 3.1 % and of 20 in 4.4 %. So a short
-series, or one whose gaps leave few pairs at every lag, stays
-conservative: `"auto"` gives 5 values one lag of 4 pairs (0.2 %), 6
-values 1.0 % and 8 values 2.0 %. Many lags make the test liberal: 6.2 %
-at `max_lag=11` and 7.5 % at 17 with 35 values, 8.1 % at 33 with 100;
-`"auto"` reads at most 10 lags and a fifth of the values. A series whose
-every lag reads fewer than 4 pairs, such as one of 4 values, has no `Q̃`:
-`portmanteau` and `p_value` are `None`, and the `portmanteau_reason` says
-so.
+the sets, of 6 in 1.2 %, of 10 in 3.1 % and of 20 in 4.4 %. So a series of
+a few values, or one whose gaps leave few pairs at every lag, stays
+conservative whatever its `max_lag`: 5 values have one lag of 4 pairs
+(0.2 %), and 8 values at most four lags, of 4 to 7 pairs (2.4 %). A series
+whose every lag reads fewer than 4 pairs, such as one of 4 values, has no
+`Q̃`: `portmanteau` and `p_value` are `None`, and the `portmanteau_reason`
+says so.
+
+### Choose the largest lag
+
+`max_lag` says which dependence the autocorrelations and `Q̃` can show, and
+the p-value of `Q̃` depends on it. commol does not choose it.
+
+- **It counts steps of the grid of each series.** 7 is a week of a daily
+  series and 7 weeks of a weekly one.
+- **It must reach the period to detect.** A weekly pattern of a daily series
+  shows at lag 7, so a smaller number can miss it.
+- **More lags cost power.** Each lag that enters `Q̃` is one more degree of
+  freedom, and a lag with no dependence dilutes those that hold it.
+- **Many lags for the length of the series make `Q̃` liberal**, from about 20
+  values on. The table below gives the rates.
+- **A common bound is 10 and a fifth of the values, the smaller of the two.**
+  Hyndman and Athanasopoulos (2021, section 5.4) suggest 10 lags for data with
+  no season, `2m` for data with a season of `m` steps, and a fifth of the
+  values when that is fewer. It is a reference, not a rule of commol. The
+  bound of 10 does not know the period of your data.
+
+How often `Q̃` rejects independent normal values at 5 %, by the length of the
+series (40 000 simulated sets each, `Q̃` against `χ²`, each rate within about
+±0.2 points):
+
+| Values | `max_lag=4` | `max_lag=7` | `max_lag=10` |
+|---|---|---|---|
+| 12 | 3.7 % | 4.9 % | 4.9 % |
+| 20 | 4.4 % | 5.5 % | 6.2 % |
+| 35 | 4.6 % | 5.4 % | 6.2 % |
+| 100 | 4.8 % | 5.3 % | 5.6 % |
+
+Many lags can reject too often: 7.5 % at `max_lag=17` with 35 values, and
+8.1 % at 33 with 100.
+
+One number serves series of different lengths. The last lags of a short
+series leave its `Q̃` and are in its `few_pairs`, and the longer series read
+all of theirs. To read one series up to another lag, repeat the analysis with
+that number. `τ`, its band and the `problem` do not change with the same `seed`
+of `series_dependence`, or with the same predictive of `residual_dependence`.
+
+Choose each number before you read a p-value. The smallest p-value of several
+numbers rejects more often than its level. At 5 %, that of 4, 7 and 10 lags
+rejects 8 to 9 % of independent normal series of 20 to 100 values (40 000
+simulated sets each).
 
 ## The series together
 
@@ -188,6 +232,8 @@ observations = [
     for output in ("north", "south")
     for t in range(1, 51)
 ]
+# The shock carries over 0.7 from one step to the next, so its correlation
+# fades to 0.17 (0.7⁵) at lag 5, the largest lag.
 together = series_dependence(
     values, observations, max_lag=5, replicates=199, confidence_level=0.9, seed=7
 )
@@ -321,7 +367,8 @@ print(holm({s.label: s.p_value for s in together.series}))  # {'south': 1.0, 'no
 |---|---|
 | `values` is a list of lists | `TypeError` that points to `residual_dependence` |
 | `values` is not one finite value per observation | `ValueError` |
-| `max_lag`, `replicates` or `randomizations` below 1, or `max_lag` a text other than `"auto"` | `ValueError` that names the rule |
+| `max_lag`, `replicates` or `randomizations` below 1 | `ValueError` that names the rule |
+| `max_lag`, `replicates` of `series_dependence` or `randomizations` not a whole number, such as a text or 7.0 | `TypeError` that names it |
 | `ResidualNoise(...)` | `TypeError` |
 | `NoNoise()` with more than one randomization | `ValueError` |
 | `DistributionNoise()` with a loss, or an observed value outside the support of its model | `ValueError` |
@@ -331,6 +378,7 @@ print(holm({s.label: s.p_value for s in together.series}))  # {'south': 1.0, 'no
 
 ## Checklist
 
+- [ ] `max_lag` reaches the period you look for, and you can say why it is that number.
 - [ ] You test the residuals of a fit with `Refitted` and those of held-out data with `AtParameters`.
 - [ ] A test of many draws reads `Calibrator.point_sample(fit)`.
 - [ ] Several series are corrected for several tests.
@@ -355,6 +403,8 @@ print(holm({s.label: s.p_value for s in together.series}))  # {'south': 1.0, 'no
   Science*, 7(4), 473–483.
 - Holm, S. (1979). A simple sequentially rejective multiple test procedure.
   *Scandinavian Journal of Statistics*, 6(2), 65–70.
+- Hyndman, R. J., & Athanasopoulos, G. (2021). *Forecasting: Principles and
+  Practice* (3rd ed.). OTexts.
 - Parzen, E. (1963). On spectral analysis with missing observations and
   amplitude modulation. *Sankhyā A*, 25, 383–392.
 - Stoffer, D. S., & Toloi, C. M. C. (1992). A note on the Ljung–Box–Pierce

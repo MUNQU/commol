@@ -235,7 +235,7 @@ def _of_draws() -> SeriesDependence:
         _predictive(),
         _flows().problem.observed_data,
         NoNoise(),
-        max_lag="auto",
+        max_lag=1,
         randomizations=1,
         reference=AtParameters(replicates=3),
         confidence_level=0.9,

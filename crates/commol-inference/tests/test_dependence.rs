@@ -3,7 +3,7 @@
 //! the information of several series.
 
 use commol_calibration::ObservedDataPoint;
-use commol_inference::dependence::{MaxLag, SeriesDependence, series_dependence};
+use commol_inference::dependence::{SeriesDependence, series_dependence};
 use commol_random::Generator;
 use commol_random::sample::normal;
 
@@ -21,7 +21,7 @@ fn steps(count: usize) -> Vec<f64> {
 }
 
 fn analysis(observations: &[ObservedDataPoint], values: &[f64], lags: usize) -> SeriesDependence {
-    series_dependence(observations, values, MaxLag::Lags(lags), 19, 0.9, 5).unwrap()
+    series_dependence(observations, values, lags, 19, 0.9, 5).unwrap()
 }
 
 fn close(actual: f64, expected: f64, tolerance: f64) {
