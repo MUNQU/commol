@@ -36,6 +36,7 @@ from .oracles import (
     settled,
     total_at,
 )
+from .far import far_calibrator
 from .parallelism import (
     assert_on_threads_of_setting,
     decay_swarm_calibrator,
@@ -135,4 +136,5 @@ __all__ = [
     "TWO_WELLS_FIT",
     "weak_parameter_calibrator",
     "two_wells_calibrator",
+    "far_calibrator",
 ]
