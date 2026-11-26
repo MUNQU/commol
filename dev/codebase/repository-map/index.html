@@ -3337,6 +3337,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/curvature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Curvature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/local-approximations/" class="md-nav__link">
         
   
@@ -4193,7 +4221,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-statistics/src/numeric.rs</code></td>
-<td>The numerical helpers that the calibration and the inference methods share, one copy of each: <code>log_sum_exp</code>, <code>x_log_y</code>, <code>x_log1p_y</code>, <code>ln_gamma</code>, <code>ln_beta</code>, <code>digamma</code>, <code>trigamma</code>, and the log densities of the normal, the log-normal and the Student t in one or several dimensions.</td>
+<td>The numerical helpers that the calibration and the inference methods share, one copy of each: <code>log_sum_exp</code>, <code>CompensatedSum</code>, <code>x_log_y</code>, <code>x_log1p_y</code>, <code>ln_gamma</code>, <code>ln_beta</code>, <code>digamma</code>, <code>trigamma</code>, and the log densities of the normal, the log-normal and the Student t in one or several dimensions.</td>
 <td>A second copy of a helper or a density; anything of a model.</td>
 </tr>
 <tr>
@@ -4208,8 +4236,8 @@
 </tr>
 <tr>
 <td><code>crates/commol-statistics/src/linear_algebra.rs</code></td>
-<td>The linear algebra of commol: <code>spectral_radius</code>, the largest modulus of the eigenvalues of a square matrix, from the real Schur decomposition of <code>nalgebra</code>, which the model compiler reads for each matrix between categories.</td>
-<td>A second eigenvalue routine.</td>
+<td>The linear algebra of commol: <code>spectral_radius</code>, the largest modulus of the eigenvalues of a square matrix, from the real Schur decomposition of <code>nalgebra</code>, which the model compiler reads for each matrix between categories; <code>symmetric_inverse</code>, the inverse of any symmetric positive definite matrix, which the curvature reads, and <code>singular</code>, its rule, which the collinearity index also reads.</td>
+<td>A second eigenvalue routine or rule of a singular matrix.</td>
 </tr>
 <tr>
 <td><code>crates/commol-model/src/builder.rs</code></td>
@@ -4463,8 +4491,8 @@
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/local/</code></td>
-<td>Local approximations at a fit: <code>Curvature</code> (Gauss–Newton or the stepped Hessian of the <code>finitediff</code> crate of the argmin fork, on the unbounded scale, with the term gradients and the curvature of each block), <code>CurvatureKind</code> and <code>laplace_approximation</code> (<code>approximation.rs</code>), <code>Gaussian</code> and <code>laplace</code> (<code>gaussian.rs</code>), <code>delta_band</code> (<code>band.rs</code>), <code>sandwich</code>, <code>block_meat</code>, <code>block_scores</code> and <code>sandwich_approximation</code> (<code>sandwich.rs</code>), <code>laplace_mixture</code> (<code>mixture.rs</code>).</td>
-<td>Finite-difference formulas of their own; samplers.</td>
+<td>Local approximations at a fit: <code>Curvature</code> (Gauss–Newton or the stepped Hessian of the <code>finitediff</code> crate of the argmin fork, on the unbounded scale, in units of the parameters, with the term gradients and the curvature of each block), <code>InverseCurvature</code> (<code>inverse.rs</code>), <code>CurvatureKind</code> and <code>laplace_approximation</code> (<code>approximation.rs</code>), <code>Gaussian</code> and <code>laplace</code> (<code>gaussian.rs</code>), <code>delta_band</code> (<code>band.rs</code>), <code>sandwich</code>, <code>scaled_block_scores</code> and <code>sandwich_approximation</code> (<code>sandwich.rs</code>), <code>laplace_mixture</code> (<code>mixture.rs</code>).</td>
+<td>Finite-difference formulas of their own; samplers; a second inverse of a curvature.</td>
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/psis.rs</code>, <code>importance.rs</code></td>
@@ -5022,7 +5050,7 @@ results.</p>
 <tr>
 <td>Change sensitivities or identifiability</td>
 <td><code>crates/commol-inference/src/sensitivity/</code>, <code>crates/commol-inference/src/identifiability/</code></td>
-<td><code>crates/commol-core/src/simulation_engine.rs</code> (<code>accuracy</code>, <code>at_accuracy</code>), <code>py-commol/src/identifiability.rs</code>, <code>py-commol/commol/identifiability/methods.py</code>, <code>identifiability/runners.py</code>, <code>docs/guide/uncertainty/identifiability.md</code></td>
+<td><code>crates/commol-core/src/simulation_engine.rs</code> (<code>accuracy</code>, <code>at_accuracy</code>), <code>crates/commol-statistics/src/linear_algebra.rs</code> (<code>singular</code>), <code>py-commol/src/identifiability.rs</code>, <code>py-commol/commol/identifiability/methods.py</code>, <code>identifiability/runners.py</code>, <code>docs/guide/uncertainty/identifiability.md</code></td>
 </tr>
 <tr>
 <td>Change a bootstrap, the jackknife, blocks or residual noise</td>
@@ -5047,7 +5075,7 @@ results.</p>
 <tr>
 <td>Change a local approximation (the curvature, Laplace, the sandwich, the Laplace mixture) or PSIS</td>
 <td><code>crates/commol-inference/src/local/</code>; <code>psis.rs</code>, <code>importance.rs</code></td>
-<td><code>crates/commol-calibration/src/likelihood/density.rs</code> (<code>information</code>, <code>scores</code>), <code>discrepancy.rs</code> (<code>term_derivatives</code>), <code>py-commol/src/local.rs</code>, <code>py-commol/commol/local/methods.py</code>, <code>local/runners.py</code>, <code>docs/guide/uncertainty/local.md</code></td>
+<td><code>crates/commol-calibration/src/likelihood/density.rs</code> (<code>information</code>, <code>scores</code>), <code>discrepancy.rs</code> (<code>term_derivatives</code>), <code>crates/commol-statistics/src/linear_algebra.rs</code> (<code>symmetric_inverse</code>, <code>singular</code>), <code>py-commol/src/local.rs</code>, <code>py-commol/commol/local/methods.py</code>, <code>local/runners.py</code>, <code>docs/guide/uncertainty/local.md</code></td>
 </tr>
 <tr>
 <td>Change the parameter sample, the predictive, the scenarios, the scores, the dependence analyses or the quantile</td>

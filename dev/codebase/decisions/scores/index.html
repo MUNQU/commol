@@ -18,7 +18,7 @@
         <link rel="prev" href="../sensitivity/">
       
       
-        <link rel="next" href="../local-approximations/">
+        <link rel="next" href="../curvature/">
       
       
         
@@ -3256,6 +3256,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../curvature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Curvature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../local-approximations/" class="md-nav__link">
         
   
@@ -3963,7 +3991,9 @@
 <p><a href="../../design-decisions/">Back to Design decisions</a></p>
 <p>Where the scores, the Fisher information and the distribution functions of
 the observation models live, and what they give at the ends of a support. The
-methods that read them are on <a href="../local-approximations/">Local approximations</a>.</p>
+methods that read them are on <a href="../local-approximations/">Local approximations</a>,
+and the curvature that reads the scores and the information is on
+<a href="../curvature/">Curvature</a>.</p>
 <h2 id="scores-and-information-live-in-commol-calibration">Scores and information live in commol-calibration<a class="headerlink" href="#scores-and-information-live-in-commol-calibration" title="Permanent link">&para;</a></h2>
 <p><code>Discrepancy::term_derivatives</code> (<code>crates/commol-calibration/src/discrepancy.rs</code>)
 gives each observation's gradient and expected curvature over its arguments:
@@ -3998,8 +4028,7 @@ parameter is not 0, and the results change with it.
 <code>Likelihood::term_derivatives</code> refuses a score that is not finite, as it
 refuses a mean outside its model, naming the observation
 (<code>MethodError::Invalid</code>): no probability at the fit, outside the support, or
-an overflow next to the edge. No reader of the terms sums a NaN. Information
-matching reads an inverse of the curvature that is not finite as singular.</p>
+an overflow next to the edge. No reader of the terms sums a NaN.</p>
 <table>
 <thead>
 <tr>
@@ -4034,7 +4063,7 @@ matching reads an inverse of the curvature that is not finite as singular.</p>
 <code>crates/commol-calibration/tests/test_likelihood.rs::sums_of_parts_of_mean_zero_have_the_limit_of_their_scores</code>, <code>crates/commol-calibration/tests/test_likelihood.rs::terms_name_a_score_that_is_not_finite</code>,
 <code>crates/commol-inference/tests/test_local.rs::a_count_of_zero_at_a_mean_of_zero_adds_no_score</code>, <code>crates/commol-inference/tests/test_local.rs::a_count_with_no_probability_at_its_mean_has_no_curvature</code>,
 <code>tests/uncertainty/test_information_matching.py::TestInformationMatching::test_a_fitted_scale_reads_the_observations_of_mean_and_value_zero</code>,
-<code>tests/uncertainty/test_smc.py::test_the_blocks_ignore_observations_that_carry_no_information_at_shared_positions</code>, <code>tests/uncertainty/test_smc.py::test_information_matching_refuses_a_curvature_singular_to_working_precision</code>, <code>tests/uncertainty/test_profiles.py::test_a_count_of_zero_at_a_mean_of_zero_keeps_the_floors</code>,
+<code>tests/uncertainty/test_smc.py::test_the_blocks_ignore_observations_that_carry_no_information_at_shared_positions</code>, <code>tests/uncertainty/test_profiles.py::test_a_count_of_zero_at_a_mean_of_zero_keeps_the_floors</code>,
 <code>crates/commol-calibration/tests/test_likelihood.rs::scores_equal_the_differences_of_the_terms</code>,
 <code>crates/commol-inference/tests/test_local.rs::the_gradient_of_a_sum_is_that_of_its_density</code>,
 <code>crates/commol-inference/tests/test_local.rs::the_information_of_a_sum_is_that_of_its_density</code>,

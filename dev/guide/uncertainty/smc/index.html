@@ -3341,6 +3341,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../codebase/decisions/curvature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Curvature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../codebase/decisions/local-approximations/" class="md-nav__link">
         
   
@@ -4392,7 +4420,9 @@ inside a block, and <code>block_length</code> has no default: <code>block_length
 the independent version, every observation its own block. <code>I</code> enters only
 through a trace, so <code>η</code> needs no inverse of <code>I</code>: it takes two blocks or more,
 also fewer blocks than parameters, and blocks can be long enough to hold the
-dependence.</p>
+dependence. <code>J</code> is inverted, so a <code>J</code> that the data
+<a href="../local/#the-curvature-and-the-unbounded-scale">do not determine</a> raises a
+<code>ValueError</code>. <code>η</code> is the same in any unit of the parameters.</p>
 <p>The blocks read at most <code>p(G − 1)</code> degrees of freedom <code>ν</code> about the scale,
 for <code>G</code> blocks, and fewer when they share the curvature <code>J</code> unevenly: a
 slope, whose curvature sits at the ends of the series, a parameter that the

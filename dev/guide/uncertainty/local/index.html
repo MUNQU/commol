@@ -3341,6 +3341,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../codebase/decisions/curvature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Curvature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../codebase/decisions/local-approximations/" class="md-nav__link">
         
   
@@ -4280,7 +4308,8 @@ and keeps every run inside the bounds. Each entry of either curvature has an
 estimated error. An entry whose error is above 1 % of <code>√(H_jj · H_kk)</code> is
 listed in <code>notes</code> and logged as a warning. The error is read as a share of a
 correlation: an off-diagonal entry near 0 is compared with the diagonal of its
-row and column, not with its own size. A note changes no result.</p>
+row and column, not with its own size. A note changes no result. A share above
+100 % says that the entry, and any covariance that reads it, is unknown.</p>
 <p>Every distribution lives on the <strong>unbounded scale</strong> of the parameters, the
 scale on which the <a href="../smc/#how-the-sampler-works">sampler</a> of sequential Monte
 Carlo proposes its moves. The curvature there is
@@ -4291,6 +4320,32 @@ skewed sample, not draws outside it. A fit <strong>on</strong> a bound of its pa
 parameter has one finite bound) raises a <code>ValueError</code>: its
 variance on the unbounded scale is infinite there, and a
 <a href="../profiles/">profile likelihood</a> describes it.</p>
+<p><code>Laplace</code>, <code>Sandwich</code> and information matching raise a <code>ValueError</code> for a
+curvature that the data do not determine: one with a parameter that moves no
+observation, or with two that the model reads only as their product.
+<code>LaplaceMixture</code> gives no component for such an end and says so in <code>notes</code>
+(<a href="#reading-k_hat">Reading <code>k_hat</code></a>). With <code>H</code> scaled to a diagonal of 1, its
+smallest eigenvalue is then at most <code>p·ε</code> times the largest, for <code>p</code>
+parameters and the machine precision <code>ε ≈ 2.2e-16</code>. The unit of a parameter
+does not change the answer. A window split into parts can read a parameter
+that its total does not: its diagonal entry is then a rounding, which the rule
+reads as 0.</p>
+<p>The rule sees such a product, or a parameter that moves no observation, only
+when the derivatives are accurate to about <code>1e-8</code>. The finite differences of
+any engine can miss it: with an ODE, with <code>"hessian"</code>, with a long series or
+with bounds much wider than the value. The covariance then means nothing,
+whether its draws are wide or narrow. <code>StructuralRank</code> tells such parameters
+apart (<a href="../identifiability/#structural-rank">Structural rank</a>), and
+<a href="../identifiability/#when-the-solver-tolerance-sets-the-rank">When the solver tolerance sets the rank</a>
+says how the error of the derivatives moves it.</p>
+<p>A covariance too large or too small for a number is refused. A variance above
+the largest number raises a <code>ValueError</code> (the covariance is not positive
+definite), and one below the smallest number a <code>RuntimeError</code> that names the
+parameter whose curvature is too large for its covariance to be a number. A
+variance below the smallest normal number is given. Information matching
+reads no covariance and gives <code>η</code> in both cases, unless the scores are too
+small against the curvature for <code>η</code> to be a number, which raises a
+<code>RuntimeError</code>.</p>
 <p>A curvature needs finite predictions and derivatives. One that is not finite
 at the fit raises a <code>RuntimeError</code> that names the observation and, for a
 derivative, the parameter, whatever the weight and the noise of the
@@ -4445,11 +4500,13 @@ far the mixture misses the target.</p>
 </tr>
 </tbody>
 </table>
-<p>A start that ends on a bound gives no component, and <code>notes</code> says so. When
-its objective is at least as good as that of the worst kept component, the
-mixture leaves out an optimum the data support, whose mass <code>k_hat</code> cannot
-see: <code>reliable</code> is false too. An end on a bound that fits worse than every
-component only adds the note.</p>
+<p>A start whose end is on a bound, whose curvature the data do not determine,
+or whose covariance is refused, gives no component, and <code>notes</code> says why.
+When its objective is at least as good as that of the worst kept component,
+the mixture leaves out an optimum, whose mass <code>k_hat</code> cannot see: <code>reliable</code>
+is false too. Such an end that fits worse than every component only adds the
+note. When no end gives a component, <code>LaplaceMixture</code> raises a <code>ValueError</code>
+that lists each end and why.</p>
 <p>An unreliable sample calls for a method that samples the posterior itself:
 <code>BayesianPosterior</code> or <code>GibbsPosterior</code> (<a href="../smc/">Sequential Monte Carlo</a>).</p>
 <h2 id="when-a-local-approximation-is-good-enough">When a local approximation is good enough<a class="headerlink" href="#when-a-local-approximation-is-good-enough" title="Permanent link">&para;</a></h2>

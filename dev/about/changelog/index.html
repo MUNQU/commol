@@ -3171,6 +3171,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/curvature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Curvature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/local-approximations/" class="md-nav__link">
         
   
@@ -6345,6 +6373,82 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <a href="../../guide/uncertainty/resampling/#how-replicates-run">How replicates run</a>.</p>
 </li>
 <li>
+<p><code>InformationMatchingEta</code> gives the same <code>η</code>, degrees of freedom and note in
+  any unit of a parameter, and <code>Laplace</code>, <code>Sandwich</code> and <code>LaplaceMixture</code> the
+  covariance of that unit, with either curvature: the curvature is kept in
+  units of its parameters, and <code>curvature="hessian"</code> takes its differences in
+  the unit of its step, a power of two, at the same points. Before, the range
+  of a number stopped them. With <code>weak_parameter_calibrator</code> of the tests,
+  whose data read <code>k2</code> through a factor <code>scale</code>, <code>InformationMatchingEta</code>
+  raised a <code>RuntimeError</code> of a singular curvature from a scale of <code>2e-159</code>;
+  <code>η</code> is now the same down to at least <code>1e-310</code>. There the covariance of
+  <code>Laplace</code> held <code>inf</code> from <code>2e-159</code> to <code>1e-166</code>, and <code>Laplace</code> raised a
+  <code>ValueError</code> of a curvature that is not positive definite from <code>1e-167</code>.
+  With its <code>own_bin</code>, where <code>k2</code> feeds a bin of its own, the variance of <code>k2</code>
+  from <code>Sandwich</code> was <code>1.2e-7</code> off its closed form at <code>1e-81</code> and 0.24 % off at
+  <code>1e-82</code>, <code>Sandwich</code> raised a <code>ValueError</code> of a covariance that is not
+  positive definite from <code>1e-83</code>, and <code>InformationMatchingEta</code> the
+  <code>RuntimeError</code> from <code>2e-157</code>; the variance is now within <code>1e-9</code> of its
+  closed form, and <code>η</code> the same, down to <code>1e-308</code>. <code>Sandwich</code> reads a squared
+  error whose squared scores overflow, where it gave an infinite variance (an
+  <code>"sse"</code> loss on data at a scale of <code>1e78</code> and above). <code>Laplace</code> and
+  <code>LaplaceMixture</code> give covariances that they refused: for a parameter in
+  <code>[0, 100]</code> read by an observation of scale <code>1e152</code>, a variance of
+  <code>4.0e-310</code>, where both raised a <code>ValueError</code>; in <code>[0, 1]</code> at <code>1e155</code>,
+  <code>4.0e-312</code>, where they raised a <code>RuntimeError</code> that a derivative may be too
+  large for its square. A variance below the smallest number raises a
+  <code>RuntimeError</code> that names the parameter whose curvature is too large for its
+  covariance to be a number, where <code>Sandwich</code> raised a <code>ValueError</code> of a
+  covariance that is not positive definite. A variance above the largest number
+  raises that <code>ValueError</code> from <code>Laplace</code>, where its covariance held <code>inf</code>, and
+  <code>LaplaceMixture</code> notes the end that has it. <code>InformationMatchingEta</code> raises a
+  <code>RuntimeError</code> when the scores are too small against the curvature for <code>η</code>
+  to be a number, as for the sum of squares of a line through data of size
+  <code>1e-156</code>, where it gave <code>inf</code>, which <code>GibbsPosterior</code> refused with a
+  <code>ValueError</code>, or said that the scores were all 0. The notes of a curvature
+  give the share of the error only, as "The curvature of ('c', 'c') has an
+  estimated error of 42.5% of the scale of its row and column", or "more than
+  100%".
+  Before, they gave the entry and its error on the unbounded scale and a share
+  of up to about 150 digits, or "inf%". In Rust, <code>Curvature::matrix</code>,
+  <code>gradients</code> and <code>block_matrix</code> are <code>scaled_matrix</code>, <code>scaled_gradients</code> and
+  <code>scaled_block_matrix</code>, in the units of <code>Curvature::scales</code>;
+  <code>local::block_scores</code> is <code>scaled_block_scores</code>; <code>local::block_meat</code> is
+  removed; <code>Curvature::names</code> is new; and <code>Transform::derivatives</code> is finite
+  and not 0 for any width of the bounds that is a number. See
+  <a href="../../guide/uncertainty/local/#the-curvature-and-the-unbounded-scale">The curvature and the unbounded scale</a>.</p>
+</li>
+<li>
+<p><code>Laplace</code>, <code>Sandwich</code> and <code>InformationMatchingEta</code> refuse a curvature that
+  the data do not determine by one rule, that of the collinearity index, and
+  with one <code>ValueError</code>, and <code>LaplaceMixture</code> gives no component for such an
+  end: the curvature scaled to a diagonal of 1 has a smallest eigenvalue of at
+  most <code>p·ε</code> times the largest, for <code>p</code> parameters. A diagonal entry that is
+  only the rounding of its sum is 0, so a parameter that the parts of a window
+  read and their total does not is refused too. Before, the sign of a rounding
+  decided. With two parameters that the model reads only through their product
+  (<code>A → B</code> at <code>k1 · k2 · A</code>, 20 and 200 positions, 20 draws of the noise),
+  <code>Laplace</code> gave standard deviations of about <code>1e5</code> to <code>1e6</code> for 7 or 8 of 20,
+  and <code>Sandwich</code> for 2 to 4, or a <code>ValueError</code> of their covariance;
+  <code>LaplaceMixture</code> raised a <code>RuntimeError</code> that every importance weight is 0
+  for 7 or 8; and <code>InformationMatchingEta</code> a <code>ValueError</code> that blamed the
+  blocks or a <code>RuntimeError</code> of a sampler whose moves accept nothing. The rule
+  sees such a product only with derivatives exact enough: the error of finite
+  differences, as with an ODE or a long series, can still hide it.
+  <code>InformationMatchingEta</code> raised a <code>RuntimeError</code> for a parameter that the
+  data do not read. <code>Sandwich</code> gives the covariance of two parameters that the
+  data tell apart by little, where it raised a <code>ValueError</code> of a covariance
+  that is not positive definite. <code>LaplaceMixture</code> marks its sample unreliable
+  for any end that gives no component and fits at least as well as its worst
+  component, not only one on a bound, and its note says so. In Rust,
+  <code>Curvature::inverse</code>, <code>local::InverseCurvature</code>,
+  <code>commol_statistics::linear_algebra::singular</code> and <code>symmetric_inverse</code> and
+  <code>commol_statistics::numeric::CompensatedSum</code> are new, and
+  <code>information_matching_eta</code> returns <code>MethodError::Invalid</code> for a singular
+  curvature. See
+  <a href="../../guide/uncertainty/local/#the-curvature-and-the-unbounded-scale">The curvature and the unbounded scale</a>.</p>
+</li>
+<li>
 <p>A <code>"pulse"</code> series acts on step 0 with a point at <code>-0.0</code>, in every engine,
   as <code>"step_function"</code> and <code>"linear"</code> do. Before, the point was accepted and
   never read, so the pulse at step 0 did nothing, with no message. In Rust,
@@ -6420,9 +6524,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   mean of 0, raises a <code>ValueError</code> from the local methods, the sandwich and
   information matching. The error names the observation and says whether
   the fit is outside the support of its observation model. Before, it
-  reached them as a NaN. <code>InformationMatchingEta</code> reports a curvature that
-  is singular to working precision as singular. Before, it reported that
-  the scores were all 0.</p>
+  reached them as a NaN.</p>
 </li>
 <li>
 <p>A prediction or a derivative that is not finite at the fit, such as a
@@ -6443,7 +6545,8 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>LaplaceMixture</code> whose matrix was right is refused too: one with
   <code>curvature="hessian"</code> or, in Rust, one with the entry in a term of weight 0.
   The error of a curvature that is not finite with finite derivatives says
-  that a derivative may be too large for its square. In Rust,
+  that a mean sits on the edge of the means its observation model allows. In
+  Rust,
   <code>Curvature::gauss_newton</code> and <code>Curvature::hessian</code> return
   <code>MethodError::Failed</code>, also where they returned <code>MethodError::Invalid</code> at a
   prediction or a derivative that is not finite, and

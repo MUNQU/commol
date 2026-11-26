@@ -615,15 +615,15 @@ The result of a Laplace mixture: draws of the mixture weighted by the target ove
 
 Attributes:
 
-| Name             | Type                     | Description                                                                                                                      |
-| ---------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
-| `fit`            | `CalibrationResult`      | The multi-start fit whose ends made the components: Calibrator.run(starts).                                                      |
-| `sample`         | `ParameterSample`        | The draws with their smoothed weights.                                                                                           |
-| `components`     | `list[MixtureComponent]` | The components, in order of their objective.                                                                                     |
-| `k_hat`          | `float`                  | The Pareto shape of the tail of the weights. Up to 0.5 the weights have a finite variance; above 0.7 the estimate is unreliable. |
-| `effective_size` | `float`                  | Kish's effective size of the smoothed weights.                                                                                   |
-| `reliable`       | `bool`                   | Whether k_hat is at most 0.7. An unreliable sample is also logged as a warning.                                                  |
-| `notes`          | `list[str]`              | Ends that gave no component, and an unreliable sample, in words.                                                                 |
+| Name             | Type                     | Description                                                                                                                                                     |
+| ---------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fit`            | `CalibrationResult`      | The multi-start fit whose ends made the components: Calibrator.run(starts).                                                                                     |
+| `sample`         | `ParameterSample`        | The draws with their smoothed weights.                                                                                                                          |
+| `components`     | `list[MixtureComponent]` | The components, in order of their objective.                                                                                                                    |
+| `k_hat`          | `float`                  | The Pareto shape of the tail of the weights. Up to 0.5 the weights have a finite variance; above 0.7 the estimate is unreliable.                                |
+| `effective_size` | `float`                  | Kish's effective size of the smoothed weights.                                                                                                                  |
+| `reliable`       | `bool`                   | Whether k_hat is at most 0.7 and no end that gives no component fits at least as well as the worst component. An unreliable sample is also logged as a warning. |
+| `notes`          | `list[str]`              | Ends that gave no component, and an unreliable sample, in words.                                                                                                |
 
 Source code in `commol/local/results.py`
 
@@ -649,8 +649,9 @@ class ImportanceResult(ResultModel):
     effective_size : float
         Kish's effective size of the smoothed weights.
     reliable : bool
-        Whether ``k_hat`` is at most 0.7. An unreliable sample is also
-        logged as a warning.
+        Whether ``k_hat`` is at most 0.7 and no end that gives no component
+        fits at least as well as the worst component. An unreliable sample is
+        also logged as a warning.
     notes : list[str]
         Ends that gave no component, and an unreliable sample, in words.
     """
