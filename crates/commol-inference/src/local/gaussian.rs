@@ -1,6 +1,10 @@
 //! A normal or Student-t distribution on the unbounded scale, and the
 //! Laplace approximation `N(û, H_u⁻¹)` of a curvature.
 //!
+//! A bound less than [`NEAR_BOUND`] sd from the centre, on the scale of the
+//! parameters, is noted ([`Gaussian::near_bounds`]): the distribution mapped
+//! back is then far from a normal there.
+//!
 //! A Student t has degrees of freedom `ν_j` for each parameter: the grouped t
 //! of Daul, De Giorgi, Lindskog and McNeil (2003), whose margin of parameter
 //! `j` is a Student t of `ν_j`, with one χ² level common to all. With equal
@@ -9,14 +13,21 @@
 use commol_random::Generator;
 use commol_random::sample::{gamma, normal};
 use commol_statistics::numeric::{normal_log_density, student_t_log_density};
-use commol_statistics::special::{chi_square_quantile, gamma_p};
+use commol_statistics::special::{
+    chi_square_quantile, gamma_p, normal_quantile_sf, student_t_two_sided_tail,
+};
 use nalgebra::DVector;
 
 use super::curvature::Curvature;
 use crate::error::MethodError;
 use crate::sensitivity::Matrix;
-use crate::transform::Transform;
+use crate::transform::{Scale, Transform};
 use commol_random::Stream;
+
+/// A bound less than this many sd from the centre, on the scale of the
+/// parameters, is noted ([`Gaussian::near_bounds`]): a normal puts 0.135 % of
+/// its mass past a bound 3 sd from its centre.
+pub const NEAR_BOUND: f64 = 3.0;
 
 /// A normal distribution on the unbounded scale, or a grouped Student t with
 /// `degrees_of_freedom` for each parameter, whose draws map back to the
@@ -154,6 +165,77 @@ impl Gaussian {
             .collect()
     }
 
+    /// Each bound less than [`NEAR_BOUND`] sd from the centre, on the scale
+    /// of the parameters, the lower bound of a parameter first.
+    ///
+    /// The scale of parameter `j` there is `(dθ/du)_j · √Σ_jj`, with the
+    /// covariance `Σ` on the unbounded scale. With `σ = √Σ_jj` and the centre
+    /// `u`, the distance `d` in that scale is `(1 + eᵘ)/σ` to the lower bound
+    /// of a logit and `(1 + e⁻ᵘ)/σ` to its upper bound; to the bound of a log,
+    /// `1/σ`. None reads `dθ/du`, which a fit near a bound rounds. For a
+    /// normal the distance is `d`. For a Student t of `ν_j` degrees of freedom
+    /// it is the distance of a normal with the same mass past the bound,
+    /// `z = Φ⁻¹(1 − P(T_ν > d))`, at most `d`, so that the rule reads the
+    /// mass past the bound whatever the tails.
+    pub fn near_bounds(&self) -> Vec<NearBound> {
+        let mut near = Vec::new();
+        for (j, scale) in self.transform.scales().iter().enumerate() {
+            let sd = self.covariance[(j, j)].sqrt();
+            let u = self.center[j];
+            let distances = match *scale {
+                Scale::Logit { lower, upper } => vec![
+                    (lower, (1.0 + libm::exp(u)) / sd),
+                    (upper, (1.0 + libm::exp(-u)) / sd),
+                ],
+                Scale::Log { lower } => vec![(lower, 1.0 / sd)],
+                Scale::LogFromAbove { upper } => vec![(upper, 1.0 / sd)],
+                Scale::Identity => Vec::new(),
+            };
+            // An infinite `ν` is a normal.
+            let degrees_of_freedom = self
+                .degrees_of_freedom
+                .as_ref()
+                .map(|degrees| degrees[j])
+                .filter(|nu| nu.is_finite());
+            for (bound, scaled) in distances {
+                let distance = match degrees_of_freedom {
+                    Some(nu) if (scaled * scaled).is_finite() => {
+                        let tail = 0.5 * student_t_two_sided_tail(scaled * scaled, nu);
+                        (normal_quantile_sf(tail) + 0.0).max(0.0)
+                    }
+                    _ => scaled,
+                };
+                if distance < NEAR_BOUND {
+                    near.push(NearBound {
+                        parameter: j,
+                        bound,
+                        distance,
+                        degrees_of_freedom,
+                    });
+                }
+            }
+        }
+        near
+    }
+
+    /// [`Self::near_bounds`] in words, with `names` the names of the
+    /// parameters: the draws that a bound skews, and the profile likelihood
+    /// that describes such a parameter.
+    pub fn bound_notes(&self, names: &[String]) -> Vec<String> {
+        self.near_bounds()
+            .iter()
+            .map(|near| {
+                format!(
+                    "{}: the draws, mapped back from the unbounded scale, are skewed by the \
+                     bound and can spread far from the fit. A profile likelihood describes the \
+                     uncertainty of a parameter near its bound: \
+                     Calibrator.uncertainty(ProfileLikelihood(...))",
+                    near.head(names)
+                )
+            })
+            .collect()
+    }
+
     /// `count` draws mapped back to the parameters, from the stream of
     /// draws of `seed`; every draw lies inside the bounds.
     pub fn draws(&self, count: usize, seed: u64) -> Vec<Vec<f64>> {
@@ -164,6 +246,55 @@ impl Gaussian {
                     .from_unbounded(&self.draw_unbounded(&mut generator))
             })
             .collect()
+    }
+}
+
+/// A bound less than [`NEAR_BOUND`] sd from the centre of a [`Gaussian`]
+/// ([`Gaussian::near_bounds`]).
+#[derive(Debug, Clone, PartialEq)]
+pub struct NearBound {
+    /// The index of the parameter.
+    pub parameter: usize,
+    /// The bound.
+    pub bound: f64,
+    /// The distance from the centre in sd, on the scale of the parameters:
+    /// for a Student t, that of a normal with its mass past the bound.
+    pub distance: f64,
+    /// The degrees of freedom of a Student t, or `None` for a normal.
+    pub degrees_of_freedom: Option<f64>,
+}
+
+impl NearBound {
+    /// The words that every note of a bound near the centre starts with, with
+    /// `names` the names of the parameters: the parameter, its distance in sd
+    /// and the bound.
+    pub fn head(&self, names: &[String]) -> String {
+        let read = self.degrees_of_freedom.map_or_else(String::new, |nu| {
+            format!(
+                " (as a normal with the mass of its Student t of {nu:.1} degrees of freedom \
+                 past the bound)"
+            )
+        });
+        format!(
+            "'{}' is {} sd from its bound {}{read}, within {NEAR_BOUND} sd",
+            names[self.parameter],
+            in_sd(self.distance),
+            self.bound
+        )
+    }
+}
+
+/// A distance below [`NEAR_BOUND`] in sd: two decimals, or two digits below
+/// 0.01, and never one that rounds up to [`NEAR_BOUND`].
+fn in_sd(distance: f64) -> String {
+    if distance < 0.01 {
+        return format!("{distance:.1e}");
+    }
+    let shown = format!("{distance:.2}");
+    if shown.parse::<f64>().is_ok_and(|shown| shown >= NEAR_BOUND) {
+        format!("{:.2}", NEAR_BOUND - 0.01)
+    } else {
+        shown
     }
 }
 
@@ -273,6 +404,14 @@ mod tests {
             assert_eq!(equal[0], close[0]);
             assert!((equal[1] - close[1]).abs() < 1e-7 * (1.0 + equal[1].abs()));
         }
+    }
+
+    #[test]
+    fn a_distance_in_sd_never_reads_as_the_threshold() {
+        assert_eq!(in_sd(0.5), "0.50");
+        assert_eq!(in_sd(2.994), "2.99");
+        assert_eq!(in_sd(2.996), "2.99");
+        assert_eq!(in_sd(1e-3), "1.0e-3");
     }
 
     #[test]

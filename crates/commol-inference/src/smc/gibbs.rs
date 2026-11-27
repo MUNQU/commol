@@ -17,10 +17,10 @@ use super::kernel::Kernel;
 use super::sampler::{SmcEvent, SmcRun, SmcSampler, SmcState, SmcSteps, Stop, stopped};
 use crate::error::MethodError;
 use crate::local::shares::ROUNDED_SHARE;
-use crate::local::{Curvature, CurvatureKind, curvature_at, scaled_block_scores};
+use crate::local::{Curvature, scaled_block_scores};
 use crate::priors::Priors;
 use crate::resampling::{BayesianBootstrap, BlockScheme};
-use crate::sensitivity::Matrix;
+use crate::sensitivity::{Design, FiniteDifferences, Matrix};
 use crate::target::discrepancy_in_support;
 use commol_random::Stream;
 
@@ -162,7 +162,11 @@ pub(crate) fn reached_the_posterior(run: SmcRun, posterior: &str) -> Result<SmcR
 /// 2011; Ribatet, Cooley and Davison 2012), for `p` parameters. `J` is the
 /// Gauss–Newton [`crate::local::Curvature`] of the objective, and `I` the
 /// variance of the scores of the terms summed over blocks of `block_length`
-/// positions, so `I` holds under dependence inside blocks. The terms are
+/// positions, so `I` holds under dependence inside blocks. `J` is read on
+/// the scale of the parameters
+/// ([`Curvature::gauss_newton_on_the_parameter_scale`]), so a fit near a
+/// bound or on it gives `η` as any other; the scores of a fit that a bound
+/// cuts do not sum to 0, so `η` comes out too small there. The terms are
 /// those of the sum of squares or of `−log L`; with a correct observation
 /// model `I ≈ J` and `η ≈ 1`. `I` enters only through a trace, so `η` needs
 /// no inverse of `I`, takes fewer blocks than parameters, and is the same on
@@ -183,10 +187,10 @@ pub(crate) fn reached_the_posterior(run: SmcRun, posterior: &str) -> Result<SmcR
 /// # Errors
 ///
 /// [`MethodError::Invalid`] when the loss is not the sum of squares, the
-/// engine is stochastic, the fit is on a bound, the blocks are fewer than
-/// two, the data do not determine every parameter ([`Curvature::inverse`]),
-/// every block score is 0 while the scores of the terms are not, or each block
-/// holds all the curvature of its parameters; [`MethodError::Failed`] when the
+/// engine is stochastic, the blocks are fewer than two, the data do not
+/// determine every parameter ([`Curvature::inverse`]), every block score is 0
+/// while the scores of the terms are not, or each block holds all the
+/// curvature of its parameters; [`MethodError::Failed`] when the
 /// derivatives fail at the fit, or every score is 0 or too small against the
 /// curvature for `η` to be a number.
 pub fn information_matching_eta<E>(
@@ -217,7 +221,9 @@ where
                 .to_string(),
         ));
     }
-    let curvature = curvature_at(problem, fit, CurvatureKind::GaussNewton)?;
+    let source =
+        FiniteDifferences::new(problem, Design::Observations).map_err(MethodError::Sensitivity)?;
+    let curvature = Curvature::gauss_newton_on_the_parameter_scale(problem, &source, fit)?;
     let blocks = BlockScheme::new(problem.observed_data(), block_length)?;
     if blocks.count() < 2 {
         return Err(MethodError::Invalid(format!(

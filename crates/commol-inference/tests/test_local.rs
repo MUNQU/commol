@@ -31,6 +31,7 @@ use commol_inference::smc::{LikelihoodTarget, information_matching_eta};
 use commol_inference::target::Target;
 use commol_inference::transform::Transform;
 use commol_inference::{MethodError, Priors};
+use commol_statistics::special::{normal_quantile_sf, student_t_two_sided_tail};
 
 /// The closed form of the outputs of a [`Curve`].
 #[derive(Clone, Copy, Debug)]
@@ -392,6 +393,134 @@ fn draws_mapped_back_stay_inside_the_bounds() {
     // the bound.
     let below = draws.iter().filter(|draw| draw[0] < 0.02).count();
     assert!((900..1100).contains(&below), "{below} draws below the fit");
+}
+
+/// The level `x = a` at sixteen positions of mean 1, with `a` in `bounds`
+/// and a normal noise of sd 0.4: the sd of `a` is 0.1. The residuals, of sd
+/// 0.79, give the sandwich an sd of about 0.2.
+fn level_problem(bounds: (f64, f64)) -> CalibrationProblem<Curve> {
+    let values: Vec<f64> = (0..16)
+        .map(|t| 1.0 + [0.5, -0.5, 1.0, -1.0][t % 4])
+        .collect();
+    CalibrationProblem::new(
+        Curve::new(Shape::Line),
+        observed("x", &values),
+        vec![CalibrationParameter::new(
+            "a".to_string(),
+            bounds.0,
+            bounds.1,
+        )],
+        None,
+        vec![],
+        DiscrepancyConfig::Likelihood(vec![normal("x", Argument::Value(0.4))]),
+    )
+    .unwrap()
+}
+
+/// The bound and the distance in sd of each note of `notes` that names a
+/// bound near the fit.
+fn noted_bounds(notes: &[String]) -> Vec<(f64, f64)> {
+    notes
+        .iter()
+        .filter_map(|note| {
+            let (_, rest) = note.split_once(" is ")?;
+            let (distance, rest) = rest.split_once(" sd from its bound ")?;
+            let bound = rest.split([',', ' ']).next()?;
+            Some((bound.parse().ok()?, distance.parse().ok()?))
+        })
+        .collect()
+}
+
+#[test]
+fn a_fit_within_a_few_sd_of_a_bound_is_noted() {
+    let fit = [1.0];
+    let laplace_notes = |bounds: (f64, f64)| {
+        let problem = level_problem(bounds);
+        let curvature = curvature_at(&problem, &fit, CurvatureKind::GaussNewton).unwrap();
+        laplace(&curvature).unwrap().bound_notes(curvature.names())
+    };
+    // Each scale of a bound: a logit from either bound, a log and a log from
+    // above, with distances of 0.001 to 2.9 sd.
+    for (bounds, bound, distance) in [
+        ((0.0, 1.05), 1.05, 0.5),
+        ((0.95, 3.0), 0.95, 0.5),
+        ((0.71, f64::INFINITY), 0.71, 2.9),
+        ((f64::NEG_INFINITY, 1.0001), 1.0001, 0.001),
+    ] {
+        let notes = laplace_notes(bounds);
+        let noted = noted_bounds(&notes);
+        assert_eq!(noted.len(), 1, "{bounds:?}: {notes:?}");
+        assert_eq!(noted[0].0, bound, "{notes:?}");
+        assert!(
+            (noted[0].1 / distance - 1.0).abs() < 0.02,
+            "{bounds:?}: {notes:?}"
+        );
+        assert!(notes[0].starts_with("'a' is "), "{notes:?}");
+    }
+    // Both bounds within 3 sd, the lower first; none at 3 sd or more.
+    let noted = noted_bounds(&laplace_notes((0.8, 1.1)));
+    assert_eq!(noted, vec![(0.8, 2.0), (1.1, 1.0)]);
+    assert!(laplace_notes((0.69, 1.31)).is_empty());
+    assert!(laplace_notes((-1e6, 1e6)).is_empty());
+    assert!(laplace_notes((f64::NEG_INFINITY, f64::INFINITY)).is_empty());
+
+    // The sandwich reads its own covariance, of a scale twice that of
+    // Laplace, and its Student t as the normal of the same mass past the
+    // bound.
+    let sandwich_near = |bounds: (f64, f64), block_length: usize| {
+        let problem = level_problem(bounds);
+        let run = sandwich_approximation(&problem, &fit, CurvatureKind::GaussNewton, block_length)
+            .unwrap();
+        let scale =
+            run.gaussian.covariance()[(0, 0)].sqrt() * logit_derivative(1.0, bounds.0, bounds.1);
+        let nu = run.gaussian.degrees_of_freedom().unwrap()[0];
+        let scaled = (bounds.1 - 1.0) / scale;
+        let tail = 0.5 * student_t_two_sided_tail(scaled * scaled, nu);
+        let notes = run.gaussian.bound_notes(run.curvature.names());
+        (scaled, normal_quantile_sf(tail), nu, notes)
+    };
+    let (scaled, z, nu, notes) = sandwich_near((0.0, 1.05), 1);
+    let noted = noted_bounds(&notes);
+    assert_eq!(noted.len(), 1, "{notes:?}");
+    // The note gives two decimals.
+    assert!((noted[0].1 - z).abs() <= 0.005, "{noted:?} {z}");
+    assert!(z < scaled && scaled < 0.3, "{scaled} {z}");
+    assert!(
+        notes[0].contains(&format!("Student t of {nu:.1} degrees of freedom")),
+        "{notes:?}"
+    );
+    // With few degrees of freedom, a bound beyond 3 units of the scale of the
+    // t is noted when the t puts more mass past it than a normal at 3 sd.
+    let (scaled, z, nu, notes) = sandwich_near((-10.0, 1.8), 5);
+    assert!(nu < 5.0 && scaled > 3.0 && z < 3.0, "{nu} {scaled} {z}");
+    let noted = noted_bounds(&notes);
+    assert_eq!(noted.len(), 1, "{notes:?}");
+    assert!((noted[0].1 - z).abs() <= 0.005, "{noted:?} {z}");
+
+    // The mixture notes it for its component.
+    let problem = level_problem((0.0, 1.05));
+    let priors = Priors::uniform_on_bounds(&["a".to_string()], &[(0.0, 1.05)]).unwrap();
+    let target = LikelihoodTarget::new(&problem, &priors).unwrap();
+    let mixture = laplace_mixture(
+        &problem,
+        &TemperedPosterior::new(&target, 1),
+        1.0,
+        &[fit.to_vec()],
+        200,
+        CurvatureKind::GaussNewton,
+        1,
+        &NoSteps,
+    )
+    .unwrap();
+    assert_eq!(noted_bounds(&mixture.notes), vec![(1.05, 0.5)]);
+    assert!(mixture.notes[0].starts_with("At the end [1.0], 'a' is "));
+    assert!(mixture.notes[0].contains("the importance weights correct it"));
+    assert!(!mixture.notes[0].contains("ProfileLikelihood"));
+
+    // A fit on its bound is still refused.
+    let problem = level_problem((0.0, 1.0 + 1e-9));
+    let error = curvature_at(&problem, &fit, CurvatureKind::GaussNewton).unwrap_err();
+    assert!(error.to_string().contains("'a' is on its bound"), "{error}");
 }
 
 /// The weighted share of `values` whose first entry is above 0.

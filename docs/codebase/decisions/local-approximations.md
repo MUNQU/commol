@@ -102,8 +102,9 @@ magnitude adjustment of a composite likelihood (Pauli, Racugno and Ventura
 2011; Ribatet, Cooley and Davison 2012), with `J` the Gauss–Newton `H` and
 `I` the variance of the block scores `s_b`, both in the
 [units of the curvature](curvature.md#the-curvature-is-kept-in-units-of-its-parameters),
-where the trace has the value it has on any scale of the parameters. It
-equals `tr(J I⁻¹ J) / tr(J)` when `I = J/η`. It refuses a `J` that
+where the trace has the value it has on any scale of the parameters; it gives
+`η` [on a bound](bounds.md#information-matching-reads-the-curvature-on-the-scale-of-the-parameters)
+too. It equals `tr(J I⁻¹ J) / tr(J)` when `I = J/η`. It refuses a `J` that
 [the data do not determine](curvature.md#one-rule-says-what-the-data-do-not-determine), one
 block, whose score of a fit is zero, a trace of 0, when every score is 0, a trace below
 `10⁻¹⁰` times that of one block per observation, when each parameter's

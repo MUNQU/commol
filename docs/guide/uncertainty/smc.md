@@ -205,7 +205,14 @@ through a trace, so `η` needs no inverse of `I`: it takes two blocks or more,
 also fewer blocks than parameters, and blocks can be long enough to hold the
 dependence. `J` is inverted, so a `J` that the data
 [do not determine](local.md#the-curvature-and-the-unbounded-scale) raises a
-`ValueError`. `η` is the same in any unit of the parameters.
+`ValueError`. `η` is the same in any unit of the parameters. `J` is read on
+the scale of the parameters, not on the unbounded scale of the
+[local approximations](local.md#the-curvature-and-the-unbounded-scale), so a
+fit near a bound or on it gives `η` as any other, with no note. The scores of
+a fit that a bound cuts, one whose optimum lies beyond the bound, do not sum
+to 0 there, so `η` comes out too small: with 24 values of sd 1 in blocks of 3,
+where 1 is right, its median over data sets is 0.86, 0.62, 0.41 and 0.20 with
+the optimum 1, 2, 3 and 5 sd past the bound.
 
 The blocks read at most `p(G − 1)` degrees of freedom `ν` about the scale,
 for `G` blocks, and fewer when they share the curvature `J` unevenly: a

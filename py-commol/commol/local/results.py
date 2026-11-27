@@ -56,7 +56,9 @@ class LocalResult(ResultModel):
         weights.
     notes : list[str]
         The entries of the curvature whose estimated error is not small
-        against their scale; each is also logged as a warning.
+        against their scale, then each bound less than 3 sd from the fit, on
+        the scale of the parameters, whose draws the bound skews; each is also
+        logged as a warning.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -156,7 +158,7 @@ class LaplaceResult(LocalResult):
         weights.
     notes : list[str]
         The entries of the curvature whose estimated error is not small
-        against their scale.
+        against their scale, then each bound less than 3 sd from the fit.
     """
 
 
@@ -182,7 +184,8 @@ class SandwichResult(LocalResult):
         degrees of freedom.
     notes : list[str]
         The entries of the curvature whose estimated error is not small
-        against their scale.
+        against their scale, then each bound less than 3 sd from the fit,
+        read as a normal with the mass of the Student t past the bound.
     degrees_of_freedom : dict[str, float]
         The degrees of freedom ``ν_j`` of each parameter: ``blocks − 1`` when
         every block holds the same share of its curvature, fewer when few
@@ -254,7 +257,10 @@ class ImportanceResult(ResultModel):
         fits at least as well as the worst component. An unreliable sample is
         also logged as a warning.
     notes : list[str]
-        Ends that gave no component, and an unreliable sample, in words.
+        Ends that gave no component, each bound less than 3 sd from the
+        centre of a component, whose skew the importance weights correct as
+        far as ``k_hat`` says, and an unreliable sample, in words; each is
+        also logged as a warning.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)

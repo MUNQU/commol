@@ -1,5 +1,6 @@
 //! The curvature of the objective of a problem at a fit, on the unbounded
-//! scale.
+//! scale, or on the scale of the parameters for information matching
+//! ([`Curvature::gauss_newton_on_the_parameter_scale`]).
 //!
 //! Gauss–Newton reads the expected curvature of each observation's term
 //! ([`commol_calibration::CalibrationProblem::term_derivatives`]): over the
@@ -94,23 +95,51 @@ impl Curvature {
         E: SimulationEngine,
         S: SensitivitySource + ?Sized,
     {
-        Self::gauss_newton_and_means(problem, source, fit).map(|(curvature, ..)| curvature)
+        let transform = Transform::new(&problem.parameter_bounds());
+        Self::gauss_newton_and_means(problem, source, fit, transform)
+            .map(|(curvature, ..)| curvature)
+    }
+
+    /// [`Self::gauss_newton`] on the scale of the parameters: the transform is
+    /// the identity, so the scales are powers of two and a fit on a bound is
+    /// read as any other. Its matrices in their units are those of
+    /// [`Self::gauss_newton`], which reads `θ` through the same derivatives.
+    /// Information matching reads them, with no map to the unbounded scale.
+    /// It is no curvature of a distribution that is drawn: [`super::laplace`]
+    /// of it would map nothing back inside the bounds.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::gauss_newton`], except a fit on a bound.
+    pub fn gauss_newton_on_the_parameter_scale<E, S>(
+        problem: &CalibrationProblem<E>,
+        source: &S,
+        fit: &[f64],
+    ) -> Result<Self, MethodError>
+    where
+        E: SimulationEngine,
+        S: SensitivitySource + ?Sized,
+    {
+        let transform = Transform::new(&vec![(f64::NEG_INFINITY, f64::INFINITY); fit.len()]);
+        Self::gauss_newton_and_means(problem, source, fit, transform)
+            .map(|(curvature, ..)| curvature)
     }
 
     /// [`Self::gauss_newton`], the mean of each part of each observation at
     /// `fit` that it reads, and the exponent of the unit of each parameter: a
     /// step of 1 in its units is one of `2^-unit` on the scale of `θ`. The
     /// unit is an exponent because its scale can be above the largest number.
+    /// The curvature is on the scale of `transform`.
     fn gauss_newton_and_means<E, S>(
         problem: &CalibrationProblem<E>,
         source: &S,
         fit: &[f64],
+        transform: Transform,
     ) -> Result<(Self, Vec<f64>, Vec<i32>), MethodError>
     where
         E: SimulationEngine,
         S: SensitivitySource + ?Sized,
     {
-        let transform = Transform::new(&problem.parameter_bounds());
         check_inside(problem, &transform, fit)?;
         problem
             .discrepancy()
@@ -238,7 +267,9 @@ impl Curvature {
         E: SimulationEngine,
         S: SensitivitySource + ?Sized,
     {
-        let (expected, means, expected_units) = Self::gauss_newton_and_means(problem, source, fit)?;
+        let transform = Transform::new(&problem.parameter_bounds());
+        let (expected, means, expected_units) =
+            Self::gauss_newton_and_means(problem, source, fit, transform)?;
         let derivatives = expected.transform.derivatives(fit);
         let accuracy = problem.forward().base_engine().accuracy().relative;
         let roundings: Vec<f64> = means

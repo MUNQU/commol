@@ -868,6 +868,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `Laplace`, `Sandwich` and `LaplaceMixture` note each bound less than 3 sd
+  from the fit, on the scale of the parameters, with the sd of the
+  distribution that is drawn: the sandwich reads its own covariance, and its
+  Student t as the normal of the same mass past the bound. The note names
+  the parameter, the bound and the distance in sd, and is logged as a
+  warning; the note of the mixture says that its importance weights correct
+  the skew as far as `k_hat` says. The draws of `Laplace` and `Sandwich`,
+  mapped back from the unbounded scale, are skewed there: with a fit of sd
+  0.2 at 10 and a bound at `10 · (1 + 1e-3)`, the 90 % interval of the draws
+  of `Laplace` ran from `3e-11` to `10.01`, with no note. A fit is refused only on its bound, as before.
+  `InformationMatchingEta` reads its curvature on the scale of the
+  parameters, so it gives `η` for a fit on its bound too, where it raised a
+  `ValueError`; the scores of a fit that a bound cuts do not sum to 0, so `η`
+  comes out too small there. See [The curvature and the unbounded
+  scale](../guide/uncertainty/local.md#the-curvature-and-the-unbounded-scale).
+
 - `Sandwich` reads its factor and its degrees of freedom from the curvature
   of each block, so a block with no curvature, such as a window of
   observations that carry no information, counts for nothing, and a parameter

@@ -12,7 +12,10 @@
 //! weighted by the target over the mixture and smoothed by PSIS. An end on a
 //! bound, one whose curvature the data do not determine and one whose
 //! covariance is refused give no component; when one fits at least as well as
-//! the worst component, the sample misses an optimum and is unreliable.
+//! the worst component, the sample misses an optimum and is unreliable. A
+//! component with a bound less than [`super::gaussian::NEAR_BOUND`] sd from
+//! its centre is noted ([`Gaussian::near_bounds`]): the bound skews the
+//! component, and the importance weights correct it as far as `k̂` says.
 
 use commol_calibration::{CalibrationProblem, Workspace};
 use commol_core::SimulationEngine;
@@ -90,8 +93,8 @@ pub struct MixtureRun {
     pub reliable: bool,
     /// The draws and their smoothed weights.
     pub sample: ImportanceRun,
-    /// What the reader should know: ends that gave no component, and an
-    /// unreliable sample.
+    /// What the reader should know: ends that gave no component, components
+    /// near a bound, and an unreliable sample.
     pub notes: Vec<String>,
 }
 
@@ -186,6 +189,14 @@ where
             .iter()
             .map(|l| 2.0 * l.ln())
             .sum();
+        notes.extend(gaussian.near_bounds().iter().map(|near| {
+            format!(
+                "At the end {end:?}, {}: the component, mapped back from the unbounded \
+                 scale, is skewed by the bound; the importance weights correct it as far as \
+                 k̂ says",
+                near.head(&names)
+            )
+        }));
         kept.push(objective);
         components.push(Component {
             center: end.clone(),

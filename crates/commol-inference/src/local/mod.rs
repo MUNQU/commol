@@ -11,12 +11,15 @@
 //! | [`mixture`] | [`laplace_mixture`]: a Laplace approximation at each optimum of the starts, the proposal of an importance sampler |
 //! | [`sandwich`](mod@sandwich) | [`sandwich()`]: the covariance of the influences of the blocks of a fit, [`sandwich_approximation`] |
 //! | [`shares`] | [`BlockShares`]: the shares of the blocks in the curvature, which give the factor and the degrees of freedom of a sandwich |
-//! | [`gaussian`] | [`Gaussian`]: a normal or grouped Student-t distribution on the unbounded scale, its draws mapped back; [`laplace`] |
+//! | [`gaussian`] | [`Gaussian`]: a normal or grouped Student-t distribution on the unbounded scale, its draws mapped back and the bounds near its centre; [`laplace`] |
 //!
 //! Every approximation lives on the unbounded scale of
 //! [`crate::transform::Transform`], centred on the fit mapped to that scale:
 //! its curvature is `H_u = D · H_θ · D` with `D = diag(dθ/du)` at the fit. A
-//! draw maps back inside the bounds.
+//! draw maps back inside the bounds, and a bound less than
+//! [`gaussian::NEAR_BOUND`] sd from the fit, on the scale of the parameters,
+//! is noted. Information matching reads the curvature on the scale of the
+//! parameters ([`Curvature::gauss_newton_on_the_parameter_scale`]).
 
 pub mod approximation;
 pub mod band;
@@ -30,7 +33,7 @@ pub mod shares;
 pub use approximation::{CurvatureKind, curvature_at, laplace_approximation};
 pub use band::{DeltaBand, delta_band};
 pub use curvature::Curvature;
-pub use gaussian::{Gaussian, laplace};
+pub use gaussian::{Gaussian, NearBound, laplace};
 pub use inverse::InverseCurvature;
 pub use mixture::{Component, MixtureRun, laplace_mixture};
 pub use sandwich::{SandwichRun, sandwich, sandwich_approximation, scaled_block_scores};

@@ -9,10 +9,10 @@ matching.
 ## The curvature lives on the unbounded scale
 
 `Curvature` (`crates/commol-inference/src/local/curvature.rs`) describes
-`H_u = D · H_θ · D`, with `D = dθ/du` at the fit on the scale of
-`Transform` (`transform.rs`: a logit with two bounds, a log with one, the
-identity with none), centred on the fit mapped to that scale, with no
-curvature of the log Jacobian. It holds `H_u` in units of its parameters
+`H_u = D · H_θ · D`, with `D = dθ/du` at the fit on the scale of `Transform`
+(`transform.rs`: a logit with two bounds, a log with one, the identity with
+none), centred on the fit mapped to that scale, with no curvature of the log
+Jacobian; information matching reads it on the [scale of the parameters](bounds.md#information-matching-reads-the-curvature-on-the-scale-of-the-parameters). It holds `H_u` in units of its parameters
 ([below](#the-curvature-is-kept-in-units-of-its-parameters)). Every draw maps back with `from_unbounded`,
 so it lies inside the bounds; every density on that scale, as the importance
 weights of the mixture, adds `log_jacobian`. A fit on a bound is refused with
@@ -24,11 +24,11 @@ comes from the optimizer: Nelder-Mead searches on a sine (`SineTransform`) of th
 coordinate, which approaches a bound quadratically in `u` and ends about
 `1e-15` of the width from it; `1e-8` of the width is a step `δu ≈ 2e-4`, far
 below any posterior spread. The mixture skips such an end
-([Local approximations](local-approximations.md#an-end-that-gives-no-component-is-noted)).
+([Local approximations](local-approximations.md#an-end-that-gives-no-component-is-noted)), and a bound [near a fit](bounds.md) is a note.
 
 | Alternative | Why not |
 |---|---|
-| The scale of the parameters | A normal there puts mass outside the bounds near them. |
+| The scale of the parameters, for a distribution that is drawn | A normal there puts mass outside the bounds near them; information matching draws nothing. |
 | A truncated normal on the scale of the parameters | It biases the mean and breaks the delta method. |
 | Centring on the mode of the density on the unbounded scale, Jacobian included | It moves the centre away from the fit for no gain: importance sampling corrects the difference. |
 | A fit on a bound by exact equality | An optimizer that the bound stops ends a few roundings from it, where the variance on the unbounded scale is huge but finite. |

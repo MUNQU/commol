@@ -197,10 +197,12 @@ class TestCurvature:
         # of (k1, k2) is above the scale of its row and column.
         result = weak_parameter_calibrator(1e-30).uncertainty(Laplace(draws=2))
 
-        assert result.notes == [
+        # The notes of the bounds near the fit follow those of the curvature.
+        assert result.notes[0] == (
             "The curvature of ('k1', 'k2') has an estimated error of more than 100% "
             "of the scale of its row and column"
-        ]
+        )
+        assert "'k2' is" in result.notes[1]
 
 
 class TestLaplace:

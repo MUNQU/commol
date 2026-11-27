@@ -31,7 +31,8 @@ class Laplace(UncertaintyMethod[LaplaceResult], RangeChecked):
     It needs ``observation_models``: a loss has no noise scale, so its
     curvature is no inverse variance (use `Sandwich`). A fit on a bound of
     its parameter is refused: on the unbounded scale its variance is
-    infinite there.
+    infinite there. A bound less than 3 sd from the fit is a note: the draws,
+    mapped back, are skewed by it.
 
     Attributes
     ----------
@@ -75,7 +76,10 @@ class Sandwich(UncertaintyMethod[SandwichResult], RangeChecked):
     meat would have rank below them; so it is when the blocks each hold all
     the curvature of a parameter. ``loss_function="mae"`` is refused: its
     sandwich needs a density of the residuals at 0 and a bandwidth (use a
-    bootstrap).
+    bootstrap). A bound less than 3 sd from the fit is a note: the draws,
+    mapped back, are skewed by it. The distance of its Student t is that of
+    a normal with the same mass past the bound, so with few degrees of
+    freedom a bound beyond 3 units of the scale of the t can be noted.
 
     Attributes
     ----------
@@ -152,7 +156,10 @@ class LaplaceMixture(UncertaintyMethod[ImportanceResult], RangeChecked):
     The ends of the starts merge into a component when they are closer than
     one Mahalanobis unit to it. Every draw is weighted by the target over
     the mixture, on the unbounded scale. ``k_hat`` says whether the mixture
-    covers the target: above 0.7 the sample is marked unreliable.
+    covers the target: above 0.7 the sample is marked unreliable. A bound
+    less than 3 sd from the centre of a component is a note: it skews the
+    component, which the importance weights correct as far as ``k_hat``
+    says.
 
     Attributes
     ----------
