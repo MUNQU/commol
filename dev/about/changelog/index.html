@@ -3227,6 +3227,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/bounds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fits Near a Bound
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/profiles/" class="md-nav__link">
         
   
@@ -6386,6 +6414,23 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>
+<p><code>Laplace</code>, <code>Sandwich</code> and <code>LaplaceMixture</code> note each bound less than 3 sd
+  from the fit, on the scale of the parameters, with the sd of the
+  distribution that is drawn: the sandwich reads its own covariance, and its
+  Student t as the normal of the same mass past the bound. The note names
+  the parameter, the bound and the distance in sd, and is logged as a
+  warning; the note of the mixture says that its importance weights correct
+  the skew as far as <code>k_hat</code> says. The draws of <code>Laplace</code> and <code>Sandwich</code>,
+  mapped back from the unbounded scale, are skewed there: with a fit of sd
+  0.2 at 10 and a bound at <code>10 · (1 + 1e-3)</code>, the 90 % interval of the draws
+  of <code>Laplace</code> ran from <code>3e-11</code> to <code>10.01</code>, with no note. A fit is refused only on its bound, as before.
+  <code>InformationMatchingEta</code> reads its curvature on the scale of the
+  parameters, so it gives <code>η</code> for a fit on its bound too, where it raised a
+  <code>ValueError</code>; the scores of a fit that a bound cuts do not sum to 0, so <code>η</code>
+  comes out too small there. See <a href="../../guide/uncertainty/local/#the-curvature-and-the-unbounded-scale">The curvature and the unbounded
+  scale</a>.</p>
+</li>
 <li>
 <p><code>Sandwich</code> reads its factor and its degrees of freedom from the curvature
   of each block, so a block with no curvature, such as a window of

@@ -91,7 +91,30 @@ The Fisher information of each observation model (`Noise::information` in `crate
 
 The Hessian steps are `δ^{1/4} · dθ/du` for a parameter with a bound and `δ^{1/4} · max(|θ|, 1)` for one without, where `δ` is the accuracy of the engine (machine precision, or the `rtol` of the ODE engine): the step that balances the truncation error of the differences with the error of the runs, and keeps every run inside the bounds. For a curvature so large that such a step moves the objective near the largest number, the step is shorter, so that by the Gauss–Newton curvature the objective stays a number, as it does for an objective that grows like its quadratic. For a step of `δ^{1/4}` on the unbounded scale, that is from a curvature there of about `4e314` with machine precision, and lower for a coarser engine (`6e309` at `rtol = 1e-6`); the larger step of a parameter without bounds and `|θ|` above 1 is shorter from a smaller curvature. When that step is within the rounding of `θ` or of the predictions of the model at the fit, `"hessian"` raises a `RuntimeError` that says the curvature of the parameter is too large for the Hessian. Each entry of either curvature has an estimated error. An entry whose error is above 1 % of `√(H_jj · H_kk)` is listed in `notes` and logged as a warning. The error is read as a share of a correlation: an off-diagonal entry near 0 is compared with the diagonal of its row and column, not with its own size. A note changes no result. A share above 100 % says that the entry, and any covariance that reads it, is unknown.
 
-Every distribution lives on the **unbounded scale** of the parameters, the scale on which the [sampler](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#how-the-sampler-works) of sequential Monte Carlo proposes its moves. The curvature there is `H_u = D · H · D` with `D = dθ/du` at the fit, and `covariance` is on that scale. Every draw maps back inside the bounds, so a fit near a bound gives a skewed sample, not draws outside it. A fit **on** a bound of its parameter (within `1e-8` of the width of its bounds, or of `max(1, |bound|)` when the parameter has one finite bound) raises a `ValueError`: its variance on the unbounded scale is infinite there, and a [profile likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md) describes it.
+Every distribution lives on the **unbounded scale** of the parameters, the scale on which the [sampler](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#how-the-sampler-works) of sequential Monte Carlo proposes its moves. The curvature there is `H_u = D · H · D` with `D = dθ/du` at the fit, and `covariance` is on that scale. Every draw maps back inside the bounds, so a fit near a bound gives a skewed sample, not draws outside it.
+
+A bound **near** the fit is a note. On the scale of the parameters the sd of parameter `j` is `D_j √Σ_jj`, with `Σ` the covariance of the distribution that is drawn: `H_u⁻¹` for `Laplace`, `(s·H_u)⁻¹` for each component of `LaplaceMixture` (`s` the curvature of its target, 1 for a likelihood), and the sandwich itself for `Sandwich`. The Student t of a sandwich reads the distance of a normal with the same mass past the bound, so with few degrees of freedom a bound beyond 3 units of the scale of the t can be noted: with one degree of freedom, 16.3 units of its scale put the mass of a normal at 2.06 sd past the bound. When a bound is less than 3 sd from the fit, where a normal puts 0.135 % of its mass past it, `notes` names the parameter, the bound and the distance in sd, and the note is logged as a warning. The covariance and `delta_band` still describe the fit there; the sample may not. The normal on the unbounded scale has the sd `1/D_j` times that one, which grows as the inverse of the distance to the bound, so its draws, mapped back, bunch at the bound and spread far from the fit on the other side: with a flat prior and a normal likelihood that the bound cuts, its 90 % intervals are 1.05, 1.18, 1.94 and 6.0 times as wide as the exact ones at 3, 2, 1 and 0.5 sd from the bound. The note of `Laplace` and `Sandwich` points to a [profile likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md), which describes such a parameter, as a posterior sampler does ([Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/index.md)). The importance weights of `LaplaceMixture` correct the skew of its components as far as `k_hat` says, and its note says so.
+
+With the upper bound of `c` at 10.1, 0.9 sd above the fit, the draws reach 0.7 below it, where the interval of the quick path reaches 0.3:
+
+```python
+near = problem.model_copy(
+    update={
+        "parameters": [
+            CalibrationParameter(
+                id="c", parameter_type="parameter", min_bound=0.0, max_bound=10.1
+            )
+        ]
+    }
+)
+near_laplace = Calibrator(Simulation(flow_model("c * A / A")), near).uncertainty(
+    Laplace(draws=2000)
+)
+print([round(value, 2) for value in near_laplace.sample.interval(0.9)["c"]])  # [9.19, 10.08]
+print(near_laplace.notes[0].split(":")[0])  # 'c' is 0.91 sd from its bound 10.1, within 3 sd
+```
+
+A fit **on** a bound of its parameter (within `1e-8` of the width of its bounds, or of `max(1, |bound|)` when the parameter has one finite bound) raises a `ValueError`: its variance on the unbounded scale is infinite there, and a [profile likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md) describes it. Information matching reads its curvature on the scale of the parameters, so it gives `η` near a bound and on it, with no note ([What `η` means](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#what-means)).
 
 `Laplace`, `Sandwich` and information matching raise a `ValueError` for a curvature that the data do not determine: one with a parameter that moves no observation, or with two that the model reads only as their product. `LaplaceMixture` gives no component for such an end and says so in `notes` ([Reading `k_hat`](#reading-k_hat)). With `H` scaled to a diagonal of 1, its smallest eigenvalue is then at most `p·ε` times the largest, for `p` parameters and the machine precision `ε ≈ 2.2e-16`. The unit of a parameter does not change the answer. A window split into parts can read a parameter that its total does not: its diagonal entry is then a rounding, which the rule reads as 0.
 
@@ -195,7 +218,7 @@ An unreliable sample calls for a method that samples the posterior itself: `Baye
 
 ## Checklist
 
-- [ ] The fit is a minimum inside the bounds; no `ValueError` names a parameter on its bound.
+- [ ] The fit is a minimum inside the bounds; no `ValueError` names a parameter on its bound, and no note a bound less than 3 sd from it.
 - [ ] `notes` is empty, or you know why an entry of the curvature is uncertain.
 - [ ] A Laplace approximation has a noise model you trust; otherwise use the sandwich.
 - [ ] A sandwich has more blocks with curvature than parameters, of a length that holds the dependence, and `degrees_of_freedom` of each parameter that are not few.

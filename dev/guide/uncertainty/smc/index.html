@@ -3397,6 +3397,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../codebase/decisions/bounds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fits Near a Bound
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../codebase/decisions/profiles/" class="md-nav__link">
         
   
@@ -4450,7 +4478,14 @@ through a trace, so <code>η</code> needs no inverse of <code>I</code>: it takes
 also fewer blocks than parameters, and blocks can be long enough to hold the
 dependence. <code>J</code> is inverted, so a <code>J</code> that the data
 <a href="../local/#the-curvature-and-the-unbounded-scale">do not determine</a> raises a
-<code>ValueError</code>. <code>η</code> is the same in any unit of the parameters.</p>
+<code>ValueError</code>. <code>η</code> is the same in any unit of the parameters. <code>J</code> is read on
+the scale of the parameters, not on the unbounded scale of the
+<a href="../local/#the-curvature-and-the-unbounded-scale">local approximations</a>, so a
+fit near a bound or on it gives <code>η</code> as any other, with no note. The scores of
+a fit that a bound cuts, one whose optimum lies beyond the bound, do not sum
+to 0 there, so <code>η</code> comes out too small: with 24 values of sd 1 in blocks of 3,
+where 1 is right, its median over data sets is 0.86, 0.62, 0.41 and 0.20 with
+the optimum 1, 2, 3 and 5 sd past the bound.</p>
 <p>The blocks read at most <code>p(G − 1)</code> degrees of freedom <code>ν</code> about the scale,
 for <code>G</code> blocks, and fewer when they share the curvature <code>J</code> unevenly: a
 slope, whose curvature sits at the ends of the series, a parameter that the

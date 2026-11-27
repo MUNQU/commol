@@ -10,7 +10,7 @@ Bases: `UncertaintyMethod[LaplaceResult]`, `RangeChecked`
 
 The Laplace approximation of the problem's observation models: the normal `N(θ̂, H⁻¹)` on the unbounded scale of the parameters, centred on the fit, with `H` the curvature of `−log L` there.
 
-It needs `observation_models`: a loss has no noise scale, so its curvature is no inverse variance (use `Sandwich`). A fit on a bound of its parameter is refused: on the unbounded scale its variance is infinite there.
+It needs `observation_models`: a loss has no noise scale, so its curvature is no inverse variance (use `Sandwich`). A fit on a bound of its parameter is refused: on the unbounded scale its variance is infinite there. A bound less than 3 sd from the fit is a note: the draws, mapped back, are skewed by it.
 
 Attributes:
 
@@ -32,7 +32,8 @@ class Laplace(UncertaintyMethod[LaplaceResult], RangeChecked):
     It needs ``observation_models``: a loss has no noise scale, so its
     curvature is no inverse variance (use `Sandwich`). A fit on a bound of
     its parameter is refused: on the unbounded scale its variance is
-    infinite there.
+    infinite there. A bound less than 3 sd from the fit is a note: the draws,
+    mapped back, are skewed by it.
 
     Attributes
     ----------
@@ -60,7 +61,7 @@ Bases: `UncertaintyMethod[SandwichResult]`, `RangeChecked`
 
 The sandwich covariance at the fit, with the meat summed over blocks of positions: `√(f_j f_k) · (H⁻¹ Σ_b s̃_b s̃_bᵀ H⁻¹)_jk`, with `s_b` the sum of the gradients of the terms of the observations of block `b`, taken after one Gauss–Newton step to the zero of their sum `g`: `s̃_b = s_b − J_b J⁻¹ g`. The factor `f_j` and the degrees of freedom `ν_j` of each parameter come from the share `J_b` of its Gauss–Newton curvature `J` that each block holds (Bell and McCaffrey, 2002): with equal shares, `f_j = G/(G − 1)` and `ν_j = G − 1` for `G` blocks; a parameter that few blocks read has fewer, and a block with no curvature counts for nothing.
 
-It needs no noise model: with a loss, `H` is the curvature of the loss; with observation models, of `−log L`. It holds when the noise depends on its neighbours inside a block, when its size changes, and when the noise model is wrong but the mean is right. Intervals read the Student t of each parameter, and draws a grouped t whose margins are those t. With no more blocks with curvature than parameters it is refused, since the meat would have rank below them; so it is when the blocks each hold all the curvature of a parameter. `loss_function="mae"` is refused: its sandwich needs a density of the residuals at 0 and a bandwidth (use a bootstrap).
+It needs no noise model: with a loss, `H` is the curvature of the loss; with observation models, of `−log L`. It holds when the noise depends on its neighbours inside a block, when its size changes, and when the noise model is wrong but the mean is right. Intervals read the Student t of each parameter, and draws a grouped t whose margins are those t. With no more blocks with curvature than parameters it is refused, since the meat would have rank below them; so it is when the blocks each hold all the curvature of a parameter. `loss_function="mae"` is refused: its sandwich needs a density of the residuals at 0 and a bandwidth (use a bootstrap). A bound less than 3 sd from the fit is a note: the draws, mapped back, are skewed by it. The distance of its Student t is that of a normal with the same mass past the bound, so with few degrees of freedom a bound beyond 3 units of the scale of the t can be noted.
 
 Attributes:
 
@@ -96,7 +97,10 @@ class Sandwich(UncertaintyMethod[SandwichResult], RangeChecked):
     meat would have rank below them; so it is when the blocks each hold all
     the curvature of a parameter. ``loss_function="mae"`` is refused: its
     sandwich needs a density of the residuals at 0 and a bandwidth (use a
-    bootstrap).
+    bootstrap). A bound less than 3 sd from the fit is a note: the draws,
+    mapped back, are skewed by it. The distance of its Student t is that of
+    a normal with the same mass past the bound, so with few degrees of
+    freedom a bound beyond 3 units of the scale of the t can be noted.
 
     Attributes
     ----------
@@ -129,7 +133,7 @@ Bases: `UncertaintyMethod[ImportanceResult]`, `RangeChecked`
 
 The Laplace mixture: a Laplace approximation at each distinct optimum of a multi-start fit, weighted by its Laplace evidence, as the proposal of importance sampling of a posterior, with the largest weights smoothed (Pareto-smoothed importance sampling, Vehtari et al. 2024).
 
-The ends of the starts merge into a component when they are closer than one Mahalanobis unit to it. Every draw is weighted by the target over the mixture, on the unbounded scale. `k_hat` says whether the mixture covers the target: above 0.7 the sample is marked unreliable.
+The ends of the starts merge into a component when they are closer than one Mahalanobis unit to it. Every draw is weighted by the target over the mixture, on the unbounded scale. `k_hat` says whether the mixture covers the target: above 0.7 the sample is marked unreliable. A bound less than 3 sd from the centre of a component is a note: it skews the component, which the importance weights correct as far as `k_hat` says.
 
 Attributes:
 
@@ -153,7 +157,10 @@ class LaplaceMixture(UncertaintyMethod[ImportanceResult], RangeChecked):
     The ends of the starts merge into a component when they are closer than
     one Mahalanobis unit to it. Every draw is weighted by the target over
     the mixture, on the unbounded scale. ``k_hat`` says whether the mixture
-    covers the target: above 0.7 the sample is marked unreliable.
+    covers the target: above 0.7 the sample is marked unreliable. A bound
+    less than 3 sd from the centre of a component is a note: it skews the
+    component, which the importance weights correct as far as ``k_hat``
+    says.
 
     Attributes
     ----------
@@ -253,12 +260,12 @@ What every local approximation returns: a distribution on the unbounded scale of
 
 Attributes:
 
-| Name         | Type                | Description                                                                                                            |
-| ------------ | ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `fit`        | `CalibrationResult` | The fit the approximation is centred on: Calibrator.run(starts).                                                       |
-| `covariance` | `list[list[float]]` | The covariance of the distribution on the unbounded scale of the parameters, in the order of the problem's parameters. |
-| `sample`     | `ParameterSample`   | Draws of the distribution, mapped back to the parameters, with equal weights.                                          |
-| `notes`      | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale; each is also logged as a warning. |
+| Name         | Type                | Description                                                                                                                                                                                                                      |
+| ------------ | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fit`        | `CalibrationResult` | The fit the approximation is centred on: Calibrator.run(starts).                                                                                                                                                                 |
+| `covariance` | `list[list[float]]` | The covariance of the distribution on the unbounded scale of the parameters, in the order of the problem's parameters.                                                                                                           |
+| `sample`     | `ParameterSample`   | Draws of the distribution, mapped back to the parameters, with equal weights.                                                                                                                                                    |
+| `notes`      | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale, then each bound less than 3 sd from the fit, on the scale of the parameters, whose draws the bound skews; each is also logged as a warning. |
 
 Source code in `commol/local/results.py`
 
@@ -280,7 +287,9 @@ class LocalResult(ResultModel):
         weights.
     notes : list[str]
         The entries of the curvature whose estimated error is not small
-        against their scale; each is also logged as a warning.
+        against their scale, then each bound less than 3 sd from the fit, on
+        the scale of the parameters, whose draws the bound skews; each is also
+        logged as a warning.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -477,12 +486,12 @@ The result of a Laplace approximation: the normal `N(θ̂, Σ)` on the unbounded
 
 Attributes:
 
-| Name         | Type                | Description                                                                          |
-| ------------ | ------------------- | ------------------------------------------------------------------------------------ |
-| `fit`        | `CalibrationResult` | The fit the approximation is centred on: Calibrator.run(starts).                     |
-| `covariance` | `list[list[float]]` | Σ = H⁻¹ on the unbounded scale of the parameters.                                    |
-| `sample`     | `ParameterSample`   | Draws of the normal, mapped back to the parameters, with equal weights.              |
-| `notes`      | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale. |
+| Name         | Type                | Description                                                                                                                       |
+| ------------ | ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `fit`        | `CalibrationResult` | The fit the approximation is centred on: Calibrator.run(starts).                                                                  |
+| `covariance` | `list[list[float]]` | Σ = H⁻¹ on the unbounded scale of the parameters.                                                                                 |
+| `sample`     | `ParameterSample`   | Draws of the normal, mapped back to the parameters, with equal weights.                                                           |
+| `notes`      | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale, then each bound less than 3 sd from the fit. |
 
 Source code in `commol/local/results.py`
 
@@ -503,7 +512,7 @@ class LaplaceResult(LocalResult):
         weights.
     notes : list[str]
         The entries of the curvature whose estimated error is not small
-        against their scale.
+        against their scale, then each bound less than 3 sd from the fit.
     """
 ```
 
@@ -515,15 +524,15 @@ The result of a sandwich: a Student t on the unbounded scale of the parameters, 
 
 Attributes:
 
-| Name                 | Type                | Description                                                                                                                                     |
-| -------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `fit`                | `CalibrationResult` | The fit the sandwich is centred on: Calibrator.run(starts).                                                                                     |
-| `covariance`         | `list[list[float]]` | The sandwich on the unbounded scale of the parameters.                                                                                          |
-| `sample`             | `ParameterSample`   | Draws of a grouped t, mapped back to the parameters, with equal weights: the margin of each parameter is a Student t of its degrees of freedom. |
-| `notes`              | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale.                                                            |
-| `degrees_of_freedom` | `dict[str, float]`  | The degrees of freedom ν_j of each parameter: blocks − 1 when every block holds the same share of its curvature, fewer when few blocks hold it. |
-| `blocks`             | `int`               | The number of blocks G, those with no curvature included.                                                                                       |
-| `block_length`       | `int`               | The positions per block.                                                                                                                        |
+| Name                 | Type                | Description                                                                                                                                                                                       |
+| -------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fit`                | `CalibrationResult` | The fit the sandwich is centred on: Calibrator.run(starts).                                                                                                                                       |
+| `covariance`         | `list[list[float]]` | The sandwich on the unbounded scale of the parameters.                                                                                                                                            |
+| `sample`             | `ParameterSample`   | Draws of a grouped t, mapped back to the parameters, with equal weights: the margin of each parameter is a Student t of its degrees of freedom.                                                   |
+| `notes`              | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale, then each bound less than 3 sd from the fit, read as a normal with the mass of the Student t past the bound. |
+| `degrees_of_freedom` | `dict[str, float]`  | The degrees of freedom ν_j of each parameter: blocks − 1 when every block holds the same share of its curvature, fewer when few blocks hold it.                                                   |
+| `blocks`             | `int`               | The number of blocks G, those with no curvature included.                                                                                                                                         |
+| `block_length`       | `int`               | The positions per block.                                                                                                                                                                          |
 
 Source code in `commol/local/results.py`
 
@@ -550,7 +559,8 @@ class SandwichResult(LocalResult):
         degrees of freedom.
     notes : list[str]
         The entries of the curvature whose estimated error is not small
-        against their scale.
+        against their scale, then each bound less than 3 sd from the fit,
+        read as a normal with the mass of the Student t past the bound.
     degrees_of_freedom : dict[str, float]
         The degrees of freedom ``ν_j`` of each parameter: ``blocks − 1`` when
         every block holds the same share of its curvature, fewer when few
@@ -579,15 +589,15 @@ The result of a Laplace mixture: draws of the mixture weighted by the target ove
 
 Attributes:
 
-| Name             | Type                     | Description                                                                                                                                                     |
-| ---------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `fit`            | `CalibrationResult`      | The multi-start fit whose ends made the components: Calibrator.run(starts).                                                                                     |
-| `sample`         | `ParameterSample`        | The draws with their smoothed weights.                                                                                                                          |
-| `components`     | `list[MixtureComponent]` | The components, in order of their objective.                                                                                                                    |
-| `k_hat`          | `float`                  | The Pareto shape of the tail of the weights. Up to 0.5 the weights have a finite variance; above 0.7 the estimate is unreliable.                                |
-| `effective_size` | `float`                  | Kish's effective size of the smoothed weights.                                                                                                                  |
-| `reliable`       | `bool`                   | Whether k_hat is at most 0.7 and no end that gives no component fits at least as well as the worst component. An unreliable sample is also logged as a warning. |
-| `notes`          | `list[str]`              | Ends that gave no component, and an unreliable sample, in words.                                                                                                |
+| Name             | Type                     | Description                                                                                                                                                                                                                  |
+| ---------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fit`            | `CalibrationResult`      | The multi-start fit whose ends made the components: Calibrator.run(starts).                                                                                                                                                  |
+| `sample`         | `ParameterSample`        | The draws with their smoothed weights.                                                                                                                                                                                       |
+| `components`     | `list[MixtureComponent]` | The components, in order of their objective.                                                                                                                                                                                 |
+| `k_hat`          | `float`                  | The Pareto shape of the tail of the weights. Up to 0.5 the weights have a finite variance; above 0.7 the estimate is unreliable.                                                                                             |
+| `effective_size` | `float`                  | Kish's effective size of the smoothed weights.                                                                                                                                                                               |
+| `reliable`       | `bool`                   | Whether k_hat is at most 0.7 and no end that gives no component fits at least as well as the worst component. An unreliable sample is also logged as a warning.                                                              |
+| `notes`          | `list[str]`              | Ends that gave no component, each bound less than 3 sd from the centre of a component, whose skew the importance weights correct as far as k_hat says, and an unreliable sample, in words; each is also logged as a warning. |
 
 Source code in `commol/local/results.py`
 
@@ -617,7 +627,10 @@ class ImportanceResult(ResultModel):
         fits at least as well as the worst component. An unreliable sample is
         also logged as a warning.
     notes : list[str]
-        Ends that gave no component, and an unreliable sample, in words.
+        Ends that gave no component, each bound less than 3 sd from the
+        centre of a component, whose skew the importance weights correct as
+        far as ``k_hat`` says, and an unreliable sample, in words; each is
+        also logged as a warning.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)

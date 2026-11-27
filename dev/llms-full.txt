@@ -6286,7 +6286,7 @@ Both calibrations read the fit `Calibrator.run(starts)`, the best of [several st
 
 Both take a `block_length` that [you choose](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#choose-the-length), and `GibbsResult.block_length` gives it; it is `None` for a number `η`.
 
-Information matching is cheap and local; it needs a sum of smooth terms, so `"rmse"` (a square root of a sum), `"mae"` (no curvature) and a stochastic engine raise a `ValueError` that points to the other choices. `J` and `I` are the curvature and the meat of the [sandwich](https://munqu.github.io/commol/latest/guide/uncertainty/local/#sandwich): `I` sums the scores over blocks, so it holds when the noise depends on its neighbours inside a block, and `block_length` has no default: `block_length=1` gives the independent version, every observation its own block. `I` enters only through a trace, so `η` needs no inverse of `I`: it takes two blocks or more, also fewer blocks than parameters, and blocks can be long enough to hold the dependence. `J` is inverted, so a `J` that the data [do not determine](https://munqu.github.io/commol/latest/guide/uncertainty/local/#the-curvature-and-the-unbounded-scale) raises a `ValueError`. `η` is the same in any unit of the parameters.
+Information matching is cheap and local; it needs a sum of smooth terms, so `"rmse"` (a square root of a sum), `"mae"` (no curvature) and a stochastic engine raise a `ValueError` that points to the other choices. `J` and `I` are the curvature and the meat of the [sandwich](https://munqu.github.io/commol/latest/guide/uncertainty/local/#sandwich): `I` sums the scores over blocks, so it holds when the noise depends on its neighbours inside a block, and `block_length` has no default: `block_length=1` gives the independent version, every observation its own block. `I` enters only through a trace, so `η` needs no inverse of `I`: it takes two blocks or more, also fewer blocks than parameters, and blocks can be long enough to hold the dependence. `J` is inverted, so a `J` that the data [do not determine](https://munqu.github.io/commol/latest/guide/uncertainty/local/#the-curvature-and-the-unbounded-scale) raises a `ValueError`. `η` is the same in any unit of the parameters. `J` is read on the scale of the parameters, not on the unbounded scale of the [local approximations](https://munqu.github.io/commol/latest/guide/uncertainty/local/#the-curvature-and-the-unbounded-scale), so a fit near a bound or on it gives `η` as any other, with no note. The scores of a fit that a bound cuts, one whose optimum lies beyond the bound, do not sum to 0 there, so `η` comes out too small: with 24 values of sd 1 in blocks of 3, where 1 is right, its median over data sets is 0.86, 0.62, 0.41 and 0.20 with the optimum 1, 2, 3 and 5 sd past the bound.
 
 The blocks read at most `p(G − 1)` degrees of freedom `ν` about the scale, for `G` blocks, and fewer when they share the curvature `J` unevenly: a slope, whose curvature sits at the ends of the series, a parameter that the data read in one part of the series only, or a short last block. Information matching corrects for both, with `J_b` the curvature of block `b`: the trace by `p / (p − Σ_b tr((J⁻¹ J_b)²))`, the leverage of the blocks, which is `G/(G − 1)` when each block holds `1/G` of `J`; and `η` by `median(χ²_ν)/ν`, with `ν` the Satterthwaite degrees of freedom of the trace, because `η` is the reciprocal of the trace and comes out too large more often than too small. Its median over data sets is then its value: with noise of sd 1, exactly `1/(2σ²)` for one constant at 24 positions in 2 blocks (`ν = 1`) and 1.02 times it for a line at 24 positions in 3 blocks (`ν ≈ 1.5`), where the trace alone gives 2.2 and 3.7 times.
 
@@ -6474,7 +6474,30 @@ The Fisher information of each observation model (`Noise::information` in `crate
 
 The Hessian steps are `δ^{1/4} · dθ/du` for a parameter with a bound and `δ^{1/4} · max(|θ|, 1)` for one without, where `δ` is the accuracy of the engine (machine precision, or the `rtol` of the ODE engine): the step that balances the truncation error of the differences with the error of the runs, and keeps every run inside the bounds. For a curvature so large that such a step moves the objective near the largest number, the step is shorter, so that by the Gauss–Newton curvature the objective stays a number, as it does for an objective that grows like its quadratic. For a step of `δ^{1/4}` on the unbounded scale, that is from a curvature there of about `4e314` with machine precision, and lower for a coarser engine (`6e309` at `rtol = 1e-6`); the larger step of a parameter without bounds and `|θ|` above 1 is shorter from a smaller curvature. When that step is within the rounding of `θ` or of the predictions of the model at the fit, `"hessian"` raises a `RuntimeError` that says the curvature of the parameter is too large for the Hessian. Each entry of either curvature has an estimated error. An entry whose error is above 1 % of `√(H_jj · H_kk)` is listed in `notes` and logged as a warning. The error is read as a share of a correlation: an off-diagonal entry near 0 is compared with the diagonal of its row and column, not with its own size. A note changes no result. A share above 100 % says that the entry, and any covariance that reads it, is unknown.
 
-Every distribution lives on the **unbounded scale** of the parameters, the scale on which the [sampler](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#how-the-sampler-works) of sequential Monte Carlo proposes its moves. The curvature there is `H_u = D · H · D` with `D = dθ/du` at the fit, and `covariance` is on that scale. Every draw maps back inside the bounds, so a fit near a bound gives a skewed sample, not draws outside it. A fit **on** a bound of its parameter (within `1e-8` of the width of its bounds, or of `max(1, |bound|)` when the parameter has one finite bound) raises a `ValueError`: its variance on the unbounded scale is infinite there, and a [profile likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md) describes it.
+Every distribution lives on the **unbounded scale** of the parameters, the scale on which the [sampler](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#how-the-sampler-works) of sequential Monte Carlo proposes its moves. The curvature there is `H_u = D · H · D` with `D = dθ/du` at the fit, and `covariance` is on that scale. Every draw maps back inside the bounds, so a fit near a bound gives a skewed sample, not draws outside it.
+
+A bound **near** the fit is a note. On the scale of the parameters the sd of parameter `j` is `D_j √Σ_jj`, with `Σ` the covariance of the distribution that is drawn: `H_u⁻¹` for `Laplace`, `(s·H_u)⁻¹` for each component of `LaplaceMixture` (`s` the curvature of its target, 1 for a likelihood), and the sandwich itself for `Sandwich`. The Student t of a sandwich reads the distance of a normal with the same mass past the bound, so with few degrees of freedom a bound beyond 3 units of the scale of the t can be noted: with one degree of freedom, 16.3 units of its scale put the mass of a normal at 2.06 sd past the bound. When a bound is less than 3 sd from the fit, where a normal puts 0.135 % of its mass past it, `notes` names the parameter, the bound and the distance in sd, and the note is logged as a warning. The covariance and `delta_band` still describe the fit there; the sample may not. The normal on the unbounded scale has the sd `1/D_j` times that one, which grows as the inverse of the distance to the bound, so its draws, mapped back, bunch at the bound and spread far from the fit on the other side: with a flat prior and a normal likelihood that the bound cuts, its 90 % intervals are 1.05, 1.18, 1.94 and 6.0 times as wide as the exact ones at 3, 2, 1 and 0.5 sd from the bound. The note of `Laplace` and `Sandwich` points to a [profile likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md), which describes such a parameter, as a posterior sampler does ([Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/index.md)). The importance weights of `LaplaceMixture` correct the skew of its components as far as `k_hat` says, and its note says so.
+
+With the upper bound of `c` at 10.1, 0.9 sd above the fit, the draws reach 0.7 below it, where the interval of the quick path reaches 0.3:
+
+```python
+near = problem.model_copy(
+    update={
+        "parameters": [
+            CalibrationParameter(
+                id="c", parameter_type="parameter", min_bound=0.0, max_bound=10.1
+            )
+        ]
+    }
+)
+near_laplace = Calibrator(Simulation(flow_model("c * A / A")), near).uncertainty(
+    Laplace(draws=2000)
+)
+print([round(value, 2) for value in near_laplace.sample.interval(0.9)["c"]])  # [9.19, 10.08]
+print(near_laplace.notes[0].split(":")[0])  # 'c' is 0.91 sd from its bound 10.1, within 3 sd
+```
+
+A fit **on** a bound of its parameter (within `1e-8` of the width of its bounds, or of `max(1, |bound|)` when the parameter has one finite bound) raises a `ValueError`: its variance on the unbounded scale is infinite there, and a [profile likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md) describes it. Information matching reads its curvature on the scale of the parameters, so it gives `η` near a bound and on it, with no note ([What `η` means](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#what-means)).
 
 `Laplace`, `Sandwich` and information matching raise a `ValueError` for a curvature that the data do not determine: one with a parameter that moves no observation, or with two that the model reads only as their product. `LaplaceMixture` gives no component for such an end and says so in `notes` ([Reading `k_hat`](#reading-k_hat)). With `H` scaled to a diagonal of 1, its smallest eigenvalue is then at most `p·ε` times the largest, for `p` parameters and the machine precision `ε ≈ 2.2e-16`. The unit of a parameter does not change the answer. A window split into parts can read a parameter that its total does not: its diagonal entry is then a rounding, which the rule reads as 0.
 
@@ -6578,7 +6601,7 @@ An unreliable sample calls for a method that samples the posterior itself: `Baye
 
 ## Checklist
 
-- [ ] The fit is a minimum inside the bounds; no `ValueError` names a parameter on its bound.
+- [ ] The fit is a minimum inside the bounds; no `ValueError` names a parameter on its bound, and no note a bound less than 3 sd from it.
 - [ ] `notes` is empty, or you know why an entry of the curvature is uncertain.
 - [ ] A Laplace approximation has a noise model you trust; otherwise use the sandwich.
 - [ ] A sandwich has more blocks with curvature than parameters, of a length that holds the dependence, and `degrees_of_freedom` of each parameter that are not few.
@@ -17398,7 +17421,7 @@ Bases: `UncertaintyMethod[LaplaceResult]`, `RangeChecked`
 
 The Laplace approximation of the problem's observation models: the normal `N(θ̂, H⁻¹)` on the unbounded scale of the parameters, centred on the fit, with `H` the curvature of `−log L` there.
 
-It needs `observation_models`: a loss has no noise scale, so its curvature is no inverse variance (use `Sandwich`). A fit on a bound of its parameter is refused: on the unbounded scale its variance is infinite there.
+It needs `observation_models`: a loss has no noise scale, so its curvature is no inverse variance (use `Sandwich`). A fit on a bound of its parameter is refused: on the unbounded scale its variance is infinite there. A bound less than 3 sd from the fit is a note: the draws, mapped back, are skewed by it.
 
 Attributes:
 
@@ -17420,7 +17443,8 @@ class Laplace(UncertaintyMethod[LaplaceResult], RangeChecked):
     It needs ``observation_models``: a loss has no noise scale, so its
     curvature is no inverse variance (use `Sandwich`). A fit on a bound of
     its parameter is refused: on the unbounded scale its variance is
-    infinite there.
+    infinite there. A bound less than 3 sd from the fit is a note: the draws,
+    mapped back, are skewed by it.
 
     Attributes
     ----------
@@ -17448,7 +17472,7 @@ Bases: `UncertaintyMethod[SandwichResult]`, `RangeChecked`
 
 The sandwich covariance at the fit, with the meat summed over blocks of positions: `√(f_j f_k) · (H⁻¹ Σ_b s̃_b s̃_bᵀ H⁻¹)_jk`, with `s_b` the sum of the gradients of the terms of the observations of block `b`, taken after one Gauss–Newton step to the zero of their sum `g`: `s̃_b = s_b − J_b J⁻¹ g`. The factor `f_j` and the degrees of freedom `ν_j` of each parameter come from the share `J_b` of its Gauss–Newton curvature `J` that each block holds (Bell and McCaffrey, 2002): with equal shares, `f_j = G/(G − 1)` and `ν_j = G − 1` for `G` blocks; a parameter that few blocks read has fewer, and a block with no curvature counts for nothing.
 
-It needs no noise model: with a loss, `H` is the curvature of the loss; with observation models, of `−log L`. It holds when the noise depends on its neighbours inside a block, when its size changes, and when the noise model is wrong but the mean is right. Intervals read the Student t of each parameter, and draws a grouped t whose margins are those t. With no more blocks with curvature than parameters it is refused, since the meat would have rank below them; so it is when the blocks each hold all the curvature of a parameter. `loss_function="mae"` is refused: its sandwich needs a density of the residuals at 0 and a bandwidth (use a bootstrap).
+It needs no noise model: with a loss, `H` is the curvature of the loss; with observation models, of `−log L`. It holds when the noise depends on its neighbours inside a block, when its size changes, and when the noise model is wrong but the mean is right. Intervals read the Student t of each parameter, and draws a grouped t whose margins are those t. With no more blocks with curvature than parameters it is refused, since the meat would have rank below them; so it is when the blocks each hold all the curvature of a parameter. `loss_function="mae"` is refused: its sandwich needs a density of the residuals at 0 and a bandwidth (use a bootstrap). A bound less than 3 sd from the fit is a note: the draws, mapped back, are skewed by it. The distance of its Student t is that of a normal with the same mass past the bound, so with few degrees of freedom a bound beyond 3 units of the scale of the t can be noted.
 
 Attributes:
 
@@ -17484,7 +17508,10 @@ class Sandwich(UncertaintyMethod[SandwichResult], RangeChecked):
     meat would have rank below them; so it is when the blocks each hold all
     the curvature of a parameter. ``loss_function="mae"`` is refused: its
     sandwich needs a density of the residuals at 0 and a bandwidth (use a
-    bootstrap).
+    bootstrap). A bound less than 3 sd from the fit is a note: the draws,
+    mapped back, are skewed by it. The distance of its Student t is that of
+    a normal with the same mass past the bound, so with few degrees of
+    freedom a bound beyond 3 units of the scale of the t can be noted.
 
     Attributes
     ----------
@@ -17517,7 +17544,7 @@ Bases: `UncertaintyMethod[ImportanceResult]`, `RangeChecked`
 
 The Laplace mixture: a Laplace approximation at each distinct optimum of a multi-start fit, weighted by its Laplace evidence, as the proposal of importance sampling of a posterior, with the largest weights smoothed (Pareto-smoothed importance sampling, Vehtari et al. 2024).
 
-The ends of the starts merge into a component when they are closer than one Mahalanobis unit to it. Every draw is weighted by the target over the mixture, on the unbounded scale. `k_hat` says whether the mixture covers the target: above 0.7 the sample is marked unreliable.
+The ends of the starts merge into a component when they are closer than one Mahalanobis unit to it. Every draw is weighted by the target over the mixture, on the unbounded scale. `k_hat` says whether the mixture covers the target: above 0.7 the sample is marked unreliable. A bound less than 3 sd from the centre of a component is a note: it skews the component, which the importance weights correct as far as `k_hat` says.
 
 Attributes:
 
@@ -17541,7 +17568,10 @@ class LaplaceMixture(UncertaintyMethod[ImportanceResult], RangeChecked):
     The ends of the starts merge into a component when they are closer than
     one Mahalanobis unit to it. Every draw is weighted by the target over
     the mixture, on the unbounded scale. ``k_hat`` says whether the mixture
-    covers the target: above 0.7 the sample is marked unreliable.
+    covers the target: above 0.7 the sample is marked unreliable. A bound
+    less than 3 sd from the centre of a component is a note: it skews the
+    component, which the importance weights correct as far as ``k_hat``
+    says.
 
     Attributes
     ----------
@@ -17641,12 +17671,12 @@ What every local approximation returns: a distribution on the unbounded scale of
 
 Attributes:
 
-| Name         | Type                | Description                                                                                                            |
-| ------------ | ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `fit`        | `CalibrationResult` | The fit the approximation is centred on: Calibrator.run(starts).                                                       |
-| `covariance` | `list[list[float]]` | The covariance of the distribution on the unbounded scale of the parameters, in the order of the problem's parameters. |
-| `sample`     | `ParameterSample`   | Draws of the distribution, mapped back to the parameters, with equal weights.                                          |
-| `notes`      | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale; each is also logged as a warning. |
+| Name         | Type                | Description                                                                                                                                                                                                                      |
+| ------------ | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fit`        | `CalibrationResult` | The fit the approximation is centred on: Calibrator.run(starts).                                                                                                                                                                 |
+| `covariance` | `list[list[float]]` | The covariance of the distribution on the unbounded scale of the parameters, in the order of the problem's parameters.                                                                                                           |
+| `sample`     | `ParameterSample`   | Draws of the distribution, mapped back to the parameters, with equal weights.                                                                                                                                                    |
+| `notes`      | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale, then each bound less than 3 sd from the fit, on the scale of the parameters, whose draws the bound skews; each is also logged as a warning. |
 
 Source code in `commol/local/results.py`
 
@@ -17668,7 +17698,9 @@ class LocalResult(ResultModel):
         weights.
     notes : list[str]
         The entries of the curvature whose estimated error is not small
-        against their scale; each is also logged as a warning.
+        against their scale, then each bound less than 3 sd from the fit, on
+        the scale of the parameters, whose draws the bound skews; each is also
+        logged as a warning.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -17865,12 +17897,12 @@ The result of a Laplace approximation: the normal `N(θ̂, Σ)` on the unbounded
 
 Attributes:
 
-| Name         | Type                | Description                                                                          |
-| ------------ | ------------------- | ------------------------------------------------------------------------------------ |
-| `fit`        | `CalibrationResult` | The fit the approximation is centred on: Calibrator.run(starts).                     |
-| `covariance` | `list[list[float]]` | Σ = H⁻¹ on the unbounded scale of the parameters.                                    |
-| `sample`     | `ParameterSample`   | Draws of the normal, mapped back to the parameters, with equal weights.              |
-| `notes`      | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale. |
+| Name         | Type                | Description                                                                                                                       |
+| ------------ | ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `fit`        | `CalibrationResult` | The fit the approximation is centred on: Calibrator.run(starts).                                                                  |
+| `covariance` | `list[list[float]]` | Σ = H⁻¹ on the unbounded scale of the parameters.                                                                                 |
+| `sample`     | `ParameterSample`   | Draws of the normal, mapped back to the parameters, with equal weights.                                                           |
+| `notes`      | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale, then each bound less than 3 sd from the fit. |
 
 Source code in `commol/local/results.py`
 
@@ -17891,7 +17923,7 @@ class LaplaceResult(LocalResult):
         weights.
     notes : list[str]
         The entries of the curvature whose estimated error is not small
-        against their scale.
+        against their scale, then each bound less than 3 sd from the fit.
     """
 ```
 
@@ -17903,15 +17935,15 @@ The result of a sandwich: a Student t on the unbounded scale of the parameters, 
 
 Attributes:
 
-| Name                 | Type                | Description                                                                                                                                     |
-| -------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `fit`                | `CalibrationResult` | The fit the sandwich is centred on: Calibrator.run(starts).                                                                                     |
-| `covariance`         | `list[list[float]]` | The sandwich on the unbounded scale of the parameters.                                                                                          |
-| `sample`             | `ParameterSample`   | Draws of a grouped t, mapped back to the parameters, with equal weights: the margin of each parameter is a Student t of its degrees of freedom. |
-| `notes`              | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale.                                                            |
-| `degrees_of_freedom` | `dict[str, float]`  | The degrees of freedom ν_j of each parameter: blocks − 1 when every block holds the same share of its curvature, fewer when few blocks hold it. |
-| `blocks`             | `int`               | The number of blocks G, those with no curvature included.                                                                                       |
-| `block_length`       | `int`               | The positions per block.                                                                                                                        |
+| Name                 | Type                | Description                                                                                                                                                                                       |
+| -------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fit`                | `CalibrationResult` | The fit the sandwich is centred on: Calibrator.run(starts).                                                                                                                                       |
+| `covariance`         | `list[list[float]]` | The sandwich on the unbounded scale of the parameters.                                                                                                                                            |
+| `sample`             | `ParameterSample`   | Draws of a grouped t, mapped back to the parameters, with equal weights: the margin of each parameter is a Student t of its degrees of freedom.                                                   |
+| `notes`              | `list[str]`         | The entries of the curvature whose estimated error is not small against their scale, then each bound less than 3 sd from the fit, read as a normal with the mass of the Student t past the bound. |
+| `degrees_of_freedom` | `dict[str, float]`  | The degrees of freedom ν_j of each parameter: blocks − 1 when every block holds the same share of its curvature, fewer when few blocks hold it.                                                   |
+| `blocks`             | `int`               | The number of blocks G, those with no curvature included.                                                                                                                                         |
+| `block_length`       | `int`               | The positions per block.                                                                                                                                                                          |
 
 Source code in `commol/local/results.py`
 
@@ -17938,7 +17970,8 @@ class SandwichResult(LocalResult):
         degrees of freedom.
     notes : list[str]
         The entries of the curvature whose estimated error is not small
-        against their scale.
+        against their scale, then each bound less than 3 sd from the fit,
+        read as a normal with the mass of the Student t past the bound.
     degrees_of_freedom : dict[str, float]
         The degrees of freedom ``ν_j`` of each parameter: ``blocks − 1`` when
         every block holds the same share of its curvature, fewer when few
@@ -17967,15 +18000,15 @@ The result of a Laplace mixture: draws of the mixture weighted by the target ove
 
 Attributes:
 
-| Name             | Type                     | Description                                                                                                                                                     |
-| ---------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `fit`            | `CalibrationResult`      | The multi-start fit whose ends made the components: Calibrator.run(starts).                                                                                     |
-| `sample`         | `ParameterSample`        | The draws with their smoothed weights.                                                                                                                          |
-| `components`     | `list[MixtureComponent]` | The components, in order of their objective.                                                                                                                    |
-| `k_hat`          | `float`                  | The Pareto shape of the tail of the weights. Up to 0.5 the weights have a finite variance; above 0.7 the estimate is unreliable.                                |
-| `effective_size` | `float`                  | Kish's effective size of the smoothed weights.                                                                                                                  |
-| `reliable`       | `bool`                   | Whether k_hat is at most 0.7 and no end that gives no component fits at least as well as the worst component. An unreliable sample is also logged as a warning. |
-| `notes`          | `list[str]`              | Ends that gave no component, and an unreliable sample, in words.                                                                                                |
+| Name             | Type                     | Description                                                                                                                                                                                                                  |
+| ---------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fit`            | `CalibrationResult`      | The multi-start fit whose ends made the components: Calibrator.run(starts).                                                                                                                                                  |
+| `sample`         | `ParameterSample`        | The draws with their smoothed weights.                                                                                                                                                                                       |
+| `components`     | `list[MixtureComponent]` | The components, in order of their objective.                                                                                                                                                                                 |
+| `k_hat`          | `float`                  | The Pareto shape of the tail of the weights. Up to 0.5 the weights have a finite variance; above 0.7 the estimate is unreliable.                                                                                             |
+| `effective_size` | `float`                  | Kish's effective size of the smoothed weights.                                                                                                                                                                               |
+| `reliable`       | `bool`                   | Whether k_hat is at most 0.7 and no end that gives no component fits at least as well as the worst component. An unreliable sample is also logged as a warning.                                                              |
+| `notes`          | `list[str]`              | Ends that gave no component, each bound less than 3 sd from the centre of a component, whose skew the importance weights correct as far as k_hat says, and an unreliable sample, in words; each is also logged as a warning. |
 
 Source code in `commol/local/results.py`
 
@@ -18005,7 +18038,10 @@ class ImportanceResult(ResultModel):
         fits at least as well as the worst component. An unreliable sample is
         also logged as a warning.
     notes : list[str]
-        Ends that gave no component, and an unreliable sample, in words.
+        Ends that gave no component, each bound less than 3 sd from the
+        centre of a component, whose skew the importance weights correct as
+        far as ``k_hat`` says, and an unreliable sample, in words; each is
+        also logged as a warning.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -36233,7 +36269,7 @@ Bases: `RangeChecked`
 
 Calibrate `η` by information matching: `η = p / tr(J⁻¹ I)` at the fit, for `p` parameters, with `J` the Gauss–Newton curvature of the objective and `I` the variance of the scores of its terms, summed over blocks of positions as the meat of `Sandwich`: the magnitude adjustment of a composite likelihood (Pauli, Racugno and Ventura 2011). For the sum of squares of a model with Gaussian noise of variance `σ²` it estimates `1/(2σ²)`; for a correct observation model, 1.
 
-It needs `loss_function="sse"` or observation models, a deterministic engine and a curvature that the data determine, and is cheap and local. `η` is the same in any unit of the parameters. The variance sums the scores over blocks of positions, so it holds under dependence inside a block, and enters only through a trace, so it takes two blocks or more, also fewer blocks than parameters. The trace is corrected by the share of the curvature each block holds, and `η` by the degrees of freedom the blocks read, so that its median over data sets is its value also with blocks that share the curvature unevenly; with few degrees of freedom one data set still gives an `η` far from it, and intervals of a high level that cover less than it. `GibbsResult.degrees_of_freedom` gives them, and a note of its diagnostics the coverage to expect when they are below 10.
+It needs `loss_function="sse"` or observation models, a deterministic engine and a curvature that the data determine, and is cheap and local. `η` is the same in any unit of the parameters, and the curvature is read on their scale, so a fit near a bound or on it gives `η` too; the scores of a fit that a bound cuts do not sum to 0, so `η` comes out too small there. The variance sums the scores over blocks of positions, so it holds under dependence inside a block, and enters only through a trace, so it takes two blocks or more, also fewer blocks than parameters. The trace is corrected by the share of the curvature each block holds, and `η` by the degrees of freedom the blocks read, so that its median over data sets is its value also with blocks that share the curvature unevenly; with few degrees of freedom one data set still gives an `η` far from it, and intervals of a high level that cover less than it. `GibbsResult.degrees_of_freedom` gives them, and a note of its diagnostics the coverage to expect when they are below 10.
 
 Attributes:
 
@@ -36257,17 +36293,19 @@ class InformationMatchingEta(RangeChecked):
 
     It needs ``loss_function="sse"`` or observation models, a deterministic
     engine and a curvature that the data determine, and is cheap and local.
-    `η` is the same in any unit of the parameters. The variance sums the
-    scores over blocks of positions, so it holds under dependence inside a
-    block, and enters only through a trace, so it takes two blocks or more,
-    also fewer blocks than parameters. The trace is corrected by the share
-    of the curvature each block holds, and `η` by the degrees of freedom the
-    blocks read, so that its median over data sets is its value also with
-    blocks that share the curvature unevenly; with few degrees of freedom
-    one data set still gives an `η` far from it, and intervals of a high
-    level that cover less than it. `GibbsResult.degrees_of_freedom` gives
-    them, and a note of its diagnostics the coverage to expect when they are
-    below 10.
+    `η` is the same in any unit of the parameters, and the curvature is read
+    on their scale, so a fit near a bound or on it gives `η` too; the scores
+    of a fit that a bound cuts do not sum to 0, so `η` comes out too small
+    there. The variance sums the scores over blocks of positions, so it
+    holds under dependence inside a block, and enters only through a trace,
+    so it takes two blocks or more, also fewer blocks than parameters. The
+    trace is corrected by the share of the curvature each block holds, and
+    `η` by the degrees of freedom the blocks read, so that its median over
+    data sets is its value also with blocks that share the curvature
+    unevenly; with few degrees of freedom one data set still gives an `η`
+    far from it, and intervals of a high level that cover less than it.
+    `GibbsResult.degrees_of_freedom` gives them, and a note of its
+    diagnostics the coverage to expect when they are below 10.
 
     Attributes
     ----------
@@ -41031,6 +41069,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- `Laplace`, `Sandwich` and `LaplaceMixture` note each bound less than 3 sd from the fit, on the scale of the parameters, with the sd of the distribution that is drawn: the sandwich reads its own covariance, and its Student t as the normal of the same mass past the bound. The note names the parameter, the bound and the distance in sd, and is logged as a warning; the note of the mixture says that its importance weights correct the skew as far as `k_hat` says. The draws of `Laplace` and `Sandwich`, mapped back from the unbounded scale, are skewed there: with a fit of sd 0.2 at 10 and a bound at `10 · (1 + 1e-3)`, the 90 % interval of the draws of `Laplace` ran from `3e-11` to `10.01`, with no note. A fit is refused only on its bound, as before. `InformationMatchingEta` reads its curvature on the scale of the parameters, so it gives `η` for a fit on its bound too, where it raised a `ValueError`; the scores of a fit that a bound cuts do not sum to 0, so `η` comes out too small there. See [The curvature and the unbounded scale](https://munqu.github.io/commol/latest/guide/uncertainty/local/#the-curvature-and-the-unbounded-scale).
 - `Sandwich` reads its factor and its degrees of freedom from the curvature of each block, so a block with no curvature, such as a window of observations that carry no information, counts for nothing, and a parameter read in few blocks gets wide enough intervals. Before, a block of observations with no information counted as one that reads the parameters: two blocks with curvature and two without, for two parameters, gave a correlation of `−0.9999994`, and a parameter read in 2 of 8 blocks had intervals of 90 % that covered about 61 %, as every parameter read a t of `blocks − 1`. A sandwich with no more blocks with curvature than parameters (a block that holds more than `10⁻¹⁰` of the curvature), with blocks that each hold all the curvature of a parameter, or with block scores of rank below the parameters, which gave draws of correlation 1, is refused with a message that suggests another block length. The rank holds for a fit an optimizer returns: each block's scores are read after one step to the zero of their sum, so the covariance does not follow the error of the fit. `LocalResult.delta_band` of a sandwich gives each output at each position the degrees of freedom of its own direction. See [Sandwich](https://munqu.github.io/commol/latest/guide/uncertainty/local/#sandwich).
 - `curvature="hessian"` gives the covariance of a parameter whose curvature is so large that its steps moved the objective above the largest number: for a parameter in `[0, 100]` read by an observation of scale `1e156`, a variance of `4.0e-318`, as Gauss–Newton gives, where it raised a `RuntimeError` of an infeasible point whose objective is not a finite number. Its step is the shorter of `δ^{1/4} · dθ/du` (`δ^{1/4} · max(|θ|, 1)` without bounds) and the one that keeps the objective a number by the Gauss–Newton curvature. For a step of `δ^{1/4}` on the unbounded scale, the step is shorter only where the curvature there is within a factor of about 15 of the one at which the objective overflowed, from about `4e314` with an accuracy `δ` of machine precision and lower for a coarser engine (`6e309` at `δ = 1e-6`); the larger step of a parameter without bounds and `|θ|` above 1 is shorter from a smaller curvature. A Hessian there can change. When the shorter step is within the rounding of the parameter or of the predictions of the model at the fit, the `RuntimeError` names the parameter and says that its curvature is too large for the Hessian, and which rounding hides the step. See [The curvature and the unbounded scale](https://munqu.github.io/commol/latest/guide/uncertainty/local/#the-curvature-and-the-unbounded-scale).
 - The robust portmanteau `Q̃` of `series_dependence`, and of `residual_dependence` with `AtParameters` and `NoNoise()`, holds its level at every `max_lag`. Its p-value is `(1 + #{Q_b ≥ Q}) / (replicates + 1)` over `replicates` permutations of the values of each series over its positions, the exact law of `Q̃` for independent values of one law. A replicate within a relative `10⁻¹⁰` of `Q` counts as reaching it. This tie also changes the p-values of the information factor, of `Refitted` and of `DistributionNoise()`. The sets of signs all +1 or all −1 give the observed statistic up to rounding, and they now count as reaching it. At 5 %, independent normal and `t₃` values of 6 to 100 positions, with or without gaps, reject in 4.2 to 6.0 %, and skewed values in 4.4 to 5.4 %. Before, `Q̃` was read against `χ²`, which rejected 0.2 % of series of 5 values, 2 % of 8, 7.5 % of 35 at `max_lag=17`, 11 % of skewed values at 100 positions and 11 % of values 0 or 1. The p-value now depends on `replicates` and `seed`, and fewer than 19 replicates never reject at 5 %. A spread that grows 30 times along a series still rejects up to 10.4 % below 20 values, and more with gaps or skewed values. The guide gives the cases in [The law of `Q̃`](https://munqu.github.io/commol/latest/guide/uncertainty/dependence/#the-law-of-q). In Rust, the stream `Stream::DependencePermutations` draws the permutations, and each series draws from a generator of its own label (`commol_random::label_seed`). So the p-value of a series does not change when other series join the call or change order.

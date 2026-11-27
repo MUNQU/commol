@@ -3356,6 +3356,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../bounds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fits Near a Bound
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../profiles/" class="md-nav__link">
         
   
@@ -4110,10 +4138,10 @@ methods of <a href="../local-approximations/">Local approximations</a> and for i
 matching.</p>
 <h2 id="the-curvature-lives-on-the-unbounded-scale">The curvature lives on the unbounded scale<a class="headerlink" href="#the-curvature-lives-on-the-unbounded-scale" title="Permanent link">&para;</a></h2>
 <p><code>Curvature</code> (<code>crates/commol-inference/src/local/curvature.rs</code>) describes
-<code>H_u = D · H_θ · D</code>, with <code>D = dθ/du</code> at the fit on the scale of
-<code>Transform</code> (<code>transform.rs</code>: a logit with two bounds, a log with one, the
-identity with none), centred on the fit mapped to that scale, with no
-curvature of the log Jacobian. It holds <code>H_u</code> in units of its parameters
+<code>H_u = D · H_θ · D</code>, with <code>D = dθ/du</code> at the fit on the scale of <code>Transform</code>
+(<code>transform.rs</code>: a logit with two bounds, a log with one, the identity with
+none), centred on the fit mapped to that scale, with no curvature of the log
+Jacobian; information matching reads it on the <a href="../bounds/#information-matching-reads-the-curvature-on-the-scale-of-the-parameters">scale of the parameters</a>. It holds <code>H_u</code> in units of its parameters
 (<a href="#the-curvature-is-kept-in-units-of-its-parameters">below</a>). Every draw maps back with <code>from_unbounded</code>,
 so it lies inside the bounds; every density on that scale, as the importance
 weights of the mixture, adds <code>log_jacobian</code>. A fit on a bound is refused with
@@ -4125,7 +4153,7 @@ comes from the optimizer: Nelder-Mead searches on a sine (<code>SineTransform</c
 coordinate, which approaches a bound quadratically in <code>u</code> and ends about
 <code>1e-15</code> of the width from it; <code>1e-8</code> of the width is a step <code>δu ≈ 2e-4</code>, far
 below any posterior spread. The mixture skips such an end
-(<a href="../local-approximations/#an-end-that-gives-no-component-is-noted">Local approximations</a>).</p>
+(<a href="../local-approximations/#an-end-that-gives-no-component-is-noted">Local approximations</a>), and a bound <a href="../bounds/">near a fit</a> is a note.</p>
 <table>
 <thead>
 <tr>
@@ -4135,8 +4163,8 @@ below any posterior spread. The mixture skips such an end
 </thead>
 <tbody>
 <tr>
-<td>The scale of the parameters</td>
-<td>A normal there puts mass outside the bounds near them.</td>
+<td>The scale of the parameters, for a distribution that is drawn</td>
+<td>A normal there puts mass outside the bounds near them; information matching draws nothing.</td>
 </tr>
 <tr>
 <td>A truncated normal on the scale of the parameters</td>
